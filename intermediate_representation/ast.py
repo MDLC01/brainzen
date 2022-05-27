@@ -25,7 +25,7 @@ class NamespaceElement(ABC):
 
 
 class SubroutineArgument:
-    __slots__ = ['location', 'identifier', 'type']
+    __slots__ = 'location', 'identifier', 'type'
 
     def __init__(self, location: Location, identifier: str, variable_type: DataType) -> None:
         self.location = location

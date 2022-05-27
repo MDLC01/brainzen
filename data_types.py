@@ -45,7 +45,7 @@ class DataType(ABC):
 
 
 class PrimitiveType(DataType):
-    __slots__ = ['identifier', '_size']
+    __slots__ = 'identifier', '_size'
 
     _types: dict[str, 'PrimitiveType'] = {}
 
@@ -85,7 +85,7 @@ class PrimitiveType(DataType):
 
 
 class ArrayType(DataType):
-    __slots__ = ['base_type', 'count']
+    __slots__ = 'base_type', 'count'
 
     @classmethod
     def string(cls, length: int):

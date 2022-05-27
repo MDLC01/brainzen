@@ -2,7 +2,7 @@ import sys
 
 
 class Location:
-    __slots__ = ['file', 'line', 'column', 'length']
+    __slots__ = 'file', 'line', 'column', 'length'
 
     @classmethod
     def unknown(cls) -> 'Location':

@@ -12,7 +12,7 @@ def generate_unique_identifier() -> str:
 
 
 class IdentifierInfo:
-    __slots__ = ['type', 'index', 'identifier', 'is_pointer']
+    __slots__ = 'type', 'index', 'identifier', 'is_pointer'
 
     def __init__(self, variable_type: DataType, index: int, identifier: str, is_pointer: bool = False) -> None:
         self.type = variable_type
