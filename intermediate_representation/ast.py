@@ -443,15 +443,16 @@ class ASTGenerator:
 
     def parse_and_define_constant(self) -> None:
         # Parse constant
-        location = self._expect(HashToken).location
+        start_location = self._expect(HashToken).location
         identifier = self._expect(IdentifierToken).name
         self._expect(EqualToken)
         expression = self.parse_expression()
         self._expect(SemicolonToken)
         # Add to list of available constants
+        location = self._location_from(start_location)
         if identifier in self.constants:
             message = f'Constant {identifier!r} is already defined at {self.constants[identifier].location!r}'
-            raise CompilationException(location.with_length(len(identifier) + 1), message)
+            raise CompilationException(location, message)
         self.constants[identifier] = Constant(location, identifier, expression)
 
     def parse_subroutine_argument_declaration(self) -> list[SubroutineArgument]:
