@@ -53,7 +53,7 @@ This section contains examples of basic programs and subroutines written in Brai
 ### Hello world
 
 ```brainzen
-void main() {
+proc main() {
     print("Hello, World!");
 }
 ```
@@ -63,7 +63,7 @@ void main() {
 The following procedure prints the passed number in base 10.
 
 ```brainzen
-void print10(char n) {
+proc print10(char n) {
     char d2 = n / 100;
     char d1 = (n / 10) % 10;
     char d0 = n % 10;
@@ -76,7 +76,7 @@ void print10(char n) {
 ### Truth machine
 
 ```braiznen
-void main() {
+proc main() {
     char i = input();
     if (i == '0') {
         print('0');
@@ -91,7 +91,7 @@ void main() {
 The following function computes the `n`th number of the [Fibonacci sequence](https://en.wikipedia.org/wiki/Fibonacci_number).
 
 ```brainzen
-char fibonacci(char n) {
+func fibonacci(char n) -> char {
     char a = 0;
     char b = 1;
     loop (n) {
@@ -106,7 +106,7 @@ char fibonacci(char n) {
 ### Fizz Buzz
 
 ```brainzen
-void fizzbuzz(char n) {
+proc fizzbuzz(char n) {
     char i = 1;
     loop (n) {
         if (i % 3 == 0 && i % 5 == 0) {

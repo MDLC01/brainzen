@@ -6,14 +6,23 @@ from intermediate_representation import SubroutineArgument
 
 
 class SubroutineSignature:
-    __slots__ = ['arguments', 'return_type']
+    __slots__ = 'arguments', 'return_type'
 
-    def __init__(self, arguments: list[SubroutineArgument], return_type: DataType) -> None:
-        self.arguments: list[SubroutineArgument] = arguments
-        self.return_type: DataType = return_type
+    def __init__(self, arguments: list[SubroutineArgument], return_type: DataType | None = None) -> None:
+        self.arguments = arguments
+        self.return_type = return_type
 
     def get_argument_types(self) -> list[DataType]:
         return [argument.type for argument in self.arguments]
+
+    def is_function(self) -> bool:
+        return self.return_type is not None
+
+    def __repr__(self) -> str:
+        arguments = ', '.join(str(argument) for argument in self.arguments)
+        if self.is_function():
+            return f'({arguments}) -> {self.return_type}'
+        return f'({arguments}) -> void'
 
 
 class VariableScope:
@@ -55,37 +64,11 @@ class VariableScope:
         return False
 
 
-class TypingContext:
-    def __init__(self) -> None:
-        self.subroutines: dict[str, SubroutineSignature] = {}
-        self.variables: VariableScope = VariableScope()
-        self.current_subroutine_identifier: str | None = None
-        self.current_subroutine_signature: SubroutineSignature | None = None
-
-    def start_subroutine_definition(self, identifier: str, signature: SubroutineSignature) -> None:
-        if self.current_subroutine_identifier is not None:
-            raise CompilerException('Can not start subroutine definition because the previous one has not ended')
-        self.current_subroutine_identifier = identifier
-        self.current_subroutine_signature = signature
-
-    def end_subroutine_definition(self) -> None:
-        if self.current_subroutine_identifier is None:
-            raise CompilerException('Can not end subroutine definition because it was never started')
-        self.subroutines[self.current_subroutine_identifier] = self.current_subroutine_signature
-        self.current_subroutine_identifier = None
-        self.current_subroutine_signature = None
+class SubroutineTypingContext:
+    def __init__(self, subroutines: dict[str, SubroutineSignature]) -> None:
+        self.subroutines = subroutines
         self.variables = VariableScope()
-
-    def get_variable_type(self, location: Location, identifier: str) -> DataType:
-        if identifier in self.variables:
-            return self.variables[identifier]
-        raise CompilationException(location, f'Variable {identifier!r} is not defined')
-
-    def open_scope(self) -> None:
-        self.variables = self.variables.make_child()
-
-    def close_scope(self) -> None:
-        self.variables = self.variables.parent
+        self.expected_return_type: DataType | None = None
 
     def get_subroutine_argument_types(self, location: Location, identifier: str) -> list[DataType]:
         if identifier in self.subroutines:
@@ -94,24 +77,32 @@ class TypingContext:
 
     def get_function_return_type(self, location: Location, identifier: str) -> DataType:
         if identifier in self.subroutines:
-            return_type = self.subroutines[identifier].return_type
-            if return_type.is_void():
-                raise CompilationException(location, f'{identifier!r} is not a function (marked as void)')
-            return return_type
+            subroutine = self.subroutines[identifier]
+            if not subroutine.is_function():
+                raise CompilationException(location, f'Subroutine {identifier!r} is not a function')
+            return subroutine.return_type
+        raise CompilationException(location, f'Function {identifier!r} does not exist')
 
-        raise CompilationException(location, f'Subroutine {identifier!r} is not defined')
+    def get_variable_type(self, location: Location, identifier: str) -> DataType:
+        if identifier in self.variables:
+            return self.variables[identifier]
+        raise CompilationException(location, f'Variable {identifier!r} is not defined')
 
     def add_variable(self, location: Location, identifier: str, variable_type: DataType) -> None:
         if self.variables.is_shadow(identifier):
             CompilationWarning.add(location, f'Declaration of {identifier!r} shadows variable from outer scope')
         elif identifier in self.variables:
-            original_type = self.variables[identifier]
-            if original_type == variable_type:
-                CompilationWarning.add(location, f'Redeclaration of variable {identifier!r} (type unchanged)')
-            else:
-                CompilationWarning.add(location, f'Redeclaration of variable {identifier!r} (type changed from'
-                                                 f' {original_type} to {variable_type})')
+            CompilationWarning.add(location, f'Redeclaration of variable {identifier!r}')
         self.variables[identifier] = variable_type
 
+    def open_scope(self) -> None:
+        self.variables = self.variables.make_child()
 
-__all__ = ['SubroutineArgument', 'SubroutineSignature', 'TypingContext']
+    def close_scope(self) -> None:
+        self.variables = self.variables.parent
+
+    def __repr__(self) -> str:
+        return repr(self.__dict__)
+
+
+__all__ = ['SubroutineArgument', 'SubroutineSignature', 'SubroutineTypingContext']

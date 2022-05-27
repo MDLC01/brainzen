@@ -5,12 +5,12 @@ from data_types import *
 from exceptions import *
 from intermediate_representation.instructions import *
 from operations import BinaryOperation, UnaryOperation
-from type_checking.typing_context import TypingContext
+from type_checking.typing_context import SubroutineTypingContext
 
 
 class TypeCheckedInstruction(ABC):
     @staticmethod
-    def from_instruction(context: TypingContext, instruction: Instruction) -> 'TypeCheckedInstruction':
+    def from_instruction(context: SubroutineTypingContext, instruction: Instruction) -> 'TypeCheckedInstruction':
         match instruction:
             case InstructionBlock() as instruction_block:
                 return TypeCheckedInstructionBlock(context, instruction_block)
@@ -65,7 +65,7 @@ class TypeCheckedInstruction(ABC):
 
 
 class TypeCheckedInstructionBlock(TypeCheckedInstruction):
-    def __init__(self, context: TypingContext, instruction_block: InstructionBlock) -> None:
+    def __init__(self, context: SubroutineTypingContext, instruction_block: InstructionBlock) -> None:
         super().__init__(instruction_block.location)
         self._may_return: bool = False
         self._may_break: bool = False
@@ -74,7 +74,8 @@ class TypeCheckedInstructionBlock(TypeCheckedInstruction):
         self.instructions: list[TypeCheckedInstruction] = self._type_check(context, instruction_block.instructions)
         context.close_scope()
 
-    def _type_check(self, context: TypingContext, instructions: list[Instruction]) -> list[TypeCheckedInstruction]:
+    def _type_check(self, context: SubroutineTypingContext,
+                    instructions: list[Instruction]) -> list[TypeCheckedInstruction]:
         type_checked_instructions: list[TypeCheckedInstruction] = []
         for instruction in instructions:
             type_checked_instruction = TypeCheckedInstruction.from_instruction(context, instruction)
@@ -116,7 +117,7 @@ class TypedExpression(TypeCheckedInstruction, ABC):
     """An expression whose type is known."""
 
     @staticmethod
-    def from_expression(context: TypingContext, expression: Expression) -> 'TypedExpression':
+    def from_expression(context: SubroutineTypingContext, expression: Expression) -> 'TypedExpression':
         match expression:
             case Char() as char:
                 return LiteralChar.from_char(char)
@@ -175,16 +176,26 @@ class LiteralChar(TypedExpression):
 
 
 class LiteralArray(TypedExpression):
+    class EmptyType(DataType):
+        def size(self) -> int:
+            return 0
+
+        def __eq__(self, other) -> bool:
+            return isinstance(other, type(self))
+
+        def __repr__(self) -> str:
+            return repr(type(self))
+
     @classmethod
-    def from_array(cls, context: TypingContext, array: Array) -> 'LiteralArray':
+    def from_array(cls, context: SubroutineTypingContext, array: Array) -> 'LiteralArray':
         return cls(array.location, [TypedExpression.from_expression(context, expression) for expression in array.value])
 
     def __init__(self, location: Location, value: list[TypedExpression]) -> None:
         super().__init__(location)
         self.value: list[TypedExpression] = value
-        self.content_type: DataType = Types.VOID
+        self.content_type: DataType = LiteralArray.EmptyType()
         for element in self.value:
-            if self.content_type == Types.VOID:
+            if self.content_type == LiteralArray.EmptyType():
                 self.content_type = element.type()
             elif element.type() != self.content_type:
                 message = f'Expected element of type {self.content_type} but found {element.type()}'
@@ -222,7 +233,7 @@ class LiteralArray(TypedExpression):
 
 
 class TypedIdentifier(TypedExpression):
-    def __init__(self, context: TypingContext, identifier: Identifier) -> None:
+    def __init__(self, context: SubroutineTypingContext, identifier: Identifier) -> None:
         super().__init__(identifier.location)
         self.name = identifier.name
         self._type: DataType = context.get_variable_type(self.location, self.name)
@@ -259,7 +270,7 @@ class TypedArithmeticExpression(TypedExpression, ABC):
 
 
 class TypedUnaryArithmeticExpression(TypedArithmeticExpression):
-    def __init__(self, context: TypingContext, expression: UnaryArithmeticExpression) -> None:
+    def __init__(self, context: SubroutineTypingContext, expression: UnaryArithmeticExpression) -> None:
         super().__init__(expression.location)
         self.operation: UnaryOperation = expression.operation
         self.operand = TypedExpression.from_expression(context, expression.operand)
@@ -280,7 +291,7 @@ class TypedUnaryArithmeticExpression(TypedArithmeticExpression):
 
 
 class TypedBinaryArithmeticExpression(TypedArithmeticExpression):
-    def __init__(self, context: TypingContext, expression: BinaryArithmeticExpression) -> None:
+    def __init__(self, context: SubroutineTypingContext, expression: BinaryArithmeticExpression) -> None:
         super().__init__(expression.location)
         self.operation: BinaryOperation = expression.operation
         self.left = TypedExpression.from_expression(context, expression.left)
@@ -351,7 +362,7 @@ class TypedBinaryArithmeticExpression(TypedArithmeticExpression):
 
 
 class TypedArrayAccessExpression(TypedExpression):
-    def __init__(self, context: TypingContext, array_access_expression: ArrayAccessExpression) -> None:
+    def __init__(self, context: SubroutineTypingContext, array_access_expression: ArrayAccessExpression) -> None:
         super().__init__(array_access_expression.location)
         self.array = TypedExpression.from_expression(context, array_access_expression.array)
         self.index = array_access_expression.index
@@ -380,14 +391,15 @@ class TypedArrayAccessExpression(TypedExpression):
 
 
 class PrintCall(TypeCheckedInstruction):
-    def __init__(self, context: TypingContext, procedure_call: ProcedureCall, new_line: bool = False) -> None:
+    def __init__(self, context: SubroutineTypingContext, procedure_call: ProcedureCall, new_line: bool = False) -> None:
         super().__init__(procedure_call.location)
         self.new_line = new_line
         self.procedure = 'println' if new_line else 'print'
         # Type checking
         self.arguments: list[TypedExpression] = self._type_check_arguments(context, procedure_call.arguments)
 
-    def _type_check_arguments(self, context: TypingContext, arguments: list[Expression]) -> list[TypedExpression]:
+    def _type_check_arguments(self, context: SubroutineTypingContext,
+                              arguments: list[Expression]) -> list[TypedExpression]:
         typed_arguments: list[TypedExpression] = []
         for argument in arguments:
             typed_argument = TypedExpression.from_expression(context, argument)
@@ -429,13 +441,14 @@ class InputCall(TypedExpression):
 
 
 class TypeCheckedProcedureCall(TypeCheckedInstruction):
-    def __init__(self, context: TypingContext, procedure_call: ProcedureCall) -> None:
+    def __init__(self, context: SubroutineTypingContext, procedure_call: ProcedureCall) -> None:
         super().__init__(procedure_call.location)
         self.identifier: str = procedure_call.identifier
         # Type checking
         self.arguments: list[TypedExpression] = self._type_check_arguments(context, procedure_call.arguments)
 
-    def _type_check_arguments(self, context: TypingContext, arguments: list[Expression]) -> list[TypedExpression]:
+    def _type_check_arguments(self, context: SubroutineTypingContext,
+                              arguments: list[Expression]) -> list[TypedExpression]:
         expected_types = context.get_subroutine_argument_types(self.location, self.identifier)
         if len(arguments) != len(expected_types):
             argument_count = f'{len(expected_types)} argument'
@@ -465,7 +478,7 @@ class TypeCheckedProcedureCall(TypeCheckedInstruction):
 
 
 class TypedFunctionCall(TypeCheckedProcedureCall, TypedExpression):
-    def __init__(self, context: TypingContext, function_call: FunctionCall) -> None:
+    def __init__(self, context: SubroutineTypingContext, function_call: FunctionCall) -> None:
         super().__init__(context, function_call)
         # Type checking
         self.return_type: DataType = context.get_function_return_type(function_call.location, function_call.identifier)
@@ -478,7 +491,7 @@ class TypedFunctionCall(TypeCheckedProcedureCall, TypedExpression):
 
 
 class TypeCheckedIncrementation(TypeCheckedInstruction):
-    def __init__(self, context: TypingContext, incrementation: Incrementation) -> None:
+    def __init__(self, context: SubroutineTypingContext, incrementation: Incrementation) -> None:
         super().__init__(incrementation.location)
         self.identifier = incrementation.identifier
         variable_type = context.get_variable_type(incrementation.location, self.identifier)
@@ -494,7 +507,7 @@ class TypeCheckedIncrementation(TypeCheckedInstruction):
 
 
 class TypeCheckedDecrementation(TypeCheckedInstruction):
-    def __init__(self, context: TypingContext, decrementation: Decrementation) -> None:
+    def __init__(self, context: SubroutineTypingContext, decrementation: Decrementation) -> None:
         super().__init__(decrementation.location)
         self.identifier = decrementation.identifier
         variable_type = context.get_variable_type(decrementation.location, self.identifier)
@@ -510,7 +523,7 @@ class TypeCheckedDecrementation(TypeCheckedInstruction):
 
 
 class TypeCheckedVariableDeclaration(TypeCheckedInstruction):
-    def __init__(self, context: TypingContext, variable_declaration: VariableDeclaration) -> None:
+    def __init__(self, context: SubroutineTypingContext, variable_declaration: VariableDeclaration) -> None:
         super().__init__(variable_declaration.location)
         self.identifier: str = variable_declaration.identifier
         self.type: DataType = variable_declaration.type
@@ -532,7 +545,7 @@ class TypeCheckedVariableDeclaration(TypeCheckedInstruction):
 
 
 class TypeCheckedAssignment(TypeCheckedInstruction):
-    def __init__(self, context: TypingContext, assignment: Assignment) -> None:
+    def __init__(self, context: SubroutineTypingContext, assignment: Assignment) -> None:
         super().__init__(assignment.location)
         self.identifier: str = assignment.identifier
         self.value: TypedExpression = TypedExpression.from_expression(context, assignment.value)
@@ -549,7 +562,7 @@ class TypeCheckedAssignment(TypeCheckedInstruction):
 
 
 class TypeCheckedArrayAssignment(TypeCheckedInstruction):
-    def __init__(self, context: TypingContext, array_assignment: ArrayAssignment) -> None:
+    def __init__(self, context: SubroutineTypingContext, array_assignment: ArrayAssignment) -> None:
         super().__init__(array_assignment.location)
         self.identifier: str = array_assignment.identifier
         self.offset: int = 0
@@ -583,7 +596,7 @@ class TypeCheckedArrayAssignment(TypeCheckedInstruction):
 
 
 class TypeCheckedLoopStatement(TypeCheckedInstruction):
-    def __init__(self, context: TypingContext, loop_statement: LoopStatement) -> None:
+    def __init__(self, context: SubroutineTypingContext, loop_statement: LoopStatement) -> None:
         super().__init__(loop_statement.location)
         self.count: TypedExpression = TypedExpression.from_expression(context, loop_statement.count)
         self.body: TypeCheckedInstructionBlock = TypeCheckedInstructionBlock(context, loop_statement.body)
@@ -602,7 +615,7 @@ class TypeCheckedLoopStatement(TypeCheckedInstruction):
 
 
 class TypeCheckedWhileLoopStatement(TypeCheckedInstruction):
-    def __init__(self, context: TypingContext, while_loop_statement: WhileLoopStatement) -> None:
+    def __init__(self, context: SubroutineTypingContext, while_loop_statement: WhileLoopStatement) -> None:
         super().__init__(while_loop_statement.location)
         self.test: TypedExpression = TypedExpression.from_expression(context, while_loop_statement.test)
         self.body: TypeCheckedInstructionBlock = TypeCheckedInstructionBlock(context, while_loop_statement.body)
@@ -621,7 +634,7 @@ class TypeCheckedWhileLoopStatement(TypeCheckedInstruction):
 
 
 class TypeCheckedForLoopStatement(TypeCheckedInstruction):
-    def __init__(self, context: TypingContext, for_loop_statement: ForLoopStatement) -> None:
+    def __init__(self, context: SubroutineTypingContext, for_loop_statement: ForLoopStatement) -> None:
         super().__init__(for_loop_statement.location)
         self.loop_type = for_loop_statement.loop_type
         self.loop_variable = for_loop_statement.loop_variable
@@ -649,7 +662,7 @@ class TypeCheckedForLoopStatement(TypeCheckedInstruction):
 
 
 class TypeCheckedConditionalStatement(TypeCheckedInstruction):
-    def __init__(self, context: TypingContext, statement: ConditionalStatement) -> None:
+    def __init__(self, context: SubroutineTypingContext, statement: ConditionalStatement) -> None:
         super().__init__(statement.location)
         self.test: TypedExpression = TypedExpression.from_expression(context, statement.test)
         self.if_body: TypeCheckedInstructionBlock = TypeCheckedInstructionBlock(context, statement.if_body)
@@ -675,12 +688,12 @@ class TypeCheckedConditionalStatement(TypeCheckedInstruction):
 
 
 class TypeCheckedReturnInstruction(TypeCheckedInstruction):
-    def __init__(self, context: TypingContext, instruction: ReturnInstruction) -> None:
+    def __init__(self, context: SubroutineTypingContext, instruction: ReturnInstruction) -> None:
         super().__init__(instruction.location)
         self.value: TypedExpression = TypedExpression.from_expression(context, instruction.value)
         # Type checking
-        if self.value.type() != context.current_subroutine_signature.return_type:
-            message = f'Expected {context.current_subroutine_signature.return_type} but found {self.value.type()}'
+        if self.value.type() != context.expected_return_type:
+            message = f'Expected {context.expected_return_type} but found {self.value.type()}'
             raise CompilationException(self.location, message)
 
     def may_return(self) -> bool:

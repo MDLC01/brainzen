@@ -6,9 +6,6 @@ from exceptions import *
 class DataType(ABC):
     """A type for variables, functions and subroutine arguments."""
 
-    def is_void(self) -> bool:
-        return self.size() == 0
-
     def is_string(self) -> bool:
         if isinstance(self, ArrayType):
             return self.base_type.is_string()
@@ -97,8 +94,6 @@ class ArrayType(DataType):
     def __init__(self, base_type: DataType, size: int | None) -> None:
         self.base_type = base_type
         self.count = size
-        if self.base_type.is_void():
-            raise CompilationException(Location.unknown(), f'Invalid type: {self}')
         if size < 1:
             raise CompilationException(Location.unknown(), 'An array must contain at least 1 element')
 
@@ -115,7 +110,6 @@ class ArrayType(DataType):
 
 
 class Types:
-    VOID = PrimitiveType('void', 0)
     CHAR = PrimitiveType('char', 1)
 
 

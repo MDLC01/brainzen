@@ -22,11 +22,11 @@ class SubroutineCompiler(ScopeManager):
     The return value of a function is defined by the position of the pointer when it ends.
     """
 
-    def __init__(self, subroutine: TypeCheckedSubroutine, context: dict[str, 'SubroutineCompiler'], *,
+    def __init__(self, subroutine: TypeCheckedProcedure, context: dict[str, 'SubroutineCompiler'], *,
                  comment_level: int = CommentLevel.BZ_CODE) -> None:
         super().__init__()
         self.context: dict[str, SubroutineCompiler] = context
-        self.subroutine: TypeCheckedSubroutine = subroutine
+        self.subroutine: TypeCheckedProcedure = subroutine
         self.comment_level: int = comment_level
         self.bf_code: str = ''
         self.index: int = 0
@@ -44,13 +44,15 @@ class SubroutineCompiler(ScopeManager):
         """Return the list of the types of the arguments this subroutine accepts."""
         return [argument.type for argument in self.subroutine.arguments]
 
-    def return_type(self) -> DataType:
-        """Return the return type of this subroutine (may be void)."""
-        return self.subroutine.return_type
-
     def returns(self) -> bool:
-        """Return a boolean indicating whether this subroutine returns a value."""
-        return self.return_type().size() > 0
+        """Return a boolean indicating whether this subroutine returns a value (is a function)."""
+        return isinstance(self.subroutine, TypeCheckedFunction)
+
+    def return_type(self) -> DataType:
+        """Return the return type of this subroutine (may be None if the subroutine is a procedure)."""
+        if not isinstance(self.subroutine, TypeCheckedFunction):
+            raise CompilerException('Can not get return type of procedure')
+        return self.subroutine.return_type
 
     def arity(self) -> int:
         """Return the number of arguments this subroutine expects."""
@@ -834,9 +836,10 @@ class SubroutineCompiler(ScopeManager):
 def generate_program(namespace: TypeCheckedNamespace, main_procedure_identifier: str, *, verbose_level: int = 1) -> str:
     # Built in procedures
     procedures: dict[str, SubroutineCompiler] = {}
-    # Get all procedures
-    for identifier, procedure in namespace:
-        procedures[identifier] = SubroutineCompiler(procedure, procedures.copy(), comment_level=verbose_level)
+    # Get all elements
+    for element in namespace:
+        if isinstance(element, TypeCheckedProcedure):
+            procedures[element.identifier] = SubroutineCompiler(element, procedures.copy(), comment_level=verbose_level)
     # Generate code for main procedure
     if main_procedure_identifier not in procedures:
         raise CompilationException(namespace.location, f'{main_procedure_identifier!r} procedure not found')
@@ -844,7 +847,7 @@ def generate_program(namespace: TypeCheckedNamespace, main_procedure_identifier:
     if main.arity() > 0:
         raise CompilationException(main.subroutine.location, 'Main procedure should not accept arguments')
     if main.returns():
-        raise CompilationException(main.subroutine.location, 'Main procedure should return void')
+        raise CompilationException(main.subroutine.location, 'Main subroutine should be a procedure')
     return main.generate().strip() + '\n'
 
 

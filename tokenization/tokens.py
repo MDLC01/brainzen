@@ -211,12 +211,24 @@ class DoubleColonToken(Token):
     binary_operation = BinaryOperation.CONCATENATION
 
 
+class ArrowToken(Token):
+    token = '->'
+
+
 class HashToken(Token):
     token = '#'
 
 
 class QuestionMarkToken(Token):
     token = '?'
+
+
+class ProcKeyword(Token):
+    keyword = 'proc'
+
+
+class FuncKeyword(Token):
+    keyword = 'func'
 
 
 class LoopKeyword(Token):
@@ -338,6 +350,7 @@ __all__ = ['is_allowed_in_word', 'is_valid_word', 'AnyToken', 'Token', 'OpenBrac
            'EqualToken', 'DoublePlusToken', 'DoubleMinusToken', 'BangToken', 'DoubleBangToken', 'DoubleEqualToken',
            'BangEqualToken', 'LessThanToken', 'LessThanEqualToken', 'GreaterThanToken', 'GreaterThanEqualToken',
            'DoubleAmpersandToken', 'DoublePipeToken', 'PlusToken', 'MinusToken', 'StarToken', 'SlashToken',
-           'PercentToken', 'ColonToken', 'DoubleColonToken', 'HashToken', 'QuestionMarkToken', 'LoopKeyword',
-           'ForKeyword', 'WhileKeyword', 'IfKeyword', 'ElseKeyword', 'ReturnKeyword', 'EOFToken', 'NumberLiteral',
-           'NumericLiteral', 'CharacterLiteral', 'StringLiteral', 'IdentifierToken', 'NativeCodeBlock']
+           'PercentToken', 'ColonToken', 'DoubleColonToken', 'ArrowToken', 'HashToken', 'QuestionMarkToken',
+           'ProcKeyword', 'FuncKeyword', 'LoopKeyword', 'ForKeyword', 'WhileKeyword', 'IfKeyword', 'ElseKeyword',
+           'ReturnKeyword', 'EOFToken', 'NumberLiteral', 'NumericLiteral', 'CharacterLiteral', 'StringLiteral',
+           'IdentifierToken', 'NativeCodeBlock']
