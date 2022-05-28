@@ -435,7 +435,7 @@ class ASTGenerator:
         base_type = self.namespace.get_base_type(base_type_identifier.location, base_type_identifier.name)
         # Array
         if self._eat(OpenBracketToken):
-            size = self._expect(NumberLiteral).value
+            size = self._expect(NumericLiteral).value
             self._expect(CloseBracketToken)
             return ArrayType(base_type, size)
         # Single
