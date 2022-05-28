@@ -151,19 +151,26 @@ class SubroutineCompiler(ScopeManager):
         else:
             self._right(delta)
 
-    def _move(self, destinations: set[int]) -> None:
+    def _move(self, destinations: set[int], *, block_size: int = 1) -> None:
         """Destructively add the content of the current cell to the destination cells."""
+        if block_size <= 0:
+            raise CompilerException('Unable to move block with negative size')
         source = self.index
-        self._loop_start()
-        self._decrement()
-        # The destinations are sorted to limit the number of moves
-        for destination in sorted(destinations):
-            if destination == source:
-                break
-            self._goto(destination)
-            self._increment()
-        self._goto(source)
-        self._loop_end()
+        if block_size > 1:
+            for i in range(block_size):
+                self._goto(source + i)
+                self._move({destination + i for destination in destinations})
+        else:
+            self._loop_start()
+            self._decrement()
+            # The destinations are sorted to limit the number of moves
+            for destination in sorted(destinations):
+                if destination == source:
+                    break
+                self._goto(destination)
+                self._increment()
+            self._goto(source)
+            self._loop_end()
 
     def register_variable(self, variable_type: DataType = Types.CHAR, identifier: str = None,
                           value: int | None = None) -> str:
@@ -651,7 +658,7 @@ class SubroutineCompiler(ScopeManager):
         call_index = self.index
         subroutine = self.get_subroutine(location, identifier)
         if expect_return and not subroutine.returns():
-            raise CompilationException(location, f'Can not get return value from subroutine {identifier!r}')
+            raise CompilerException(f'Using procedure {identifier!r} as a function should have been caught earlier')
         # Test if the number of arguments is right
         arity = subroutine.arity()
         if arity != len(arguments):
@@ -669,9 +676,10 @@ class SubroutineCompiler(ScopeManager):
         self._comment(f'Finalizing call to subroutine {identifier!r}', prefix='\n')
         if expect_return:
             return_index = self.index
-            self._reset(call_index)
+            block_size = subroutine.return_type().size()
+            self._reset(call_index, block_size=block_size)
             self._goto(return_index)
-            self._move({call_index})
+            self._move({call_index}, block_size=block_size)
             self._comment('Get return value')
         # Clear memory
         self._reset(subroutine_origin, block_size=subroutine.memory_size())
