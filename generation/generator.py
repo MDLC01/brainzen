@@ -4,8 +4,7 @@ from data_types import *
 from exceptions import *
 from generation.memory_manager import *
 from operations import *
-from type_checking.type_checked_instructions import *
-from type_checking.type_checker import *
+from type_checking import *
 
 
 class CommentLevel(IntEnum):
