@@ -265,15 +265,15 @@ class ASTGenerator:
             return True
         return False
 
-    def parse_sequence(self) -> list[Expression]:
+    def parse_sequence(self, closing_token_type: Type[AnyToken]) -> list[Expression]:
+        """Parse a sequence of expressions, separated by commas, until a toke of typen `closing_token_type` is found."""
         elements = []
-        # TODO: Rewrite that to not depend on a specific set of closing parenthesis
-        if self._is_next(CloseParToken) or self._is_next(CloseBracketToken) or self._is_next(CloseBraceToken):
-            return elements
         while True:
-            if elements and not self._eat(CommaToken):
+            if self._is_next(closing_token_type):
                 break
             elements.append(self.parse_expression())
+            if not self._eat(CommaToken):
+                break
         return elements
 
     def parse_operand_start(self) -> Expression:
@@ -306,14 +306,14 @@ class ASTGenerator:
                 return Array.from_string(location, value)
             # Array literal
             case OpenBracketToken(location=location):
-                array = Array(location, self.parse_sequence())
+                array = Array(location, self.parse_sequence(CloseBracketToken))
                 self._expect(CloseBracketToken)
                 return array
             # Identifier
             case IdentifierToken(location=location, name=name):
                 # Function call
                 if self._eat(OpenParToken):
-                    arguments = self.parse_sequence()
+                    arguments = self.parse_sequence(CloseParToken)
                     self._expect(CloseParToken)
                     return FunctionCall(location, name, arguments)
                 # Value
@@ -378,7 +378,7 @@ class ASTGenerator:
                 return ArrayAssignment(self._location_from(start_location), identifier.name, indices, value)
             # Procedure call
             if self._eat(OpenParToken):
-                arguments = self.parse_sequence()
+                arguments = self.parse_sequence(CloseParToken)
                 self._expect(CloseParToken)
                 return ProcedureCall(self._location_from(start_location), identifier.name, arguments)
             self.index -= 1
