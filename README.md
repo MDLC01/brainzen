@@ -19,7 +19,7 @@ Here is a non-exhaustive list of major available features:
 - Conditional statements.
 - Types (characters and arrays of fixed length).
 
-## Planned features
+## Considered features
 
 Here is a list of considered features in arbitrary order (this list is *not* commitment, merely an indication of where the language is heading):
 
