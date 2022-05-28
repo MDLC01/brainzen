@@ -22,11 +22,11 @@ class SubroutineCompiler(ScopeManager):
     The return value of a function is defined by the position of the pointer when it ends.
     """
 
-    def __init__(self, subroutine: TypeCheckedProcedure, context: dict[str, 'SubroutineCompiler'], *,
+    def __init__(self, subroutine: TypeCheckedSubroutine, context: dict[str, 'SubroutineCompiler'], *,
                  comment_level: int = CommentLevel.BZ_CODE) -> None:
         super().__init__()
         self.context: dict[str, SubroutineCompiler] = context
-        self.subroutine: TypeCheckedProcedure = subroutine
+        self.subroutine: TypeCheckedSubroutine = subroutine
         self.comment_level: int = comment_level
         self.bf_code: str = ''
         self.index: int = 0
@@ -46,12 +46,10 @@ class SubroutineCompiler(ScopeManager):
 
     def returns(self) -> bool:
         """Return a boolean indicating whether this subroutine returns a value (is a function)."""
-        return isinstance(self.subroutine, TypeCheckedFunction)
+        return self.subroutine.is_function()
 
     def return_type(self) -> DataType:
         """Return the return type of this subroutine (may be None if the subroutine is a procedure)."""
-        if not isinstance(self.subroutine, TypeCheckedFunction):
-            raise CompilerException('Can not get return type of procedure')
         return self.subroutine.return_type
 
     def arity(self) -> int:
@@ -610,12 +608,6 @@ class SubroutineCompiler(ScopeManager):
                 self.call(location, identifier, arguments, True)
             case TypedArithmeticExpression() as arithmetic_expression:
                 self.evaluate_arithmetic_expression(arithmetic_expression)
-            case TypedNativeCode(location=location, bf_code=bf_code):
-                message = 'Using native Brainfuck code is not recommended. Make sure it is well balanced.'
-                CompilationWarning.add(location, message)
-                self._comment('```', CommentLevel.BZ_CODE, prefix='\n')
-                self.bf_code += bf_code
-                self._comment('```', CommentLevel.BZ_CODE, prefix='\n')
             case _:
                 raise ImpossibleException(f'Unknown expression type: {expression.__class__.__name__}')
         self._goto(index)
@@ -836,8 +828,14 @@ class SubroutineCompiler(ScopeManager):
 
     def generate(self) -> str:
         if not self.bf_code:
-            for instruction in self.subroutine.instructions:
-                self.compile_instruction(instruction)
+            if isinstance(self.subroutine, TypeCheckedNativeSubroutine):
+                self.bf_code = self.subroutine.bf_code
+                self.index = self.subroutine.offset
+            elif isinstance(self.subroutine, TypeCheckedProcedure):
+                for instruction in self.subroutine.body:
+                    self.compile_instruction(instruction)
+            else:
+                raise ImpossibleException(f'Unknown subroutine type: {self.subroutine.__class__.__name__}')
         return self.bf_code
 
 
@@ -846,8 +844,10 @@ def generate_program(namespace: TypeCheckedNamespace, main_procedure_identifier:
     procedures: dict[str, SubroutineCompiler] = {}
     # Get all elements
     for element in namespace:
-        if isinstance(element, TypeCheckedProcedure):
+        if isinstance(element, TypeCheckedSubroutine):
             procedures[element.identifier] = SubroutineCompiler(element, procedures.copy(), comment_level=verbose_level)
+        else:
+            raise ImpossibleException(f'Unknown element type: {element.__class__.__name__}')
     # Generate code for main procedure
     if main_procedure_identifier not in procedures:
         raise CompilationException(namespace.location, f'{main_procedure_identifier!r} procedure not found')

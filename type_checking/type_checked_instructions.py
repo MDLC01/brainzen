@@ -125,8 +125,6 @@ class TypedExpression(TypeCheckedInstruction, ABC):
                 return LiteralArray.from_array(context, array)
             case Identifier() as identifier:
                 return TypedIdentifier(context, identifier)
-            case NativeCode() as native_code:
-                return TypedNativeCode(native_code)
             case UnaryArithmeticExpression() as unary_arithmetic_expression:
                 return TypedUnaryArithmeticExpression(context, unary_arithmetic_expression)
             case BinaryArithmeticExpression() as binary_arithmetic_expression:
@@ -249,18 +247,6 @@ class TypedIdentifier(TypedExpression):
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}[{self.name}]'
-
-
-class TypedNativeCode(TypedExpression):
-    def __init__(self, native_code: NativeCode) -> None:
-        super().__init__(native_code.location)
-        self.bf_code = native_code.bf_code
-
-    def type(self) -> DataType:
-        return Types.CHAR
-
-    def is_known_at_compile_time(self) -> bool:
-        return False
 
 
 class TypedArithmeticExpression(TypedExpression, ABC):
@@ -692,6 +678,8 @@ class TypeCheckedReturnInstruction(TypeCheckedInstruction):
         super().__init__(instruction.location)
         self.value: TypedExpression = TypedExpression.from_expression(context, instruction.value)
         # Type checking
+        if context.expected_return_type is None:
+            raise CompilationException(self.location, 'Unexpected return statement in procedure')
         if self.value.type() != context.expected_return_type:
             message = f'Expected {context.expected_return_type} but found {self.value.type()}'
             raise CompilationException(self.location, message)
@@ -718,7 +706,7 @@ class TypeCheckedContextSnapshot(TypeCheckedInstruction):
 
 
 __all__ = ['TypeCheckedInstruction', 'TypeCheckedInstructionBlock', 'TypedExpression', 'LiteralChar', 'LiteralArray',
-           'TypedIdentifier', 'TypedNativeCode', 'TypedArithmeticExpression', 'TypedUnaryArithmeticExpression',
+           'TypedIdentifier', 'TypedArithmeticExpression', 'TypedUnaryArithmeticExpression',
            'TypedBinaryArithmeticExpression', 'TypedArrayAccessExpression', 'PrintCall', 'InputCall',
            'TypeCheckedProcedureCall', 'TypedFunctionCall', 'TypeCheckedIncrementation', 'TypeCheckedDecrementation',
            'TypeCheckedVariableDeclaration', 'TypeCheckedAssignment', 'TypeCheckedArrayAssignment',

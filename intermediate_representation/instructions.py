@@ -121,18 +121,6 @@ class Identifier(Expression):
         return f'{self.__class__.__name__}[{self.name}]'
 
 
-class NativeCode(Expression):
-    def __init__(self, location: Location, bf_code: str) -> None:
-        super().__init__(location)
-        self.bf_code = bf_code
-
-    def __str__(self) -> str:
-        return f'```{self.bf_code}```'
-
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[```{self.bf_code}```]'
-
-
 class ArithmeticExpression(Expression, ABC):
     """An arithmetic expression contains an operation tree."""
 
@@ -369,8 +357,8 @@ class ContextSnapshot(Instruction):
         return f'{self.__class__.__name__}'
 
 
-__all__ = ['Instruction', 'InstructionBlock', 'Expression', 'Char', 'Array', 'Identifier', 'NativeCode',
-           'ArithmeticExpression', 'UnaryArithmeticExpression', 'BinaryArithmeticExpression', 'ArrayAccessExpression',
-           'ProcedureCall', 'FunctionCall', 'Incrementation', 'Decrementation', 'VariableDeclaration', 'Assignment',
-           'ArrayAssignment', 'LoopStatement', 'WhileLoopStatement', 'ForLoopStatement', 'ConditionalStatement',
-           'ReturnInstruction', 'ContextSnapshot']
+__all__ = ['Instruction', 'InstructionBlock', 'Expression', 'Char', 'Array', 'Identifier', 'ArithmeticExpression',
+           'UnaryArithmeticExpression', 'BinaryArithmeticExpression', 'ArrayAccessExpression', 'ProcedureCall',
+           'FunctionCall', 'Incrementation', 'Decrementation', 'VariableDeclaration', 'Assignment', 'ArrayAssignment',
+           'LoopStatement', 'WhileLoopStatement', 'ForLoopStatement', 'ConditionalStatement', 'ReturnInstruction',
+           'ContextSnapshot']

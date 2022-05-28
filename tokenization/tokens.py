@@ -215,12 +215,20 @@ class ArrowToken(Token):
     token = '->'
 
 
+class TildeToken(Token):
+    token = '~'
+
+
 class HashToken(Token):
     token = '#'
 
 
 class QuestionMarkToken(Token):
     token = '?'
+
+
+class NativeKeyword(Token):
+    keyword = 'native'
 
 
 class ProcKeyword(Token):
@@ -351,6 +359,6 @@ __all__ = ['is_allowed_in_word', 'is_valid_word', 'AnyToken', 'Token', 'OpenBrac
            'BangEqualToken', 'LessThanToken', 'LessThanEqualToken', 'GreaterThanToken', 'GreaterThanEqualToken',
            'DoubleAmpersandToken', 'DoublePipeToken', 'PlusToken', 'MinusToken', 'StarToken', 'SlashToken',
            'PercentToken', 'ColonToken', 'DoubleColonToken', 'ArrowToken', 'HashToken', 'QuestionMarkToken',
-           'ProcKeyword', 'FuncKeyword', 'LoopKeyword', 'ForKeyword', 'WhileKeyword', 'IfKeyword', 'ElseKeyword',
-           'ReturnKeyword', 'EOFToken', 'NumberLiteral', 'NumericLiteral', 'CharacterLiteral', 'StringLiteral',
-           'IdentifierToken', 'NativeCodeBlock']
+           'NativeKeyword', 'TildeToken', 'ProcKeyword', 'FuncKeyword', 'LoopKeyword', 'ForKeyword', 'WhileKeyword',
+           'IfKeyword', 'ElseKeyword', 'ReturnKeyword', 'EOFToken', 'NumberLiteral', 'NumericLiteral',
+           'CharacterLiteral', 'StringLiteral', 'IdentifierToken', 'NativeCodeBlock']

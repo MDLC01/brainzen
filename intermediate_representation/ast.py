@@ -36,35 +36,62 @@ class SubroutineArgument:
         return f'{self.type} {self.identifier}'
 
 
-class Procedure(NamespaceElement):
-    __slots__ = 'arguments', 'body'
+class Subroutine(NamespaceElement, ABC):
+    __slots__ = 'arguments', 'return_type'
 
     def __init__(self, location: Location, identifier: str, arguments: list[SubroutineArgument],
-                 body: InstructionBlock) -> None:
+                 return_type: DataType | None) -> None:
         super().__init__(location, identifier)
         self.arguments = arguments
-        self.body = body
+        self.return_type = return_type
+
+    def is_function(self) -> bool:
+        return self.return_type is not None
+
+    def _keyword(self) -> str:
+        if self.is_function():
+            return 'func'
+        return 'proc'
 
     def _argument_string(self) -> str:
         return ', '.join(repr(argument) for argument in self.arguments)
 
     def __str__(self) -> str:
-        return f'proc {self.identifier}({self._argument_string()}) line {self.location.line}'
+        suffix = ''
+        if self.is_function():
+            suffix = f' -> {self.return_type}'
+        return f'{self._keyword()} {self.identifier}({self._argument_string()}){suffix} line {self.location.line}'
+
+
+class NativeSubroutine(Subroutine):
+    __slots__ = 'offset', 'bf_code'
+
+    def __init__(self, location: Location, identifier: str, arguments: list[SubroutineArgument],
+                 return_type: DataType | None, offset: int, bf_code: str) -> None:
+        super().__init__(location, identifier, arguments, return_type)
+        self.offset = offset
+        self.bf_code = bf_code
+
+    def __str__(self) -> str:
+        return 'native ' + super().__str__()
+
+    def __repr__(self, indent: str = '') -> str:
+        return f'```{self.bf_code}```'
+
+
+class Procedure(Subroutine):
+    __slots__ = 'body'
+
+    def __init__(self, location: Location, identifier: str, arguments: list[SubroutineArgument],
+                 return_type: DataType | None, body: InstructionBlock) -> None:
+        super().__init__(location, identifier, arguments, return_type)
+        self.body = body
+
+    def _argument_string(self) -> str:
+        return ', '.join(repr(argument) for argument in self.arguments)
 
     def __repr__(self, indent: str = '') -> str:
         return f'({self._argument_string()}) -> {self.body.__repr__(indent)}'
-
-
-class Function(Procedure):
-    __slots__ = 'return_type'
-
-    def __init__(self, location: Location, identifier: str, arguments: list[SubroutineArgument], body: InstructionBlock,
-                 return_type: DataType) -> None:
-        super().__init__(location, identifier, arguments, body)
-        self.return_type = return_type
-
-    def __str__(self) -> str:
-        return f'func {self.identifier}({self._argument_string()}) -> {self.return_type} line {self.location.line}'
 
 
 class Namespace:
@@ -82,7 +109,7 @@ class Namespace:
     def is_valid_base_type(self, identifier: str) -> bool:
         return PrimitiveType.is_valid_base_type(identifier)
 
-    def add_subroutine(self, subroutine: Procedure) -> None:
+    def add_subroutine(self, subroutine: Subroutine) -> None:
         identifier = subroutine.identifier
         if identifier in self.subroutine_locations:
             message = f'Subroutine {identifier!r} is already defined at {self.subroutine_locations[identifier]}'
@@ -355,10 +382,6 @@ class ASTGenerator:
                 self._expect(CloseParToken)
                 return ProcedureCall(self._location_from(start_location), identifier.name, arguments)
             self.index -= 1
-        # Native code block
-        if self._is_next(NativeCodeBlock):
-            native_code_block = self._expect(NativeCodeBlock)
-            return NativeCode(native_code_block.location, native_code_block.bf_code)
         # Return instruction
         if self._eat(ReturnKeyword):
             start_location = self._previous_location()
@@ -470,38 +493,42 @@ class ASTGenerator:
                 break
         return arguments
 
-    def parse_procedure_definition(self) -> Procedure:
-        start_location = self._expect(ProcKeyword).location
-        identifier = self._expect(IdentifierToken)
+    def parse_subroutine_definition(self) -> Subroutine:
+        start_location = self._location()
+        # Subroutine type
+        is_native = self._eat(NativeKeyword)
+        is_function = self._eat(FuncKeyword)
+        if not is_function:
+            self._expect(ProcKeyword)
+        # Subroutine identifier
+        identifier = self._expect(IdentifierToken).name
+        # Subroutine signature
         arguments = self.parse_subroutine_argument_declaration()
-        instructions = self.parse_instruction_block()
+        return_type = None
+        if is_function:
+            self._expect(ArrowToken)
+            return_type = self.parse_type()
+        # Native code
+        if is_native:
+            self._expect(TildeToken)
+            offset = self._expect(NumericLiteral).value
+            location = self._location_from(start_location)
+            bf_code = self._expect(NativeCodeBlock).bf_code
+            return NativeSubroutine(location, identifier, arguments, return_type, offset, bf_code)
+        # Subroutine body
         location = self._location_from(start_location)
-        return Procedure(location, identifier.name, arguments, instructions)
-
-    def parse_function_definition(self) -> Function:
-        start_location = self._expect(FuncKeyword).location
-        identifier = self._expect(IdentifierToken)
-        arguments = self.parse_subroutine_argument_declaration()
-        self._expect(ArrowToken)
-        return_type = self.parse_type()
-        instructions = self.parse_instruction_block()
-        location = self._location_from(start_location)
-        return Function(location, identifier.name, arguments, instructions, return_type)
+        body = self.parse_instruction_block()
+        return Procedure(location, identifier, arguments, return_type, body)
 
     def generate_ast(self) -> Namespace:
         while self._has_next():
             if self._is_next(HashToken):
                 self.parse_and_define_constant()
-            elif self._is_next(ProcKeyword):
-                procedure = self.parse_procedure_definition()
-                self.namespace.add_subroutine(procedure)
-            elif self._is_next(FuncKeyword):
-                function = self.parse_function_definition()
-                self.namespace.add_subroutine(function)
             else:
-                message = f'Expected constant or subroutine declaration but found {self._peek().__doc__}'
-                raise CompilationException(self._location(), message)
+                subroutine = self.parse_subroutine_definition()
+                self.namespace.add_subroutine(subroutine)
         return self.namespace
 
 
-__all__ = ['NamespaceElement', 'SubroutineArgument', 'Procedure', 'Function', 'Namespace', 'Constant', 'ASTGenerator']
+__all__ = ['NamespaceElement', 'SubroutineArgument', 'Subroutine', 'NativeSubroutine', 'Procedure', 'Namespace',
+           'Constant', 'ASTGenerator']
