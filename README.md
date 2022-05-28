@@ -14,7 +14,7 @@ Brainzen does not have an official specification yet. You can consider the compi
 
 Here is a non-exhaustive list of major available features:
 
-- Function declaration.
+- Subroutines.
 - Loops.
 - Conditional statements.
 - Types (characters and arrays of fixed length).
@@ -54,7 +54,7 @@ This section contains examples of basic programs and subroutines written in Brai
 
 ```brainzen
 proc main() {
-    print("Hello, World!");
+    println("Hello, World!");
 }
 ```
 
