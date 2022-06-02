@@ -779,9 +779,13 @@ class SubroutineCompiler(ScopeManager):
                 self._decrement(self[has_entered_if])  # Reset
                 self._loop_end()
 
-    def create_context_snapshot(self) -> None:
+    def create_context_snapshot(self, location: Location, identifier: str | None = None) -> None:
+        current_index = self.index
+
         self._comment('=== CONTEXT SNAPSHOT ===', CommentLevel.ONLY_REQUIRED, prefix='\n')
 
+        if identifier is not None:
+            self.goto_variable(location, identifier)
         self.bf_code += '#'
 
         context = f'Currently at index {self.index} in subroutine {self.identifier()!r}'
@@ -791,7 +795,9 @@ class SubroutineCompiler(ScopeManager):
         self._comment(scopes, CommentLevel.ONLY_REQUIRED, prefix='\n', end='')
 
         local_memory_overview = f'Local memory size: {self.memory_size()}'
-        self._comment(local_memory_overview, CommentLevel.ONLY_REQUIRED, prefix='\n', end='')
+        self._comment(local_memory_overview, CommentLevel.ONLY_REQUIRED, prefix='\n')
+
+        self._goto(current_index)
 
         self._comment('=== CONTEXT SNAPSHOT END ===', CommentLevel.ONLY_REQUIRED, prefix='\n')
 
@@ -833,8 +839,8 @@ class SubroutineCompiler(ScopeManager):
                 self.condition(test, if_body, else_body)
             case TypeCheckedReturnInstruction(value=expression):
                 self.evaluate(expression)
-            case TypeCheckedContextSnapshot(location=location):
-                self.create_context_snapshot()
+            case TypeCheckedContextSnapshot(location=location, identifier=identifier):
+                self.create_context_snapshot(location, identifier)
                 CompilationWarning.add(location, '`?` is a debug feature and should not be used in production code')
                 comment_line = False
             case _:

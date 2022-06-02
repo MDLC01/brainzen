@@ -355,7 +355,13 @@ class ReturnInstruction(Instruction):
 
 
 class ContextSnapshot(Instruction):
+    def __init__(self, location: Location, identifier: str | None = None) -> None:
+        super().__init__(location)
+        self.identifier = identifier
+
     def __str__(self) -> str:
+        if self.identifier is not None:
+            return f'{self.identifier}?'
         return '?'
 
     def __repr__(self) -> str:

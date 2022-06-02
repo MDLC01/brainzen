@@ -686,8 +686,11 @@ class TypeCheckedReturnInstruction(TypeCheckedInstruction):
 class TypeCheckedContextSnapshot(TypeCheckedInstruction):
     def __init__(self, context_snapshot: ContextSnapshot) -> None:
         super().__init__(context_snapshot.location)
+        self.identifier = context_snapshot.identifier
 
     def __str__(self) -> str:
+        if self.identifier is not None:
+            return f'{self.identifier}?'
         return '?'
 
     def __repr__(self) -> str:

@@ -408,6 +408,10 @@ class ASTGenerator:
             expression = self.parse_expression()
             return ReturnInstruction(self._location_from(start_location), expression)
         # Context snapshot
+        if self._is_next(IdentifierToken) and self._is_next(QuestionMarkToken, 1):
+            identifier = self._expect(IdentifierToken).name
+            self._expect(QuestionMarkToken)
+            return ContextSnapshot(self._location_from(start_location), identifier)
         if self._eat(QuestionMarkToken):
             return ContextSnapshot(self._location_from(start_location))
         # Assignment
