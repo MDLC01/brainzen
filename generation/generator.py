@@ -741,6 +741,16 @@ class SubroutineCompiler(ScopeManager):
             self.evaluate(test)
             self._loop_end()
 
+    def do_while_loop(self, body: TypeCheckedInstructionBlock, test: TypedExpression) -> None:
+        with self:
+            condition = self.register_variable()
+            self._increment(self[condition])
+            self._loop_start(self[condition])
+            self.compile_instruction(body)
+            self._goto(self[condition])
+            self.evaluate(test)
+            self._loop_end()
+
     def for_loop(self, loop_type: DataType, loop_variable: str, loop_array: TypedExpression,
                  body: TypeCheckedInstructionBlock) -> None:
         array_type = loop_array.type()
@@ -832,6 +842,8 @@ class SubroutineCompiler(ScopeManager):
                 self.loop(count, body)
             case TypeCheckedWhileLoopStatement(test=test, body=body):
                 self.while_loop(test, body)
+            case TypeCheckedDoWhileLoopStatement(body=body, test=test):
+                self.do_while_loop(body, test)
             case TypeCheckedForLoopStatement(loop_type=loop_type, loop_variable=loop_variable, loop_array=loop_array,
                                              body=body):
                 self.for_loop(loop_type, loop_variable, loop_array, body)

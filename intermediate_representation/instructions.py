@@ -295,6 +295,22 @@ class WhileLoopStatement(Instruction):
         return f'{self.__class__.__name__}[{self.test!r}, {self.body!r}]'
 
 
+class DoWhileLoopStatement(Instruction):
+    def __init__(self, location: Location, body: InstructionBlock, test: Expression) -> None:
+        super().__init__(location)
+        self.body = body
+        self.test = test
+
+    def may_return(self) -> bool:
+        return self.body.may_return()
+
+    def __str__(self) -> str:
+        return f'do while ({self.test}) line {self.location.line}'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.body!r}, {self.test!r}]'
+
+
 class ForLoopStatement(Instruction):
     def __init__(self, location: Location, loop_type: DataType, loop_variable: str,
                  loop_array: Expression, body: InstructionBlock) -> None:
@@ -371,5 +387,5 @@ class ContextSnapshot(Instruction):
 __all__ = ['Instruction', 'InstructionBlock', 'Expression', 'Char', 'Array', 'Identifier', 'Tuple',
            'ArithmeticExpression', 'UnaryArithmeticExpression', 'BinaryArithmeticExpression', 'ArrayAccessExpression',
            'ProcedureCall', 'FunctionCall', 'Incrementation', 'Decrementation', 'VariableDeclaration', 'Assignment',
-           'LoopStatement', 'WhileLoopStatement', 'ForLoopStatement', 'ConditionalStatement', 'ReturnInstruction',
-           'ContextSnapshot']
+           'LoopStatement', 'WhileLoopStatement', 'DoWhileLoopStatement', 'ForLoopStatement', 'ConditionalStatement',
+           'ReturnInstruction', 'ContextSnapshot']

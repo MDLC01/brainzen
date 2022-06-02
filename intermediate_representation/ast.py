@@ -438,6 +438,14 @@ class ASTGenerator:
             self._expect(CloseParToken)
             instructions = self.parse_instruction_block()
             return WhileLoopStatement(location, condition, instructions)
+        # Do while loop
+        if self._eat(DoKeyword):
+            instructions = self.parse_instruction_block()
+            self._expect(WhileKeyword)
+            self._expect(OpenParToken)
+            condition = self.parse_expression()
+            self._expect(CloseParToken)
+            return DoWhileLoopStatement(location, instructions, condition)
         # For loop
         if self._eat(ForKeyword):
             self._expect(OpenParToken)

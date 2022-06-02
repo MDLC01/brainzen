@@ -255,6 +255,10 @@ class WhileKeyword(Token):
     keyword = 'while'
 
 
+class DoKeyword(Token):
+    keyword = 'do'
+
+
 class IfKeyword(Token):
     keyword = 'if'
 
@@ -364,5 +368,5 @@ __all__ = ['is_allowed_in_word', 'is_valid_word', 'AnyToken', 'Token', 'OpenBrac
            'DoubleAmpersandToken', 'DoublePipeToken', 'PlusToken', 'MinusToken', 'StarToken', 'SlashToken',
            'PercentToken', 'ColonToken', 'DoubleColonToken', 'ArrowToken', 'HashToken', 'QuestionMarkToken',
            'NativeKeyword', 'TildeToken', 'ProcKeyword', 'FuncKeyword', 'LetKeyword', 'LoopKeyword', 'ForKeyword',
-           'WhileKeyword', 'IfKeyword', 'ElseKeyword', 'ReturnKeyword', 'EOFToken', 'NumberLiteral', 'NumericLiteral',
-           'CharacterLiteral', 'StringLiteral', 'IdentifierToken', 'NativeCodeBlock']
+           'WhileKeyword', 'DoKeyword', 'IfKeyword', 'ElseKeyword', 'ReturnKeyword', 'EOFToken', 'NumberLiteral',
+           'NumericLiteral', 'CharacterLiteral', 'StringLiteral', 'IdentifierToken', 'NativeCodeBlock']

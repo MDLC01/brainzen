@@ -37,6 +37,8 @@ class TypeCheckedInstruction(ABC):
                 return TypeCheckedLoopStatement(context, loop_statement)
             case WhileLoopStatement() as while_loop_statement:
                 return TypeCheckedWhileLoopStatement(context, while_loop_statement)
+            case DoWhileLoopStatement() as do_while_loop_statement:
+                return TypeCheckedDoWhileLoopStatement(context, do_while_loop_statement)
             case ForLoopStatement() as for_loop_statement:
                 return TypeCheckedForLoopStatement(context, for_loop_statement)
             case ConditionalStatement() as conditional_statement:
@@ -608,6 +610,25 @@ class TypeCheckedWhileLoopStatement(TypeCheckedInstruction):
         return f'{self.__class__.__name__}[{self.test!r}, {self.body!r}]'
 
 
+class TypeCheckedDoWhileLoopStatement(TypeCheckedInstruction):
+    def __init__(self, context: SubroutineTypingContext, do_while_loop_statement: DoWhileLoopStatement) -> None:
+        super().__init__(do_while_loop_statement.location)
+        self.body: TypeCheckedInstructionBlock = TypeCheckedInstructionBlock(context, do_while_loop_statement.body)
+        self.test: TypedExpression = TypedExpression.from_expression(context, do_while_loop_statement.test)
+        # Type checking
+        if self.test.type() != Types.CHAR:
+            raise CompilationException(self.test.location, f'Expected char but found {self.test.type()}')
+
+    def may_return(self) -> bool:
+        return self.body.may_return()
+
+    def __str__(self) -> str:
+        return f'do while ({self.test}) line {self.location.line}'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.body!r}, {self.test!r}]'
+
+
 class TypeCheckedForLoopStatement(TypeCheckedInstruction):
     def __init__(self, context: SubroutineTypingContext, for_loop_statement: ForLoopStatement) -> None:
         super().__init__(for_loop_statement.location)
@@ -702,5 +723,5 @@ __all__ = ['TypeCheckedInstruction', 'TypeCheckedInstructionBlock', 'TypedExpres
            'TypedBinaryArithmeticExpression', 'TypedArrayAccessExpression', 'PrintCall', 'InputCall',
            'TypeCheckedProcedureCall', 'TypedFunctionCall', 'TypeCheckedIncrementation', 'TypeCheckedDecrementation',
            'TypeCheckedVariableDeclaration', 'TypeCheckedAssignment', 'TypeCheckedLoopStatement',
-           'TypeCheckedWhileLoopStatement', 'TypeCheckedForLoopStatement', 'TypeCheckedConditionalStatement',
-           'TypeCheckedReturnInstruction', 'TypeCheckedContextSnapshot']
+           'TypeCheckedWhileLoopStatement', 'TypeCheckedDoWhileLoopStatement', 'TypeCheckedForLoopStatement',
+           'TypeCheckedConditionalStatement', 'TypeCheckedReturnInstruction', 'TypeCheckedContextSnapshot']
