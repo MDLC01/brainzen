@@ -337,14 +337,16 @@ class ASTGenerator:
 
     def parse_binary_operation(self) -> Expression:
         left = self.parse_unary_operation()
+        priority = Priority.PARENTHESIS
         while self._peek().is_binary_operation():
             location = self._location()
             operation = self._next().binary_operation
             right = self.parse_unary_operation()
-            if isinstance(left, BinaryArithmeticExpression) and left.operation.priority < operation.priority:
+            if isinstance(left, BinaryArithmeticExpression) and priority < operation.priority:
                 left.right = BinaryArithmeticExpression(location, operation, left.right, right)
             else:
                 left = BinaryArithmeticExpression(location, operation, left, right)
+            priority = left.operation.priority
         return left
 
     def parse_expression(self) -> Expression:
