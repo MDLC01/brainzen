@@ -415,8 +415,8 @@ class PrintCall(TypeCheckedInstruction):
             typed_argument = TypedExpression.from_expression(context, argument)
             argument_type = typed_argument.type()
             if not argument_type.is_string():
-                message = f"Procedure {self.procedure!r} only accepts string-like argument, but found {argument_type}"
-                raise CompilationException(self.location, message)
+                message = f'Procedure {self.procedure!r} only accepts string-like argument, but found {argument_type}'
+                raise CompilationException(argument.location, message)
             typed_arguments.append(typed_argument)
         return typed_arguments
 
