@@ -239,6 +239,10 @@ class FuncKeyword(Token):
     keyword = 'func'
 
 
+class LetKeyword(Token):
+    keyword = 'let'
+
+
 class LoopKeyword(Token):
     keyword = 'loop'
 
@@ -359,6 +363,6 @@ __all__ = ['is_allowed_in_word', 'is_valid_word', 'AnyToken', 'Token', 'OpenBrac
            'BangEqualToken', 'LessThanToken', 'LessThanEqualToken', 'GreaterThanToken', 'GreaterThanEqualToken',
            'DoubleAmpersandToken', 'DoublePipeToken', 'PlusToken', 'MinusToken', 'StarToken', 'SlashToken',
            'PercentToken', 'ColonToken', 'DoubleColonToken', 'ArrowToken', 'HashToken', 'QuestionMarkToken',
-           'NativeKeyword', 'TildeToken', 'ProcKeyword', 'FuncKeyword', 'LoopKeyword', 'ForKeyword', 'WhileKeyword',
-           'IfKeyword', 'ElseKeyword', 'ReturnKeyword', 'EOFToken', 'NumberLiteral', 'NumericLiteral',
+           'NativeKeyword', 'TildeToken', 'ProcKeyword', 'FuncKeyword', 'LetKeyword', 'LoopKeyword', 'ForKeyword',
+           'WhileKeyword', 'IfKeyword', 'ElseKeyword', 'ReturnKeyword', 'EOFToken', 'NumberLiteral', 'NumericLiteral',
            'CharacterLiteral', 'StringLiteral', 'IdentifierToken', 'NativeCodeBlock']

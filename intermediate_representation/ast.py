@@ -3,6 +3,7 @@ from typing import Generator, Type, TypeVar
 
 from data_types import *
 from exceptions import *
+from intermediate_representation.assignment_targets import *
 from intermediate_representation.instructions import *
 from operations import *
 from tokenization.tokens import *
@@ -237,13 +238,13 @@ class ASTGenerator:
         # return self.index < len(self.tokens)
         return not isinstance(self.tokens[self.index], EOFToken)
 
-    def _peek(self) -> AnyToken:
+    def _peek(self, offset: int = 0) -> AnyToken:
         """Return the next token without advancing the cursor"""
-        return self.tokens[self.index]
+        return self.tokens[self.index + offset]
 
-    def _is_next(self, token_type: Type[AnyToken]) -> bool:
+    def _is_next(self, token_type: Type[AnyToken], offset: int = 0) -> bool:
         """Test if the next token if of the passed token type"""
-        return isinstance(self._peek(), token_type)
+        return isinstance(self._peek(offset), token_type)
 
     def _next(self) -> AnyToken:
         """Return the next token and advance the cursor"""
@@ -266,132 +267,154 @@ class ASTGenerator:
         return False
 
     def parse_sequence(self, closing_token_type: Type[AnyToken]) -> list[Expression]:
-        """Parse a sequence of expressions, separated by commas, until a toke of typen `closing_token_type` is found."""
+        """
+        Parse a sequence of expressions (actually, binary operations), separated by commas, until a token of type
+        `closing_token_type` is found. Closing token is skipped.
+        """
         elements = []
         while True:
-            if self._is_next(closing_token_type):
+            if self._eat(closing_token_type):
                 break
-            elements.append(self.parse_expression())
+            elements.append(self.parse_binary_operation())
             if not self._eat(CommaToken):
+                self._expect(closing_token_type)
                 break
         return elements
 
-    def parse_operand_start(self) -> Expression:
-        match self._next():
-            # Parenthesis
-            case OpenParToken():
-                expression = self.parse_expression()
-                self._expect(CloseParToken)
-                return expression
-            # Bool normalization
-            case DoubleBangToken(location=location):
-                return UnaryArithmeticExpression(location, UnaryOperation.BOOL_NORMALIZATION, self.parse_operand())
-            # Logical not
-            case BangToken(location=location):
-                return UnaryArithmeticExpression(location, UnaryOperation.NEGATION, self.parse_operand())
-            # Minus sign
-            case MinusToken(location=location):
-                return UnaryArithmeticExpression(location, UnaryOperation.OPPOSITION, self.parse_operand())
-            # Constant
-            case HashToken(location=location):
-                identifier = self._expect(IdentifierToken).name
-                if identifier not in self.constants:
-                    raise CompilationException(location, f'Unknown constant: {identifier!r}')
-                return self.constants[identifier].value
-            # Number literal
-            case NumberLiteral(location=location, value=value):
-                return Char(location, value)
-            # String literal
-            case StringLiteral(location=location, value=value):
-                return Array.from_string(location, value)
-            # Array literal
-            case OpenBracketToken(location=location):
-                array = Array(location, self.parse_sequence(CloseBracketToken))
-                self._expect(CloseBracketToken)
-                return array
-            # Identifier
-            case IdentifierToken(location=location, name=name):
-                # Function call
-                if self._eat(OpenParToken):
-                    arguments = self.parse_sequence(CloseParToken)
-                    self._expect(CloseParToken)
-                    return FunctionCall(location, name, arguments)
-                # Value
-                return Identifier(location, name)
-            case Token(location=location) as token:
-                raise CompilationException(location, f'Unexpected token: {token.__doc__}')
+    def parse_value(self) -> Expression:
+        start_location = self._location()
+        # Parenthesised expression
+        if self._eat(OpenParToken):
+            value = self.parse_expression()
+            self._expect(CloseParToken)
+            return value
+        # Constant
+        if self._eat(HashToken):
+            identifier = self._expect(IdentifierToken).name
+            if identifier not in self.constants:
+                raise CompilationException(self._location_from(start_location), f'Unknown constant: {identifier!r}')
+            return self.constants[identifier].value
+        # Function call
+        if self._is_next(IdentifierToken) and self._is_next(OpenParToken, 1):
+            identifier = self._expect(IdentifierToken).name
+            self._expect(OpenParToken)
+            arguments = self.parse_sequence(CloseParToken)
+            return FunctionCall(self._location_from(start_location), identifier, arguments)
+        # Identifier
+        if self._is_next(IdentifierToken):
+            identifier = self._expect(IdentifierToken).name
+            return Identifier(self._location_from(start_location), identifier)
+        # Number literal
+        if self._is_next(NumberLiteral):
+            value = self._expect(NumberLiteral).value
+            return Char(self._location_from(start_location), value)
+        # String literal
+        if self._is_next(StringLiteral):
+            string_literal = self._expect(StringLiteral)
+            return Array.from_string(string_literal.location, string_literal.value)
+        # Array literal
+        start_location = self._location()
+        self._expect(OpenBracketToken)
+        sequence = self.parse_sequence(CloseBracketToken)
+        return Array(self._location_from(start_location), sequence)
 
     def parse_operand(self) -> Expression:
-        operand = self.parse_operand_start()
+        expression = self.parse_value()
+        # Subscripts
         while self._is_next(OpenBracketToken):
-            location = self._next().location
-            index = self._expect(NumberLiteral)
-            close_bracket_location = self._expect(CloseBracketToken).location
-            location = location.extend_to(close_bracket_location)
-            operand = ArrayAccessExpression(location, operand, index.value)
-        return operand
+            start_location = self._location()
+            self._expect(OpenBracketToken)
+            index = self._expect(NumericLiteral).value
+            self._expect(CloseBracketToken)
+            expression = ArrayAccessExpression(self._location_from(start_location), expression, index)
+        return expression
 
-    def parse_expression(self) -> Expression:
-        left = self.parse_operand()
-        while self._peek().is_binary_operation() or self._is_next(OpenBracketToken):
+    def parse_unary_operation(self) -> Expression:
+        if self._peek().is_unary_operation():
+            token = self._next()
+            return UnaryArithmeticExpression(token.location, token.unary_operation, self.parse_unary_operation())
+        return self.parse_operand()
+
+    def parse_binary_operation(self) -> Expression:
+        left = self.parse_unary_operation()
+        while self._peek().is_binary_operation():
             location = self._location()
             operation = self._next().binary_operation
-            right = self.parse_operand()
+            right = self.parse_unary_operation()
             if isinstance(left, BinaryArithmeticExpression) and left.operation.priority < operation.priority:
                 left.right = BinaryArithmeticExpression(location, operation, left.right, right)
             else:
                 left = BinaryArithmeticExpression(location, operation, left, right)
         return left
 
+    def parse_expression(self) -> Expression:
+        start_location = self._location()
+        elements = [self.parse_binary_operation()]
+        while self._eat(CommaToken):
+            elements.append(self.parse_binary_operation())
+        return Tuple.from_elements(self._location_from(start_location), elements)
+
+    def parse_primitive_assignment_target(self) -> PrimitiveAssignmentTarget:
+        start_location = self._location()
+        identifier = self._expect(IdentifierToken).name
+        target = IdentifierAssignmentTarget(self._location_from(start_location), identifier)
+        while self._eat(OpenBracketToken):
+            index = self._expect(NumericLiteral).value
+            target = ArrayElementAssignmentTarget(self._location_from(start_location), target, index)
+        return target
+
+    def parse_assignment_target(self) -> AssignmentTarget:
+        start_location = self._location()
+        targets: list[AssignmentTarget] = []
+        while True:
+            if self._eat(OpenParToken):
+                targets.append(self.parse_assignment_target())
+                self._expect(CloseParToken)
+            else:
+                targets.append(self.parse_primitive_assignment_target())
+            if not self._eat(CommaToken):
+                break
+        return TupleAssignmentTarget(self._location_from(start_location), targets)
+
     def parse_instruction(self) -> Instruction:
         """Parse an instruction (does not expect a semicolon at the end)"""
-        if self._is_next(IdentifierToken):
-            identifier = self._expect(IdentifierToken)
-            start_location = identifier.location
-            # Variable declaration
-            if self.namespace.is_valid_base_type(identifier.name):
-                self.index -= 1
-                variable_type = self.parse_type()
-                variable_name = self._expect(IdentifierToken).name
-                if self._eat(EqualToken):
-                    value = self.parse_expression()
-                    return VariableDeclaration(self._location_from(start_location), variable_name, variable_type, value)
-                return VariableDeclaration(self._location_from(start_location), variable_name, variable_type)
-            # Incrementation
-            if self._eat(DoublePlusToken):
-                return Incrementation(self._location_from(start_location), identifier.name)
-            # Decrementation
-            if self._eat(DoubleMinusToken):
-                return Decrementation(self._location_from(start_location), identifier.name)
-            # Assignment
+        start_location = self._location()
+        # Incrementation
+        if self._is_next(IdentifierToken) and self._is_next(DoublePlusToken, 1):
+            identifier = self._expect(IdentifierToken).name
+            self._expect(DoublePlusToken)
+            return Incrementation(self._location_from(start_location), identifier)
+        # Decrementation
+        if self._is_next(IdentifierToken) and self._is_next(DoubleMinusToken, 1):
+            identifier = self._expect(IdentifierToken).name
+            self._expect(DoubleMinusToken)
+            return Decrementation(self._location_from(start_location), identifier)
+        # Procedure call
+        if self._is_next(IdentifierToken) and self._is_next(OpenParToken, 1):
+            identifier = self._expect(IdentifierToken).name
+            self._expect(OpenParToken)
+            arguments = self.parse_sequence(CloseParToken)
+            return ProcedureCall(self._location_from(start_location), identifier, arguments)
+        # Variable declaration
+        if self._eat(LetKeyword):
+            variable_type = self.parse_type()
+            variable_name = self._expect(IdentifierToken).name
             if self._eat(EqualToken):
                 value = self.parse_expression()
-                return Assignment(self._location_from(start_location), identifier.name, value)
-            # Array assignment
-            if self._is_next(OpenBracketToken):
-                indices = []
-                while self._eat(OpenBracketToken):
-                    indices.append(self._expect(NumberLiteral).value)
-                    self._expect(CloseBracketToken)
-                self._expect(EqualToken)
-                value = self.parse_expression()
-                return ArrayAssignment(self._location_from(start_location), identifier.name, indices, value)
-            # Procedure call
-            if self._eat(OpenParToken):
-                arguments = self.parse_sequence(CloseParToken)
-                self._expect(CloseParToken)
-                return ProcedureCall(self._location_from(start_location), identifier.name, arguments)
-            self.index -= 1
+                return VariableDeclaration(self._location_from(start_location), variable_name, variable_type, value)
+            return VariableDeclaration(self._location_from(start_location), variable_name, variable_type)
         # Return instruction
         if self._eat(ReturnKeyword):
-            start_location = self._previous_location()
             expression = self.parse_expression()
             return ReturnInstruction(self._location_from(start_location), expression)
-        # Question mark
+        # Context snapshot
         if self._eat(QuestionMarkToken):
-            return ContextSnapshot(self._previous_location())
-        # Invalid instruction
-        raise CompilationException(self._location(), f'Expected instruction but found {self._peek().__doc__}')
+            return ContextSnapshot(self._location_from(start_location))
+        # Assignment
+        assignment_target = self.parse_assignment_target()
+        self._expect(EqualToken)
+        value = self.parse_expression()
+        return Assignment(self._location_from(start_location), assignment_target, value)
 
     def parse_instruction_or_statement(self) -> Instruction:
         location = self._location()
@@ -453,16 +476,32 @@ class ASTGenerator:
         instruction = self.parse_instruction_or_statement()
         return InstructionBlock(instruction.location, instruction)
 
-    def parse_type(self) -> DataType:
-        base_type_identifier = self._expect(IdentifierToken)
-        base_type = self.namespace.get_base_type(base_type_identifier.location, base_type_identifier.name)
-        # Array
-        if self._eat(OpenBracketToken):
+    def parse_base_type(self) -> DataType:
+        # Parenthesised type description
+        if self._eat(OpenParToken):
+            operand = self.parse_type()
+            self._expect(CloseParToken)
+            return operand
+        # Identifier
+        start_location = self._location()
+        identifier = self._expect(IdentifierToken).name
+        return self.namespace.get_base_type(self._location_from(start_location), identifier)
+
+    def parse_type_operand(self) -> DataType:
+        operand = self.parse_base_type()
+        # Subscripts
+        while self._is_next(OpenBracketToken):
+            self._expect(OpenBracketToken)
             size = self._expect(NumericLiteral).value
             self._expect(CloseBracketToken)
-            return ArrayType(base_type, size)
-        # Single
-        return base_type
+            operand = ArrayType(operand, size)
+        return operand
+
+    def parse_type(self) -> DataType:
+        types = [self.parse_type_operand()]
+        while self._eat(StarToken):
+            types.append(self.parse_type_operand())
+        return ProductType.from_operands(types)
 
     def parse_and_define_constant(self) -> None:
         # Parse constant

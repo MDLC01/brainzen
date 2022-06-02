@@ -5,6 +5,7 @@ from data_types import *
 from exceptions import *
 from intermediate_representation.instructions import *
 from operations import BinaryOperation, UnaryOperation
+from type_checking.typed_assignment_targets import TypedAssignmentTarget
 from type_checking.typing_context import SubroutineTypingContext
 
 
@@ -32,8 +33,6 @@ class TypeCheckedInstruction(ABC):
                 return TypeCheckedVariableDeclaration(context, variable_declaration)
             case Assignment() as assignment:
                 return TypeCheckedAssignment(context, assignment)
-            case ArrayAssignment() as array_assignment:
-                return TypeCheckedArrayAssignment(context, array_assignment)
             case LoopStatement() as loop_statement:
                 return TypeCheckedLoopStatement(context, loop_statement)
             case WhileLoopStatement() as while_loop_statement:
@@ -123,6 +122,8 @@ class TypedExpression(TypeCheckedInstruction, ABC):
                 return LiteralChar.from_char(char)
             case Array() as array:
                 return LiteralArray.from_array(context, array)
+            case Tuple() as tuple_expression:
+                return LiteralTuple.from_tuple_expression(context, tuple_expression)
             case Identifier() as identifier:
                 return TypedIdentifier(context, identifier)
             case UnaryArithmeticExpression() as unary_arithmetic_expression:
@@ -219,15 +220,38 @@ class LiteralArray(TypedExpression):
                     s += str(element)
             return s + '"'
         # If the value is not a constant string
-        s = '['
-        for i, element in enumerate(self.value):
-            if i > 0:
-                s += ', '
-            s += str(element)
-        return s + ']'
+        elements = ', '.join(str(element) for element in self.value)
+        return f'[{elements}]'
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}[{self.value!r}]'
+
+
+class LiteralTuple(TypedExpression):
+    @classmethod
+    def from_tuple_expression(cls, context: SubroutineTypingContext, tuple_expression: Tuple) -> 'LiteralTuple':
+        return cls(tuple_expression.location,
+                   [TypedExpression.from_expression(context, expression) for expression in tuple_expression.elements])
+
+    def __init__(self, location: Location, elements: list[TypedExpression]) -> None:
+        super().__init__(location)
+        self.elements = elements
+        self.types = [element.type() for element in elements]
+        if len(self.elements) < 2:
+            raise CompilerException('Tuple must be contain at least two elements')
+
+    def type(self) -> DataType:
+        return ProductType.from_operands(self.types)
+
+    def is_known_at_compile_time(self) -> bool:
+        return all(element.is_known_at_compile_time() for element in self.elements)
+
+    def __str__(self) -> str:
+        elements = ', '.join(str(element) for element in self.elements)
+        return f'({elements})'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.elements!r}]'
 
 
 class TypedIdentifier(TypedExpression):
@@ -524,7 +548,7 @@ class TypeCheckedVariableDeclaration(TypeCheckedInstruction):
         context.add_variable(self.location, self.identifier, self.type)
 
     def __str__(self) -> str:
-        return f'{self.type} {self.identifier} = {self.value}'
+        return f'let {self.type} {self.identifier} = {self.value}'
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}[{self.identifier}, {self.type!r}, {self.value!r}]'
@@ -533,52 +557,17 @@ class TypeCheckedVariableDeclaration(TypeCheckedInstruction):
 class TypeCheckedAssignment(TypeCheckedInstruction):
     def __init__(self, context: SubroutineTypingContext, assignment: Assignment) -> None:
         super().__init__(assignment.location)
-        self.identifier: str = assignment.identifier
-        self.value: TypedExpression = TypedExpression.from_expression(context, assignment.value)
+        self.target = TypedAssignmentTarget.from_assignment_target(context, assignment.target)
+        self.value = TypedExpression.from_expression(context, assignment.value)
         # Type checking
-        expected_type = context.get_variable_type(self.location, self.identifier)
-        if self.value is not None and self.value.type() != expected_type:
-            raise CompilationException(self.value.location, f'Expected {expected_type} but found {self.value.type()}')
+        if self.target.type() != self.value.type():
+            raise CompilationException(self.location, f'Unable to assign {self.value.type()} to {self.target.type()}')
 
     def __str__(self) -> str:
-        return f'{self.identifier} = {self.value}'
+        return f'{self.target} = {self.value}'
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.identifier}, {self.value!r}]'
-
-
-class TypeCheckedArrayAssignment(TypeCheckedInstruction):
-    def __init__(self, context: SubroutineTypingContext, array_assignment: ArrayAssignment) -> None:
-        super().__init__(array_assignment.location)
-        self.identifier: str = array_assignment.identifier
-        self.offset: int = 0
-        self.indices: list[int] = array_assignment.indices
-        self.value: TypedExpression = TypedExpression.from_expression(context, array_assignment.value)
-        # Type checking
-        array_type = context.get_variable_type(self.location, self.identifier)
-        expected_type = array_type
-        for i, index in enumerate(self.indices):
-            if not isinstance(expected_type, ArrayType):
-                # TODO: Specify a more precise location and improve error message
-                raise CompilationException(self.location, f'Can not subscript {array_type}')
-            # Negative indices start wrap around
-            if index < 0:
-                self.offset += (expected_type.count - index) * expected_type.base_type.size()
-            else:
-                self.offset = index * expected_type.base_type.size()
-            if index < 0 or index >= expected_type.count:
-                # TODO: Specify a more precise location and improve error message
-                raise CompilationException(self.location, f'Array index out of bounds')
-            expected_type = expected_type.base_type
-        if self.value is not None and self.value.type() != expected_type:
-            raise CompilationException(self.value.location, f'Expected {expected_type} but found {self.value.type()}')
-
-    def __str__(self) -> str:
-        indices = ']['.join(str(index) for index in self.indices)
-        return f'{self.identifier}[{indices}] = {self.value}'
-
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.identifier}, {self.indices}, {self.value!r}]'
+        return f'{self.__class__.__name__}[{self.target!r}, {self.value!r}]'
 
 
 class TypeCheckedLoopStatement(TypeCheckedInstruction):
@@ -706,9 +695,9 @@ class TypeCheckedContextSnapshot(TypeCheckedInstruction):
 
 
 __all__ = ['TypeCheckedInstruction', 'TypeCheckedInstructionBlock', 'TypedExpression', 'LiteralChar', 'LiteralArray',
-           'TypedIdentifier', 'TypedArithmeticExpression', 'TypedUnaryArithmeticExpression',
+           'LiteralTuple', 'TypedIdentifier', 'TypedArithmeticExpression', 'TypedUnaryArithmeticExpression',
            'TypedBinaryArithmeticExpression', 'TypedArrayAccessExpression', 'PrintCall', 'InputCall',
            'TypeCheckedProcedureCall', 'TypedFunctionCall', 'TypeCheckedIncrementation', 'TypeCheckedDecrementation',
-           'TypeCheckedVariableDeclaration', 'TypeCheckedAssignment', 'TypeCheckedArrayAssignment',
-           'TypeCheckedLoopStatement', 'TypeCheckedWhileLoopStatement', 'TypeCheckedForLoopStatement',
-           'TypeCheckedConditionalStatement', 'TypeCheckedReturnInstruction', 'TypeCheckedContextSnapshot']
+           'TypeCheckedVariableDeclaration', 'TypeCheckedAssignment', 'TypeCheckedLoopStatement',
+           'TypeCheckedWhileLoopStatement', 'TypeCheckedForLoopStatement', 'TypeCheckedConditionalStatement',
+           'TypeCheckedReturnInstruction', 'TypeCheckedContextSnapshot']

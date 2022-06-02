@@ -591,6 +591,10 @@ class SubroutineCompiler(ScopeManager):
                 for element in value:
                     self.evaluate(element)
                     self._right(element.type().size())
+            case LiteralTuple(elements=elements):
+                for element in elements:
+                    self.evaluate(element)
+                    self._right(element.type().size())
             case TypedIdentifier(name=name):
                 self.copy_variable(name)
                 self._comment(f'Copied {name}', CommentLevel.BZ_CODE_EXTENDED)
@@ -678,6 +682,22 @@ class SubroutineCompiler(ScopeManager):
         # Finalize
         self._goto(call_index)
         self._comment('Go to call index')
+
+    def assign(self, target: TypedAssignmentTarget, index: int) -> None:
+        match target:
+            case TypedPrimitiveAssignmentTarget(location=location, identifier=identifier, offset=offset):
+                self.goto_variable(location, identifier)
+                self._right(offset)
+                self._reset(block_size=target.type().size())
+                destination = self.index
+                self._goto(index)
+                self._move({destination}, block_size=target.type().size())
+            case TypedTupleAssignmentTarget(elements=elements) as tuple_target:
+                product_type = tuple_target.type()
+                for i, element in enumerate(elements):
+                    self.assign(element, index + product_type.offset_of(i))
+            case _:
+                raise ImpossibleException(f'Unknown assignment target type: {target.__class__.__name__}')
 
     def print(self, values: list[TypedExpression], *, new_line: bool = False) -> None:
         for expression in values:
@@ -791,13 +811,10 @@ class SubroutineCompiler(ScopeManager):
                 self.increment_variable(location, identifier)
             case TypeCheckedDecrementation(location=location, identifier=identifier):
                 self.decrement_variable(location, identifier)
-            case TypeCheckedAssignment(location=location, identifier=identifier, value=expression):
-                self.goto_variable(location, identifier)
-                self.evaluate(expression)
-            case TypeCheckedArrayAssignment(location=location, identifier=identifier, offset=offset, value=expression):
-                self.goto_variable(location, identifier)
-                self._right(offset)
-                self.evaluate(expression)
+            case TypeCheckedAssignment(target=target, value=value):
+                with self:
+                    tmp = self.evaluate_in_new_variable(value)
+                    self.assign(target, self[tmp])
             case PrintCall(arguments=arguments, new_line=new_line):
                 self.print(arguments, new_line=new_line)
             case TypeCheckedProcedureCall(location=location, identifier=identifier, arguments=arguments):

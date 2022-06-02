@@ -2,7 +2,8 @@ from abc import ABC
 from typing import Generator
 
 from data_types import DataType
-from exceptions import Location
+from exceptions import CompilerException, Location
+from intermediate_representation.assignment_targets import AssignmentTarget
 from operations import *
 
 
@@ -98,12 +99,8 @@ class Array(Expression):
         self.value = value
 
     def __str__(self) -> str:
-        s = '['
-        for i, element in enumerate(self.value):
-            if i > 0:
-                s += ', '
-            s += str(element)
-        return s + ']'
+        elements = ', '.join(str(element) for element in self.value)
+        return f'[{elements}]'
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}[{self.value!r}]'
@@ -119,6 +116,29 @@ class Identifier(Expression):
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}[{self.name}]'
+
+
+class Tuple(Expression):
+    """A tuple literal."""
+
+    @classmethod
+    def from_elements(cls, location: Location, elements: list[Expression]) -> Expression:
+        if len(elements) == 1:
+            return elements[0]
+        return cls(location, elements)
+
+    def __init__(self, location: Location, elements: list[Expression]) -> None:
+        super().__init__(location)
+        self.elements = elements
+        if len(self.elements) < 2:
+            raise CompilerException('Tuple must be contain at least two elements')
+
+    def __str__(self) -> str:
+        elements = ', '.join(str(element) for element in self.elements)
+        return f'({elements})'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.elements!r}]'
 
 
 class ArithmeticExpression(Expression, ABC):
@@ -224,38 +244,23 @@ class VariableDeclaration(Instruction):
         self.value = value
 
     def __str__(self) -> str:
-        return f'{self.type} {self.identifier} = {self.value}'
+        return f'let {self.type} {self.identifier} = {self.value}'
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}[{self.identifier}, {self.type!r}, {self.value!r}]'
 
 
 class Assignment(Instruction):
-    def __init__(self, location: Location, identifier: str, value: Expression) -> None:
+    def __init__(self, location: Location, target: AssignmentTarget, value: Expression) -> None:
         super().__init__(location)
-        self.identifier = identifier
+        self.target = target
         self.value = value
 
     def __str__(self) -> str:
-        return f'{self.identifier} = {self.value}'
+        return f'{self.target} = {self.value}'
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.identifier}, {self.value!r}]'
-
-
-class ArrayAssignment(Instruction):
-    def __init__(self, location: Location, identifier: str, indices: list[int], value: Expression) -> None:
-        super().__init__(location)
-        self.identifier = identifier
-        self.indices = indices
-        self.value = value
-
-    def __str__(self) -> str:
-        indices = ']['.join(str(index) for index in self.indices)
-        return f'{self.identifier}[{indices}] = {self.value}'
-
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.identifier}, {self.indices}, {self.value!r}]'
+        return f'{self.__class__.__name__}[{self.target!r}, {self.value!r}]'
 
 
 class LoopStatement(Instruction):
@@ -357,8 +362,8 @@ class ContextSnapshot(Instruction):
         return f'{self.__class__.__name__}'
 
 
-__all__ = ['Instruction', 'InstructionBlock', 'Expression', 'Char', 'Array', 'Identifier', 'ArithmeticExpression',
-           'UnaryArithmeticExpression', 'BinaryArithmeticExpression', 'ArrayAccessExpression', 'ProcedureCall',
-           'FunctionCall', 'Incrementation', 'Decrementation', 'VariableDeclaration', 'Assignment', 'ArrayAssignment',
+__all__ = ['Instruction', 'InstructionBlock', 'Expression', 'Char', 'Array', 'Identifier', 'Tuple',
+           'ArithmeticExpression', 'UnaryArithmeticExpression', 'BinaryArithmeticExpression', 'ArrayAccessExpression',
+           'ProcedureCall', 'FunctionCall', 'Incrementation', 'Decrementation', 'VariableDeclaration', 'Assignment',
            'LoopStatement', 'WhileLoopStatement', 'ForLoopStatement', 'ConditionalStatement', 'ReturnInstruction',
            'ContextSnapshot']

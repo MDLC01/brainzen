@@ -84,6 +84,38 @@ class PrimitiveType(DataType):
         return self.identifier
 
 
+class ProductType(DataType):
+    __slots__ = 'types'
+
+    @classmethod
+    def from_operands(cls, operands: list[DataType]) -> 'DataType':
+        if len(operands) == 1:
+            return operands[0]
+        return cls(operands)
+
+    def __init__(self, operands: list[DataType]) -> None:
+        self.operands = operands
+        if len(self.operands) < 2:
+            raise CompilerException('Product type must contain at least two operand')
+
+    def count(self) -> int:
+        return len(self.operands)
+
+    def offset_of(self, index: int) -> int:
+        return sum(operand.size() for i, operand in enumerate(self.operands) if i < index)
+
+    def size(self) -> int:
+        return sum(t.size() for t in self.operands)
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, type(self)):
+            return False
+        return other.operands == self.operands
+
+    def __repr__(self) -> str:
+        return ' * '.join(t.__repr__() for t in self.operands)
+
+
 class ArrayType(DataType):
     __slots__ = 'base_type', 'count'
 
@@ -113,4 +145,4 @@ class Types:
     CHAR = PrimitiveType('char', 1)
 
 
-__all__ = ['DataType', 'PrimitiveType', 'ArrayType', 'Types']
+__all__ = ['DataType', 'PrimitiveType', 'ProductType', 'ArrayType', 'Types']
