@@ -142,7 +142,7 @@ class TypedExpression(TypeCheckedInstruction, ABC):
                 return InputCall(function_call)
             case FunctionCall() as function_call:
                 return TypedFunctionCall(context, function_call)
-        raise ImpossibleException(f'Unknown expression type: {expression.__class__!r}')
+        raise ImpossibleException(f'Unknown expression type: {expression.__class__.__name__}')
 
     @abstractmethod
     def type(self) -> DataType:
