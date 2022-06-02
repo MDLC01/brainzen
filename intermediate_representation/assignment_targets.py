@@ -11,6 +11,9 @@ class AssignmentTarget(ABC):
     def __str__(self) -> str:
         ...
 
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self}]'
+
 
 class PrimitiveAssignmentTarget(AssignmentTarget, ABC):
     pass
