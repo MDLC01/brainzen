@@ -47,7 +47,7 @@ class TypeCheckedInstruction(ABC):
                 return TypeCheckedReturnInstruction(context, return_instruction)
             case ContextSnapshot() as context_snapshot:
                 return TypeCheckedContextSnapshot(context_snapshot)
-        raise ImpossibleException(f'Unknown instruction type: {instruction.__class__!r}')
+        raise ImpossibleException(f'Unknown instruction type: {instruction.__class__.__name__}')
 
     def __init__(self, location: Location) -> None:
         self.location = location
