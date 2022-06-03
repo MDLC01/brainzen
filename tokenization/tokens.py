@@ -33,7 +33,7 @@ class Token:
             return Token.__token_map[token](location)
         if Token.is_valid_keyword(token):
             return Token.__keyword_map[token](location)
-        raise ImpossibleException(f'Unknown token: {token!r}. This error could be avoided.')
+        raise ImpossibleException(f'Unknown token: {token!r}.')
 
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
