@@ -23,7 +23,7 @@ class SubroutineCompiler(NameManager):
 
     def __init__(self, subroutine: TypeCheckedSubroutine, context: dict[str, 'SubroutineCompiler'], *,
                  comment_level: int = CommentLevel.BZ_CODE) -> None:
-        super().__init__(subroutine.arguments)
+        super().__init__(subroutine.arguments, subroutine.return_type)
         self.context: dict[str, SubroutineCompiler] = context
         self.subroutine: TypeCheckedSubroutine = subroutine
         self.comment_level: int = comment_level
@@ -795,7 +795,7 @@ class SubroutineCompiler(NameManager):
             case TypeCheckedConditionalStatement(test=test, if_body=if_body, else_body=else_body):
                 self.condition(test, if_body, else_body)
             case TypeCheckedReturnInstruction(value=expression):
-                self.evaluate(expression)
+                self.evaluate(expression, self.return_index)
             case TypeCheckedContextSnapshot(location=location, identifier=identifier):
                 self.create_context_snapshot(location, identifier)
                 CompilationWarning.add(location, '`?` is a debug feature and should not be used in production code')
@@ -812,6 +812,7 @@ class SubroutineCompiler(NameManager):
                 self.index = self.subroutine.offset
             elif isinstance(self.subroutine, TypeCheckedProcedure):
                 self.compile_instruction(self.subroutine.body)
+                self._goto(self.return_index)
             else:
                 raise ImpossibleException(f'Unknown subroutine type: {self.subroutine.__class__.__name__}')
         return self.bf_code

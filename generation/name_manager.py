@@ -115,7 +115,7 @@ class Scope:
 
 
 class NameManager(ABC):
-    def __init__(self, arguments: list[SubroutineArgument]) -> None:
+    def __init__(self, arguments: list[SubroutineArgument], return_type: DataType | None = None) -> None:
         argument_variables = []
         argument_buffer_size = 0
         for argument in arguments:
@@ -127,6 +127,9 @@ class NameManager(ABC):
         for argument_variable in argument_variables:
             argument_variable.__enter__()
         self.tmp = self.variable(identifier='$tmp').__enter__()
+        self.return_index = 0
+        if return_type is not None:
+            self.return_index = self.variable(return_type, '$return').__enter__().index
 
     def memory_size(self) -> int:
         return self.memory.size()
