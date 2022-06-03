@@ -2,7 +2,7 @@ from enum import IntEnum
 
 from data_types import *
 from exceptions import *
-from generation.memory_manager import *
+from generation.name_manager import *
 from operations import *
 from type_checking import *
 
@@ -14,7 +14,7 @@ class CommentLevel(IntEnum):
     DETAILS = 3
 
 
-class SubroutineCompiler(ScopeManager):
+class SubroutineCompiler(NameManager):
     """
     A subroutine is only allowed to change cells to the right of where it started, and it
     must set all values back to 0 after being called. It can expect cells to contain 0 by default.
@@ -23,17 +23,13 @@ class SubroutineCompiler(ScopeManager):
 
     def __init__(self, subroutine: TypeCheckedSubroutine, context: dict[str, 'SubroutineCompiler'], *,
                  comment_level: int = CommentLevel.BZ_CODE) -> None:
-        super().__init__()
+        super().__init__(subroutine.arguments)
         self.context: dict[str, SubroutineCompiler] = context
         self.subroutine: TypeCheckedSubroutine = subroutine
         self.comment_level: int = comment_level
         self.bf_code: str = ''
         self.index: int = 0
         self._loop_start_indices: list[int] = []
-        for argument in subroutine.arguments:
-            self.register_argument(argument.identifier, argument.type)
-        self.register_variable(Types.CHAR, '$tmp')
-        self.tmp = self['$tmp']
 
     def identifier(self) -> str:
         """Return the identifier of the subroutine."""
@@ -169,63 +165,43 @@ class SubroutineCompiler(ScopeManager):
             self._goto(source)
             self._loop_end()
 
-    def register_variable(self, variable_type: DataType = Types.CHAR, identifier: str = None,
-                          value: int | None = None) -> str:
-        # Register identifier
-        if identifier is None:
-            identifier = generate_unique_identifier()
-        self.register_identifier(identifier, variable_type)
-        # Set the value of the variable if provided
+    def value(self, value: int, variable_type: DataType = Types.CHAR, identifier: str = None) -> Variable:
+        variable = self.variable(variable_type, identifier)
         if value is not None:
             initial_index = self.index
-            self._goto(self[identifier])
+            self._goto(variable.index)
             self._set(value)
             self._goto(initial_index)
-        # Return identifier
-        return identifier
+        return variable
 
-    def __delitem__(self, identifier: str) -> None:
-        self._reset(self[identifier], block_size=self.size_of(identifier))
-        super().__delitem__(identifier)
+    def clear_variable_memory(self, variable: Variable) -> None:
+        self._reset(variable.index, block_size=variable.size())
 
-    def goto_variable(self, location: Location, identifier: str) -> None:
-        """Move the pointer to the position of the passed variable."""
+    def get_name(self, location: Location, identifier: str) -> Name:
         if identifier not in self:
             raise CompilationException(location, f'Unknown variable: {identifier!r}')
-        self._goto(self[identifier])
+        return self[identifier]
 
-    def increment_variable(self, location: Location, identifier: str) -> None:
-        """Increment the passed variable and move the pointer to its position"""
-        self.goto_variable(location, identifier)
-        self._increment()
+    def reset_variable(self, variable: Name) -> None:
+        """Reset the passed variable to 0 and move the pointer to its position."""
+        self._reset(variable.index, block_size=variable.size())
 
-    def decrement_variable(self, location: Location, identifier: str) -> None:
-        """Decrement the passed variable and move the pointer to its position"""
-        self.goto_variable(location, identifier)
-        self._decrement()
-
-    def reset_variable(self, location: Location, identifier: str) -> None:
-        """Reset the passed variable to 0 and move the pointer to its position"""
-        self.goto_variable(location, identifier)
-        self._reset(block_size=self.size_of(identifier))
-
-    def copy_variable(self, identifier: str) -> None:
+    def copy_variable(self, source: Name) -> None:
         """Copy the value of the passed variable to the current location."""
-        source = self[identifier]
         destination = self.index
         backup = self.tmp
         if source == destination:
             return
-        size = self.size_of(identifier)
+        size = source.size()
         # Reset destination
         self._reset(destination, block_size=size)
         # Copy variable cell by cell
         for i in range(size):
-            self._reset(backup)
-            self._goto(source + i)
-            self._move({destination + i, backup})
-            self._goto(backup)
-            self._move({source + i})
+            self._reset(backup.index)
+            self._goto(source.index + i)
+            self._move({destination + i, backup.index})
+            self._goto(backup.index)
+            self._move({source.index + i})
         # Return to the destination cell
         self._goto(destination)
 
@@ -235,51 +211,44 @@ class SubroutineCompiler(ScopeManager):
         raise CompilationException(location, f'Unknown subroutine: {identifier!r}')
 
     def evaluate_unary_arithmetic_expression(self, expression: TypedUnaryArithmeticExpression) -> None:
-        with self:
-            evaluation_index = self.index
-            # Evaluate operand
-            operand = self.evaluate_in_new_variable(expression.operand)
-            # Reset destination to 0
+        evaluation_index = self.index
+        with self.evaluate_in_new_variable(expression.operand) as operand:
             self._reset(evaluation_index)
             # Comments show corresponding Brainfuck code, where the evaluation index is the starting index, and the
             # operand is stored at the index of the pointer when the comma is reached
             if expression.operation is UnaryOperation.BOOL_NORMALIZATION:
                 # >,[<+>[-]]
-                self._loop_start(self[operand])
+                self._loop_start(operand.index)
                 self._goto(evaluation_index)
                 self._increment()
-                self._reset(self[operand])
+                self._reset(operand.index)
                 self._loop_end()
             elif expression.operation is UnaryOperation.NEGATION:
                 # >, <+>[<->[-]]
                 self._goto(evaluation_index)
                 self._increment()
-                self._loop_start(self[operand])
+                self._loop_start(operand.index)
                 self._goto(evaluation_index)
                 self._decrement()
-                self._reset(self[operand])
+                self._reset(operand.index)
                 self._loop_end()
             elif expression.operation is UnaryOperation.OPPOSITION:
                 # >, [-<->]
-                self._loop_start(self[operand])
+                self._loop_start(operand.index)
                 self._decrement()
                 self._goto(evaluation_index)
                 self._decrement()
-                self._goto(self[operand])
+                self._goto(operand.index)
                 self._loop_end()
             else:
                 raise ImpossibleException(f'Unknown operation: {expression.operation!r}')
-            # Finalize
-            self._goto(evaluation_index)
+        self._goto(evaluation_index)
 
     def evaluate_binary_arithmetic_expression(self, expression: TypedBinaryArithmeticExpression) -> None:
         """Evaluate the passed binary arithmetic expression in the current cell."""
-        with self:
-            evaluation_index = self.index
-            # Evaluate operands
-            left = self.evaluate_in_new_variable(expression.left)
-            right = self.evaluate_in_new_variable(expression.right)
-            # Reset destination to 0
+        evaluation_index = self.index
+        with (self.evaluate_in_new_variable(expression.left) as left,
+              self.evaluate_in_new_variable(expression.right) as right):
             self._reset(evaluation_index)
             # Comments show corresponding Brainfuck code, where the evaluation index is the starting index, the
             # left operand is stored at the index of the pointer when the first comma is reached, and the right
@@ -287,289 +256,287 @@ class SubroutineCompiler(ScopeManager):
             if expression.operation is BinaryOperation.EQUALITY_TEST:
                 # >,>, [-<->] <<+>[<->[-]]
                 # Subtract right from left
-                self._loop_start(self[right])
+                self._loop_start(right.index)
                 self._decrement()
-                self._decrement(self[left])
-                self._goto(self[right])
+                self._decrement(left.index)
+                self._goto(right.index)
                 self._loop_end()
                 # Test if the result is zero
                 self._goto(evaluation_index)
                 self._increment()
-                self._loop_start(self[left])
+                self._loop_start(left.index)
                 self._goto(evaluation_index)
                 self._decrement()
-                self._reset(self[left])
+                self._reset(left.index)
                 self._loop_end()
             elif expression.operation is BinaryOperation.DIFFERENCE_TEST:
                 # >,>, [-<->] <[<+>[-]]
                 # Subtract right from left
-                self._loop_start(self[right])
+                self._loop_start(right.index)
                 self._decrement()
-                self._decrement(self[left])
-                self._goto(self[right])
+                self._decrement(left.index)
+                self._goto(right.index)
                 self._loop_end()
                 # Test if the result is non-zero
-                self._loop_start(self[left])
+                self._loop_start(left.index)
                 self._goto(evaluation_index)
                 self._increment()
-                self._reset(self[left])
+                self._reset(left.index)
                 self._loop_end()
             elif expression.operation is BinaryOperation.STRICT_INEQUALITY_TEST:
-                tmp1, tmp2 = self.require_memory(count=2)
-                self._loop_start(self[right])
-                # Duplicate right operand
-                self._goto(self[left])
-                self._move({self[tmp1], self[tmp2]})
-                self._goto(self[tmp2])
-                self._move({self[left]})
-                self._increment(self[tmp2])
-                # Do stuff
-                self._loop_start(self[tmp1])
-                self._decrement(self[right])
-                self._decrement(self[left])
-                self._decrement(self[tmp2])
-                self._reset(self[tmp1])
-                self._loop_end()
-                # Do other stuff
-                self._loop_start(self[tmp2])
-                self._reset(self[right])
-                self._goto(evaluation_index)
-                self._increment()
-                self._decrement(self[tmp2])
-                self._loop_end()
-                self._goto(self[right])
-                self._loop_end()
+                with self.variable() as tmp1, self.variable() as tmp2:
+                    self._loop_start(right.index)
+                    # Duplicate right operand
+                    self._goto(left.index)
+                    self._move({tmp1.index, tmp2.index})
+                    self._goto(tmp2.index)
+                    self._move({left.index})
+                    self._increment(tmp2.index)
+                    # Do stuff
+                    self._loop_start(tmp1.index)
+                    self._decrement(right.index)
+                    self._decrement(left.index)
+                    self._decrement(tmp2.index)
+                    self._reset(tmp1.index)
+                    self._loop_end()
+                    # Do other stuff
+                    self._loop_start(tmp2.index)
+                    self._reset(right.index)
+                    self._goto(evaluation_index)
+                    self._increment()
+                    self._decrement(tmp2.index)
+                    self._loop_end()
+                    self._goto(right.index)
+                    self._loop_end()
             elif expression.operation is BinaryOperation.LARGE_INEQUALITY_TEST:
                 # Compute !(l > r)
-                tmp1, tmp2 = self.require_memory(count=2)
-                self._loop_start(self[left])
-                # Duplicate right operand
-                self._goto(self[right])
-                self._move({self[tmp1], self[tmp2]})
-                self._goto(self[tmp2])
-                self._move({self[right]})
-                self._increment(self[tmp2])
-                # Do stuff
-                self._loop_start(self[tmp1])
-                self._decrement(self[left])
-                self._decrement(self[right])
-                self._decrement(self[tmp2])
-                self._reset(self[tmp1])
-                self._loop_end()
-                # Do other stuff
-                self._loop_start(self[tmp2])
-                self._reset(self[left])
-                self._increment(self[tmp1])
-                self._decrement(self[tmp2])
-                self._loop_end()
-                self._goto(self[left])
-                self._loop_end()
-                # Negate result
-                self._goto(evaluation_index)
-                self._increment()
-                self._loop_start(self[tmp1])
-                self._decrement(self[tmp1])
-                self._goto(evaluation_index)
-                self._decrement()
-                self._goto(self[tmp1])
-                self._loop_end()
+                with self.variable() as tmp1, self.variable() as tmp2:
+                    self._loop_start(left.index)
+                    # Duplicate right operand
+                    self._goto(right.index)
+                    self._move({tmp1.index, tmp2.index})
+                    self._goto(tmp2.index)
+                    self._move({right.index})
+                    self._increment(tmp2.index)
+                    # Do stuff
+                    self._loop_start(tmp1.index)
+                    self._decrement(left.index)
+                    self._decrement(right.index)
+                    self._decrement(tmp2.index)
+                    self._reset(tmp1.index)
+                    self._loop_end()
+                    # Do other stuff
+                    self._loop_start(tmp2.index)
+                    self._reset(left.index)
+                    self._increment(tmp1.index)
+                    self._decrement(tmp2.index)
+                    self._loop_end()
+                    self._goto(left.index)
+                    self._loop_end()
+                    # Negate result
+                    self._goto(evaluation_index)
+                    self._increment()
+                    self._loop_start(tmp1.index)
+                    self._decrement(tmp1.index)
+                    self._goto(evaluation_index)
+                    self._decrement()
+                    self._goto(tmp1.index)
+                    self._loop_end()
             elif expression.operation is BinaryOperation.INVERSE_STRICT_INEQUALITY_TEST:
-                tmp1, tmp2 = self.require_memory(count=2)
-                self._loop_start(self[left])
-                # Duplicate right operand
-                self._goto(self[right])
-                self._move({self[tmp1], self[tmp2]})
-                self._goto(self[tmp2])
-                self._move({self[right]})
-                self._increment(self[tmp2])
-                # Do stuff
-                self._loop_start(self[tmp1])
-                self._decrement(self[left])
-                self._decrement(self[right])
-                self._decrement(self[tmp2])
-                self._reset(self[tmp1])
-                self._loop_end()
-                # Do other stuff
-                self._loop_start(self[tmp2])
-                self._reset(self[left])
-                self._goto(evaluation_index)
-                self._increment()
-                self._decrement(self[tmp2])
-                self._loop_end()
-                self._goto(self[left])
-                self._loop_end()
+                with self.variable() as tmp1, self.variable() as tmp2:
+                    self._loop_start(left.index)
+                    # Duplicate right operand
+                    self._goto(right.index)
+                    self._move({tmp1.index, tmp2.index})
+                    self._goto(tmp2.index)
+                    self._move({right.index})
+                    self._increment(tmp2.index)
+                    # Do stuff
+                    self._loop_start(tmp1.index)
+                    self._decrement(left.index)
+                    self._decrement(right.index)
+                    self._decrement(tmp2.index)
+                    self._reset(tmp1.index)
+                    self._loop_end()
+                    # Do other stuff
+                    self._loop_start(tmp2.index)
+                    self._reset(left.index)
+                    self._goto(evaluation_index)
+                    self._increment()
+                    self._decrement(tmp2.index)
+                    self._loop_end()
+                    self._goto(left.index)
+                    self._loop_end()
             elif expression.operation is BinaryOperation.INVERSE_LARGE_INEQUALITY_TEST:
                 # Compute !(l < r)
-                tmp1, tmp2 = self.require_memory(count=2)
-                self._loop_start(self[right])
-                # Duplicate right operand
-                self._goto(self[left])
-                self._move({self[tmp1], self[tmp2]})
-                self._goto(self[tmp2])
-                self._move({self[left]})
-                self._increment(self[tmp2])
-                # Do stuff
-                self._loop_start(self[tmp1])
-                self._decrement(self[right])
-                self._decrement(self[left])
-                self._decrement(self[tmp2])
-                self._reset(self[tmp1])
-                self._loop_end()
-                # Do other stuff
-                self._loop_start(self[tmp2])
-                self._reset(self[right])
-                self._increment(self[tmp1])
-                self._decrement(self[tmp2])
-                self._loop_end()
-                self._goto(self[right])
-                self._loop_end()
-                # Negate result
-                self._goto(evaluation_index)
-                self._increment()
-                self._loop_start(self[tmp1])
-                self._decrement(self[tmp1])
-                self._goto(evaluation_index)
-                self._decrement()
-                self._goto(self[tmp1])
-                self._loop_end()
+                with self.variable() as tmp1, self.variable() as tmp2:
+                    self._loop_start(right.index)
+                    # Duplicate right operand
+                    self._goto(left.index)
+                    self._move({tmp1.index, tmp2.index})
+                    self._goto(tmp2.index)
+                    self._move({left.index})
+                    self._increment(tmp2.index)
+                    # Do stuff
+                    self._loop_start(tmp1.index)
+                    self._decrement(right.index)
+                    self._decrement(left.index)
+                    self._decrement(tmp2.index)
+                    self._reset(tmp1.index)
+                    self._loop_end()
+                    # Do other stuff
+                    self._loop_start(tmp2.index)
+                    self._reset(right.index)
+                    self._increment(tmp1.index)
+                    self._decrement(tmp2.index)
+                    self._loop_end()
+                    self._goto(right.index)
+                    self._loop_end()
+                    # Negate result
+                    self._goto(evaluation_index)
+                    self._increment()
+                    self._loop_start(tmp1.index)
+                    self._decrement(tmp1.index)
+                    self._goto(evaluation_index)
+                    self._decrement()
+                    self._goto(tmp1.index)
+                    self._loop_end()
             elif expression.operation is BinaryOperation.CONJUNCTION:
                 # There might be a better way
                 # >,>, >++(tmp1) >+(tmp2) <<<[>>-<<[-]] >[>-<[-]] >[>-<[-]] >[<<<<+>>>>[-]]
-                tmp1 = self.register_variable(Types.CHAR, value=2)
-                tmp2 = self.register_variable(Types.CHAR, value=1)
-                # Test if the left operand is true
-                self._loop_start(self[left])
-                self._decrement(self[tmp1])
-                self._reset(self[left])
-                self._loop_end()
-                # Test if the right operand is true
-                self._loop_start(self[right])
-                self._decrement(self[tmp1])
-                self._reset(self[right])
-                self._loop_end()
-                # Test if one of the operand is true
-                self._loop_start(self[tmp1])
-                self._decrement(self[tmp2])
-                self._reset(self[tmp1])
-                self._loop_end()
-                # Return result
-                self._loop_start(self[tmp2])
-                self._goto(evaluation_index)
-                self._increment()
-                self._reset(self[tmp2])
-                self._loop_end()
+                with self.value(2) as tmp1, self.value(1) as tmp2:
+                    # Test if the left operand is true
+                    self._loop_start(left.index)
+                    self._decrement(tmp1.index)
+                    self._reset(left.index)
+                    self._loop_end()
+                    # Test if the right operand is true
+                    self._loop_start(right.index)
+                    self._decrement(tmp1.index)
+                    self._reset(right.index)
+                    self._loop_end()
+                    # Test if one of the operand is true
+                    self._loop_start(tmp1.index)
+                    self._decrement(tmp2.index)
+                    self._reset(tmp1.index)
+                    self._loop_end()
+                    # Return result
+                    self._loop_start(tmp2.index)
+                    self._goto(evaluation_index)
+                    self._increment()
+                    self._reset(tmp2.index)
+                    self._loop_end()
             elif expression.operation is BinaryOperation.DISJUNCTION:
                 # There might be a better way
                 # >,>, >+(tmp) <<[>>[-]<<-<+>] >>[<[-<<+>>]>[-]]
-                tmp = self.register_variable(Types.CHAR, value=1)
-                # If the left operand is truthy, its value is copied
-                self._loop_start(self[left])
-                self._reset(self[tmp])
-                self._decrement(self[left])
-                self._goto(evaluation_index)
-                self._increment()
-                self._goto(self[left])
-                self._loop_end()
-                # Else, the value of the right operand is copied
-                self._loop_start(self[tmp])
-                self._goto(self[right])
-                self._move({evaluation_index})
-                self._reset(self[tmp])
-                self._loop_end()
+                with self.value(1) as tmp:
+                    # If the left operand is truthy, its value is copied
+                    self._loop_start(left.index)
+                    self._reset(tmp.index)
+                    self._decrement(left.index)
+                    self._goto(evaluation_index)
+                    self._increment()
+                    self._goto(left.index)
+                    self._loop_end()
+                    # Else, the value of the right operand is copied
+                    self._loop_start(tmp.index)
+                    self._goto(right.index)
+                    self._move({evaluation_index})
+                    self._reset(tmp.index)
+                    self._loop_end()
             elif expression.operation is BinaryOperation.ADDITION:
                 # >,>, <[-<+>] >[-<<+>>]
-                self._goto(self[left])
+                self._goto(left.index)
                 self._move({evaluation_index})
-                self._loop_start(self[right])
+                self._loop_start(right.index)
                 self._decrement()
                 self._goto(evaluation_index)
                 self._increment()
-                self._goto(self[right])
+                self._goto(right.index)
                 self._loop_end()
             elif expression.operation is BinaryOperation.SUBTRACTION:
                 # >,>, <[-<+>] >[-<<->>]
-                self._goto(self[left])
+                self._goto(left.index)
                 self._move({evaluation_index})
-                self._loop_start(self[right])
+                self._loop_start(right.index)
                 self._decrement()
                 self._goto(evaluation_index)
                 self._decrement()
-                self._goto(self[right])
+                self._goto(right.index)
                 self._loop_end()
             elif expression.operation is BinaryOperation.MULTIPLICATION:
                 # >,>, >(tmp) <<[- >[-<<+>>>+<] >[-<+>]<<]
-                tmp = self.register_variable()
-                self._loop_start(self[left])
-                self._decrement()
-                self._goto(self[right])
-                self._move({evaluation_index, self[tmp]})
-                self._goto(self[tmp])
-                self._move({self[right]})
-                self._goto(self[left])
-                self._loop_end()
+                with self.variable() as tmp:
+                    self._loop_start(left.index)
+                    self._decrement()
+                    self._goto(right.index)
+                    self._move({evaluation_index, tmp.index})
+                    self._goto(tmp.index)
+                    self._move({right.index})
+                    self._goto(left.index)
+                    self._loop_end()
             elif expression.operation is BinaryOperation.DIVISION:
                 # >,>, >(tmp1) >(tmp2) >(tmp3) <<<<<[->->+ <[->>+>+<<<]>>>[-<<<+>>>] + <[>-<[-]] >[-<<<<<+>>>[-<+>]>>]<<<<]
-                tmp1, tmp2, tmp3 = self.require_memory(count=3)
-                self._loop_start(self[left])
-                self._decrement()
-                self._decrement(self[right])
-                self._increment(self[tmp1])
-                self._goto(self[right])
-                self._move({self[tmp2], self[tmp3]})
-                self._goto(self[tmp3])
-                self._move({self[right]})
-                self._increment()
-                self._loop_start(self[tmp2])
-                self._decrement(self[tmp3])
-                self._reset(self[tmp2])
-                self._loop_end()
-                self._loop_start(self[tmp3])
-                self._decrement()
-                self._goto(evaluation_index)
-                self._increment()
-                self._goto(self[tmp1])
-                self._move({self[right]})
-                self._goto(self[tmp3])
-                self._loop_end()
-                self._goto(self[left])
-                self._loop_end()
+                with self.variable() as tmp1, self.variable() as tmp2, self.variable() as tmp3:
+                    self._loop_start(left.index)
+                    self._decrement()
+                    self._decrement(right.index)
+                    self._increment(tmp1.index)
+                    self._goto(right.index)
+                    self._move({tmp2.index, tmp3.index})
+                    self._goto(tmp3.index)
+                    self._move({right.index})
+                    self._increment()
+                    self._loop_start(tmp2.index)
+                    self._decrement(tmp3.index)
+                    self._reset(tmp2.index)
+                    self._loop_end()
+                    self._loop_start(tmp3.index)
+                    self._decrement()
+                    self._goto(evaluation_index)
+                    self._increment()
+                    self._goto(tmp1.index)
+                    self._move({right.index})
+                    self._goto(tmp3.index)
+                    self._loop_end()
+                    self._goto(left.index)
+                    self._loop_end()
             elif expression.operation is BinaryOperation.MODULO_OPERATION:
                 # Same as division, but result is in tmp1
                 # >,>, >(tmp1) >(tmp2) >(tmp3) <<<<<[->->+ <[->>+>+<<<]>>>[-<<<+>>>] + <[>-<[-]] >[-<<<<<+>>>[-<+>]>>]<<<<]
-                tmp1, tmp2, tmp3 = self.require_memory(count=3)
-                self._loop_start(self[left])
-                self._decrement()
-                self._decrement(self[right])
-                self._goto(evaluation_index)
-                self._increment()
-                self._goto(self[right])
-                self._move({self[tmp1], self[tmp2]})
-                self._goto(self[tmp2])
-                self._move({self[right]})
-                self._increment()
-                self._loop_start(self[tmp1])
-                self._decrement(self[tmp2])
-                self._reset(self[tmp1])
-                self._loop_end()
-                self._loop_start(self[tmp2])
-                self._decrement()
-                self._increment(self[tmp3])
-                self._goto(evaluation_index)
-                self._move({self[right]})
-                self._goto(self[tmp2])
-                self._loop_end()
-                self._goto(self[left])
-                self._loop_end()
+                with self.variable() as tmp1, self.variable() as tmp2, self.variable() as tmp3:
+                    self._loop_start(left.index)
+                    self._decrement()
+                    self._decrement(right.index)
+                    self._goto(evaluation_index)
+                    self._increment()
+                    self._goto(right.index)
+                    self._move({tmp1.index, tmp2.index})
+                    self._goto(tmp2.index)
+                    self._move({right.index})
+                    self._increment()
+                    self._loop_start(tmp1.index)
+                    self._decrement(tmp2.index)
+                    self._reset(tmp1.index)
+                    self._loop_end()
+                    self._loop_start(tmp2.index)
+                    self._decrement()
+                    self._increment(tmp3.index)
+                    self._goto(evaluation_index)
+                    self._move({right.index})
+                    self._goto(tmp2.index)
+                    self._loop_end()
+                    self._goto(left.index)
+                    self._loop_end()
             elif expression.operation is BinaryOperation.CONCATENATION:
                 # TODO: Evaluate operands here instead of copying them
                 self._goto(evaluation_index)
                 self.copy_variable(left)
-                self._right(self.size_of(left))
+                self._right(left.size())
                 self.copy_variable(right)
             else:
                 raise ImpossibleException(f'Unknown operation: {expression.operation!r}')
-            # Finalize
-            self._goto(evaluation_index)
+        self._goto(evaluation_index)
 
     def evaluate_arithmetic_expression(self, expression: TypedArithmeticExpression) -> None:
         """Evaluate the passed arithmetic expression at the current location."""
@@ -581,9 +548,11 @@ class SubroutineCompiler(ScopeManager):
             case _:
                 raise ImpossibleException(f'Unknown arithmetic expression type: {expression.__class__}')
 
-    def evaluate(self, expression: TypedExpression) -> None:
-        """Evaluate the passed expression at the current location. Does not move the cursor."""
-        index = self.index
+    def evaluate(self, expression: TypedExpression, index: int | None = None) -> None:
+        """Evaluate the passed expression at the current location (or `index` if specified)."""
+        if index is None:
+            index = self.index
+        self._goto(index)
         match expression:
             case LiteralChar(value=value):
                 self._set(value)
@@ -595,14 +564,14 @@ class SubroutineCompiler(ScopeManager):
                 for element in elements:
                     self.evaluate(element)
                     self._right(element.type().size())
-            case TypedIdentifier(name=name):
-                self.copy_variable(name)
+            case TypedIdentifier(location=location, name=name):
+                variable = self.get_name(location, name)
+                self.copy_variable(variable)
                 self._comment(f'Copied {name}', CommentLevel.BZ_CODE_EXTENDED)
-            case TypedArrayAccessExpression(array=array, index=index):
+            case TypedArrayAccessExpression(array=array, index=array_index):
                 evaluation_index = self.index
-                with self:
-                    tmp = self.evaluate_in_new_variable(array)
-                    self._goto(self[tmp] + index)
+                with self.evaluate_in_new_variable(array) as tmp:
+                    self._goto(tmp.index + array_index)
                     self._move({evaluation_index})
                     self._goto(evaluation_index)
             case InputCall():
@@ -615,26 +584,27 @@ class SubroutineCompiler(ScopeManager):
                 raise ImpossibleException(f'Unknown expression type: {expression.__class__.__name__}')
         self._goto(index)
 
-    def evaluate_in_new_variable(self, expression: TypedExpression) -> str:
-        variable = self.register_variable(expression.type())
-        self._goto(self[variable])
-        self.evaluate(expression)
+    def evaluate_in_new_variable(self, expression: TypedExpression) -> Name:
+        variable = self.variable(expression.type())
+        self.evaluate(expression, variable.index)
         return variable
 
     def _evaluate_arguments(self, arguments: list[TypedExpression]) -> int:
-        """Evaluate passed arguments and return subroutine origin."""
-        with self:
+        """Evaluate passed arguments for subroutine call and return subroutine origin."""
+        with self.scope():
             # Start by evaluating complex arguments (arguments that are not just literals and identifiers)
-            evaluated_arguments: list[int | str] = []
+            evaluated_arguments: list[int | Name] = []
             for argument in arguments:
                 match argument:
                     case LiteralChar(value=value):
                         evaluated_arguments.append(value)
-                    case TypedIdentifier(name=name):
-                        evaluated_arguments.append(name)
+                    case TypedIdentifier(location=location, name=name):
+                        variable = self.get_name(location, name)
+                        evaluated_arguments.append(variable)
                     case _:
-                        tmp = self.evaluate_in_new_variable(argument)
-                        evaluated_arguments.append(tmp)
+                        arg = self.scoped_variable(generate_unique_identifier(), argument.type())
+                        self.evaluate(argument, arg.index)
+                        evaluated_arguments.append(arg)
             # Then copy everything at the right place
             subroutine_origin = self.memory_size()
             self._goto(subroutine_origin)
@@ -644,8 +614,8 @@ class SubroutineCompiler(ScopeManager):
                     self._right()
                 else:
                     self.copy_variable(evaluated_argument)
-                    self._right(self.size_of(evaluated_argument))
-            return subroutine_origin
+                    self._right(evaluated_argument.size())
+        return subroutine_origin
 
     def call(self, location: Location, identifier: str, arguments: list[TypedExpression], expect_return: bool) -> None:
         """Call a subroutine and, if specified, get a return value"""
@@ -686,7 +656,8 @@ class SubroutineCompiler(ScopeManager):
     def assign(self, target: TypedAssignmentTarget, index: int) -> None:
         match target:
             case TypedPrimitiveAssignmentTarget(location=location, identifier=identifier, offset=offset):
-                self.goto_variable(location, identifier)
+                variable = self.get_name(location, identifier)
+                self._goto(variable.index)
                 self._right(offset)
                 self._reset(block_size=target.type().size())
                 destination = self.index
@@ -703,134 +674,110 @@ class SubroutineCompiler(ScopeManager):
         for expression in values:
             if not expression.type().is_string():
                 raise CompilationException(expression.location, f'Expected string but found {expression.type()}')
-            with self:
-                # Evaluate expression
-                tmp = self.evaluate_in_new_variable(expression)
-                # Print expression
-                self._goto(self[tmp])
+            with self.evaluate_in_new_variable(expression) as tmp:
+                self._goto(tmp.index)
                 for i in range(expression.type().size()):
                     self._output()
                     self._right()
         if new_line:
-            with self:
-                tmp = self.register_variable(Types.CHAR)
-                self._goto(self[tmp])
-                self._set(ord('\n'))
-                self._output()
+            with self.value(ord('\n')) as tmp:
+                self._output(tmp.index)
 
     def loop(self, count: TypedExpression, body: TypeCheckedInstructionBlock) -> None:
-        with self:
-            # Initialize loop counter
-            self._comment('Initializing loop counter', prefix='\n')
-            counter = self.evaluate_in_new_variable(count)
-            # Loop body
+        self._comment('Initializing loop counter', prefix='\n')
+        with self.evaluate_in_new_variable(count) as counter:
             self._comment('Starting loop', prefix='\n')
-            self._loop_start(self[counter])
+            self._loop_start(counter.index)
             self.compile_instruction(body)
-            self._decrement(self[counter])
+            self._decrement(counter.index)
             self._loop_end()
-            # End loop
             self._comment(f'Ending loop', prefix='\n')
 
     def while_loop(self, test: TypedExpression, body: TypeCheckedInstructionBlock) -> None:
-        with self:
-            condition = self.evaluate_in_new_variable(test)
+        with self.evaluate_in_new_variable(test) as condition:
             self._loop_start()
             self.compile_instruction(body)
-            self._goto(self[condition])
-            self.evaluate(test)
+            self.evaluate(test, condition.index)
             self._loop_end()
 
     def do_while_loop(self, body: TypeCheckedInstructionBlock, test: TypedExpression) -> None:
-        with self:
-            condition = self.register_variable()
-            self._increment(self[condition])
-            self._loop_start(self[condition])
+        with self.value(1) as condition:
+            self._loop_start(condition.index)
             self.compile_instruction(body)
-            self._goto(self[condition])
-            self.evaluate(test)
+            self.evaluate(test, condition.index)
             self._loop_end()
 
-    def for_loop(self, loop_type: DataType, loop_variable: str, loop_array: TypedExpression,
+    def for_loop(self, loop_type: DataType, loop_variable_identifier: str, loop_array: TypedExpression,
                  body: TypeCheckedInstructionBlock) -> None:
         array_type = loop_array.type()
         if not isinstance(array_type, ArrayType):
             raise ImpossibleException('For loop iterator is not an array (should have been caught earlier)')
 
-        with self:
-            array = self.evaluate_in_new_variable(loop_array)
-            self.register_pointer(loop_variable, loop_type, 0)
+        with (self.evaluate_in_new_variable(loop_array) as array,
+              self.pointer(0, loop_type, loop_variable_identifier) as loop_variable):
             for i in range(array_type.count):
-                with self:
-                    self.update_pointer(loop_variable, self[array] + i * array_type.base_type.size())
-                    self.compile_instruction(body)
+                loop_variable.update_index(array.index + i * array_type.base_type.size())
+                self.compile_instruction(body)
 
     def condition(self, test: TypedExpression, if_body: TypeCheckedInstructionBlock,
                   else_body: TypeCheckedInstructionBlock) -> None:
-        self._comment('Initializing conditional statement', prefix='\n')
-        with self:
-            # This variable is used for the else statement
-            has_entered_if = self.register_variable(Types.CHAR, value=1)
-            # This is where the condition is evaluated
-            self._comment('Evaluating condition', prefix='\n')
-            condition = self.evaluate_in_new_variable(test)
+        self._comment('Initializing conditional statement and evaluating condition', prefix='\n')
+        with self.value(1) as has_entered_if, self.evaluate_in_new_variable(test) as condition:
             self._comment('Starting if', prefix='\n')
-            # If body
-            with self:
-                self._loop_start()
-                self.compile_instruction(if_body)
-                self._decrement(self[has_entered_if])  # Reset
-                self._reset(self[condition])
-                self._loop_end()
-            # Else body
-            with self:
-                self._loop_start(self[has_entered_if])
-                self.compile_instruction(else_body)
-                self._decrement(self[has_entered_if])  # Reset
-                self._loop_end()
+            self._loop_start(condition.index)
+            self.compile_instruction(if_body)
+            self._decrement(has_entered_if.index)  # Reset
+            self._reset(condition.index)
+            self._loop_end()
+            self._comment('Starting else', prefix='\n')
+            self._loop_start(has_entered_if.index)
+            self.compile_instruction(else_body)
+            self._decrement(has_entered_if.index)  # Reset
+            self._loop_end()
 
-    def create_context_snapshot(self, location: Location, identifier: str | None = None) -> None:
+    def create_context_snapshot(self, location: Location = Location.unknown(), identifier: str | None = None) -> None:
         current_index = self.index
 
         self._comment('=== CONTEXT SNAPSHOT ===', CommentLevel.ONLY_REQUIRED, prefix='\n')
 
         if identifier is not None:
-            self.goto_variable(location, identifier)
+            variable = self.get_name(location, identifier)
+            self._goto(variable.index)
         self.bf_code += '#'
 
         context = f'Currently at index {self.index} in subroutine {self.identifier()!r}'
         self._comment(context, CommentLevel.ONLY_REQUIRED, prefix='\n', end='')
 
-        scopes = 'Active scopes: ' + str(self.scopes).replace(',', ';')
+        scopes = 'Active names: ' + str(self.names).replace(',', ';')
         self._comment(scopes, CommentLevel.ONLY_REQUIRED, prefix='\n', end='')
 
         local_memory_overview = f'Local memory size: {self.memory_size()}'
         self._comment(local_memory_overview, CommentLevel.ONLY_REQUIRED, prefix='\n')
 
-        self._goto(current_index)
+        self._comment('=== CONTEXT SNAPSHOT END ===', CommentLevel.ONLY_REQUIRED, prefix='')
 
-        self._comment('=== CONTEXT SNAPSHOT END ===', CommentLevel.ONLY_REQUIRED, prefix='\n')
+        self._goto(current_index)
 
     def compile_instruction(self, instruction: TypeCheckedInstruction) -> None:
         comment_line = True
         match instruction:
             case TypeCheckedInstructionBlock(instructions=instructions):
-                with self:
+                with self.scope():
                     for instruction in instructions:
                         self.compile_instruction(instruction)
             case TypeCheckedVariableDeclaration(identifier=identifier, type=variable_type, value=expression):
-                self.register_variable(variable_type, identifier)
+                variable = self.scoped_variable(identifier, variable_type)
                 if expression is not None:
-                    self._goto(self[identifier])
-                    self.evaluate(expression)
+                    self.evaluate(expression, variable.index)
             case TypeCheckedIncrementation(location=location, identifier=identifier):
-                self.increment_variable(location, identifier)
+                variable = self.get_name(location, identifier)
+                self._increment(variable.index)
             case TypeCheckedDecrementation(location=location, identifier=identifier):
-                self.decrement_variable(location, identifier)
+                variable = self.get_name(location, identifier)
+                self._decrement(variable.index)
             case TypeCheckedAssignment(target=target, value=value):
-                with self:
-                    tmp = self.evaluate_in_new_variable(value)
-                    self.assign(target, self[tmp])
+                with self.evaluate_in_new_variable(value) as tmp:
+                    self.assign(target, tmp.index)
             case PrintCall(arguments=arguments, new_line=new_line):
                 self.print(arguments, new_line=new_line)
             case TypeCheckedProcedureCall(location=location, identifier=identifier, arguments=arguments):
@@ -866,8 +813,7 @@ class SubroutineCompiler(ScopeManager):
                 self.bf_code = self.subroutine.bf_code
                 self.index = self.subroutine.offset
             elif isinstance(self.subroutine, TypeCheckedProcedure):
-                for instruction in self.subroutine.body:
-                    self.compile_instruction(instruction)
+                self.compile_instruction(self.subroutine.body)
             else:
                 raise ImpossibleException(f'Unknown subroutine type: {self.subroutine.__class__.__name__}')
         return self.bf_code
