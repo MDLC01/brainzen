@@ -17,18 +17,16 @@ Here is a non-exhaustive list of major available features:
 - Subroutines.
 - Loops.
 - Conditional statements.
-- Types (characters and arrays of fixed length).
+- Types (characters, arrays of fixed length and [product types](https://en.wikipedia.org/wiki/Product_type)).
 
 ## Considered features
 
 Here is a list of considered features in arbitrary order (this list is *not* commitment, merely an indication of where the language is heading):
 
-- [Product types](https://en.wikipedia.org/wiki/Product_type).
 - Type inference.
 - Some form of [overloading](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism).
 - Namespaces.
 - Separating a program in multiple files (import statements).
-- Do while loops.
 - Ternary operator.
 - Python-like list comprehensions.
 - Python-like array slicing operations.
@@ -64,9 +62,9 @@ The following procedure prints the passed number in base 10.
 
 ```brainzen
 proc print10(char n) {
-    char d2 = n / 100;
-    char d1 = (n / 10) % 10;
-    char d0 = n % 10;
+    let char d2 = n / 100;
+    let char d1 = (n / 10) % 10;
+    let char d0 = n % 10;
     if (d2) print('0' + d2);
     if (d1 || d2) print('0' + d1);
     print('0' + d0);
@@ -77,7 +75,7 @@ proc print10(char n) {
 
 ```braiznen
 proc main() {
-    char i = input();
+    let char i = input();
     if (i == '0') {
         print('0');
     } else {
@@ -92,10 +90,10 @@ The following function computes the `n`th number of the [Fibonacci sequence](htt
 
 ```brainzen
 func fibonacci(char n) -> char {
-    char a = 0;
-    char b = 1;
+    let char a = 0;
+    let char b = 1;
     loop (n) {
-        char c = a + b;
+        let char c = a + b;
         a = b;
         b = c;
     }
@@ -107,7 +105,7 @@ func fibonacci(char n) -> char {
 
 ```brainzen
 proc fizzbuzz(char n) {
-    char i = 1;
+    let char i = 1;
     loop (n) {
         if (i % 3 == 0 && i % 5 == 0) {
             println("FizzBuzz");
