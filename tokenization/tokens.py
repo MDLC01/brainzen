@@ -39,7 +39,8 @@ class Token:
         super().__init_subclass__(**kwargs)
         if hasattr(cls, 'token') and cls.token is not None:  # noqa
             if cls.token in Token.__token_map:
-                raise Exception(f'Token {cls.token!r} is already defined in {Token.__token_map[cls.token]}')
+                message = f'Token {cls.token!r} is already defined in {Token.__token_map[cls.token].__name__}'
+                raise CompilerException(message)
             Token.__token_map[cls.token] = cls
             if cls.__doc__ is None:
                 cls.__doc__ = f'{cls.token!r}'
@@ -48,7 +49,8 @@ class Token:
 
         if hasattr(cls, 'keyword') and cls.keyword is not None:  # noqa
             if cls.keyword in Token.__keyword_map:
-                raise Exception(f'Keyword {cls.keyword!r} is already defined in {Token.__keyword_map[cls.keyword]}')
+                message = f'Keyword {cls.keyword!r} is already defined in {Token.__keyword_map[cls.keyword].__name__}'
+                raise CompilerException(message)
             Token.__keyword_map[cls.keyword] = cls
             if cls.__doc__ is None:
                 cls.__doc__ = f'keyword {cls.keyword!r}'
