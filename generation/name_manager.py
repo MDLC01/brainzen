@@ -51,6 +51,8 @@ class Memory:
 
 
 class Name:
+    __slots__ = 'name_manager', 'identifier', 'type', 'index', 'shadows', 'is_opened'
+
     def __init__(self, name_manager: 'NameManager', identifier: str, variable_type: DataType,
                  index: int) -> None:
         self.name_manager = name_manager
@@ -85,12 +87,16 @@ class Name:
 
 
 class Variable(Name):
+    __slots__ = ()
+
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         super().__exit__(exc_type, exc_val, exc_tb)
         self.name_manager.clear_variable_memory(self)
 
 
 class Pointer(Name):
+    __slots__ = ()
+
     def update_index(self, index: int) -> None:
         self.index = index
 
