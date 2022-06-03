@@ -113,7 +113,7 @@ class Namespace:
     def add_subroutine(self, subroutine: Subroutine) -> None:
         identifier = subroutine.identifier
         if identifier in self.subroutine_locations:
-            message = f'Subroutine {identifier!r} is already defined at {self.subroutine_locations[identifier]}'
+            message = f'Subroutine {identifier!r} is already defined at {self.subroutine_locations[identifier]!r}'
             raise CompilationException(subroutine.location, message)
         self.subroutine_locations[identifier] = subroutine.location
         self.elements.append(subroutine)
