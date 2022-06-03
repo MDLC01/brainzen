@@ -8,7 +8,7 @@ Brainfuck is an extremely basic programming language created by Urban Müller in
 
 ## Specification
 
-Brainzen does not have an official specification yet. You can consider the compiler as the definition of the language (bugs aside).
+Brainzen does not have an official specification yet. You can consider the compiler as the definition of the language (bugs aside). However, the language is currently under heavy development, so everything is bound to change at any time (including syntax and major features).
 
 ## Features
 
