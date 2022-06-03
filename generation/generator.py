@@ -657,10 +657,8 @@ class SubroutineCompiler(NameManager):
         match target:
             case TypedPrimitiveAssignmentTarget(location=location, identifier=identifier, offset=offset):
                 variable = self.get_name(location, identifier)
-                self._goto(variable.index)
-                self._right(offset)
-                self._reset(block_size=target.type().size())
-                destination = self.index
+                destination = variable.index + offset
+                self._reset(destination, block_size=target.type().size())
                 self._goto(index)
                 self._move({destination}, block_size=target.type().size())
             case TypedTupleAssignmentTarget(elements=elements) as tuple_target:
