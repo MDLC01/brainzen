@@ -29,9 +29,6 @@ class DataType(ABC):
     def size(self) -> int:
         """The size of a variable of this type, in cells."""
 
-    def get_actual_type(self) -> 'DataType':
-        return self
-
     @abstractmethod
     def __eq__(self, other) -> bool:
         """Test if the passed type is the same as this one."""

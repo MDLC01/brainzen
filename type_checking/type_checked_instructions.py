@@ -348,8 +348,8 @@ class TypedBinaryArithmeticExpression(TypedArithmeticExpression):
             self._expect_both_operand(Types.CHAR)
             return Types.CHAR
         if self.operation is BinaryOperation.CONCATENATION:
-            left_type = self.left.type().get_actual_type()
-            right_type = self.right.type().get_actual_type()
+            left_type = self.left.type()
+            right_type = self.right.type()
             if not isinstance(left_type, ArrayType):
                 message = f'Expected left operand of {self.operation} to be an array, but found {left_type}'
                 raise CompilationException(self.left.location, message)
@@ -379,7 +379,7 @@ class TypedArrayAccessExpression(TypedExpression):
         self.array = TypedExpression.from_expression(context, array_access_expression.array)
         self.index = array_access_expression.index
         # Type checking
-        array_type = self.array.type().get_actual_type()
+        array_type = self.array.type()
         if not isinstance(array_type, ArrayType):
             raise CompilationException(self.location, f'Can not subscript {array_type}')
         # Negative indices start wrap around
