@@ -84,7 +84,6 @@ class OpenBraceToken(Token):
 class CloseBraceToken(Token):
     """closing brace"""
     token = '}'
-    closes = True
 
 
 class OpenBracketToken(Token):
