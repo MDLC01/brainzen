@@ -1,7 +1,7 @@
 from typing import Type, TypeVar
 
 from exceptions import *
-from operations import BinaryOperation, UnaryOperation
+from tokenization.operators import BinaryOperator, UnaryOperator
 
 
 def is_allowed_in_word(char: str) -> bool:
@@ -57,11 +57,11 @@ class Token:
         else:
             cls.keyword: str | None = None
 
-        if not hasattr(cls, 'binary_operation'):
-            cls.binary_operation: BinaryOperation | None = None
+        if not hasattr(cls, 'binary_operator'):
+            cls.binary_operator: BinaryOperator | None = None
 
-        if not hasattr(cls, 'unary_operation'):
-            cls.unary_operation: UnaryOperation | None = None
+        if not hasattr(cls, 'unary_operator'):
+            cls.unary_operator: UnaryOperator | None = None
 
     def __init__(self, location: Location) -> None:
         self.location = location
@@ -69,11 +69,11 @@ class Token:
     def __repr__(self) -> str:
         return self.__class__.__name__
 
-    def is_unary_operation(self) -> bool:
-        return self.unary_operation is not None
+    def is_unary_operator(self) -> bool:
+        return self.unary_operator is not None
 
-    def is_binary_operation(self) -> bool:
-        return self.binary_operation is not None
+    def is_binary_operator(self) -> bool:
+        return self.binary_operator is not None
 
 
 class OpenBraceToken(Token):
@@ -129,78 +129,83 @@ class DoubleMinusToken(Token):
 
 class BangToken(Token):
     token = '!'
-    unary_operation = UnaryOperation.NEGATION
+    unary_operator = UnaryOperator.BANG
 
 
 class DoubleBangToken(Token):
     token = '!!'
-    unary_operation = UnaryOperation.BOOL_NORMALIZATION
+    unary_operator = UnaryOperator.DOUBLE_BANG
 
 
 class DoubleEqualToken(Token):
     token = '=='
-    binary_operation = BinaryOperation.EQUALITY_TEST
+    binary_operator = BinaryOperator.DOUBLE_EQUAL
 
 
 class BangEqualToken(Token):
     token = '!='
-    binary_operation = BinaryOperation.DIFFERENCE_TEST
+    binary_operator = BinaryOperator.BANG_EQUAL
 
 
 class LessThanToken(Token):
     token = '<'
-    binary_operation = BinaryOperation.STRICT_INEQUALITY_TEST
+    binary_operator = BinaryOperator.LESS_THAN
 
 
 class LessThanEqualToken(Token):
     token = '<='
-    binary_operation = BinaryOperation.LARGE_INEQUALITY_TEST
+    binary_operator = BinaryOperator.LESS_THAN_EQUAL
 
 
 class GreaterThanToken(Token):
     token = '>'
-    binary_operation = BinaryOperation.INVERSE_STRICT_INEQUALITY_TEST
+    binary_operator = BinaryOperator.GREATER_THAN
 
 
 class GreaterThanEqualToken(Token):
     token = '>='
-    binary_operation = BinaryOperation.INVERSE_LARGE_INEQUALITY_TEST
+    binary_operator = BinaryOperator.GREATER_THAN_EQUAL
 
 
 class DoubleAmpersandToken(Token):
     token = '&&'
-    binary_operation = BinaryOperation.CONJUNCTION
+    binary_operator = BinaryOperator.DOUBLE_AMPERSAND
 
 
 class DoublePipeToken(Token):
     token = '||'
-    binary_operation = BinaryOperation.DISJUNCTION
+    binary_operator = BinaryOperator.DOUBLE_PIPE
 
 
 class PlusToken(Token):
     token = '+'
-    binary_operation = BinaryOperation.ADDITION
+    binary_operator = BinaryOperator.PLUS
 
 
 class MinusToken(Token):
     token = '-'
-    binary_operation = BinaryOperation.SUBTRACTION
-    unary_operation = UnaryOperation.OPPOSITION
+    binary_operator = BinaryOperator.MINUS
+    unary_operator = UnaryOperator.MINUS
 
 
 class StarToken(Token):
     token = '*'
-    binary_operation = BinaryOperation.MULTIPLICATION
+    binary_operator = BinaryOperator.STAR
 
 
 class SlashToken(Token):
     token = '/'
-    binary_operation = BinaryOperation.DIVISION
+    binary_operator = BinaryOperator.SLASH
 
 
 class PercentToken(Token):
     token = '%'
-    binary_operation = BinaryOperation.MODULO_OPERATION
+    binary_operator = BinaryOperator.PERCENT
+
+
+class DoubleDotToken(Token):
+    token = '..'
+    binary_operator = BinaryOperator.DOUBLE_DOT
 
 
 class ColonToken(Token):
@@ -209,7 +214,6 @@ class ColonToken(Token):
 
 class DoubleColonToken(Token):
     token = '::'
-    binary_operation = BinaryOperation.CONCATENATION
 
 
 class ArrowToken(Token):
@@ -367,7 +371,8 @@ __all__ = ['is_allowed_in_word', 'is_valid_word', 'AnyToken', 'Token', 'OpenBrac
            'EqualToken', 'DoublePlusToken', 'DoubleMinusToken', 'BangToken', 'DoubleBangToken', 'DoubleEqualToken',
            'BangEqualToken', 'LessThanToken', 'LessThanEqualToken', 'GreaterThanToken', 'GreaterThanEqualToken',
            'DoubleAmpersandToken', 'DoublePipeToken', 'PlusToken', 'MinusToken', 'StarToken', 'SlashToken',
-           'PercentToken', 'ColonToken', 'DoubleColonToken', 'ArrowToken', 'HashToken', 'QuestionMarkToken',
-           'NativeKeyword', 'TildeToken', 'ProcKeyword', 'FuncKeyword', 'LetKeyword', 'LoopKeyword', 'ForKeyword',
-           'WhileKeyword', 'DoKeyword', 'IfKeyword', 'ElseKeyword', 'ReturnKeyword', 'EOFToken', 'NumberLiteral',
-           'NumericLiteral', 'CharacterLiteral', 'StringLiteral', 'IdentifierToken', 'NativeCodeBlock']
+           'PercentToken', 'DoubleDotToken', 'ColonToken', 'DoubleColonToken', 'ArrowToken', 'HashToken',
+           'QuestionMarkToken', 'NativeKeyword', 'TildeToken', 'ProcKeyword', 'FuncKeyword', 'LetKeyword',
+           'LoopKeyword', 'ForKeyword', 'WhileKeyword', 'DoKeyword', 'IfKeyword', 'ElseKeyword', 'ReturnKeyword',
+           'EOFToken', 'NumberLiteral', 'NumericLiteral', 'CharacterLiteral', 'StringLiteral', 'IdentifierToken',
+           'NativeCodeBlock']

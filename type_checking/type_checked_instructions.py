@@ -4,7 +4,7 @@ from typing import Generator
 from data_types import *
 from exceptions import *
 from intermediate_representation.instructions import *
-from operations import BinaryOperation, UnaryOperation
+from tokenization.operators import BinaryOperator, UnaryOperator
 from type_checking.typed_assignment_targets import TypedAssignmentTarget
 from type_checking.typing_context import SubroutineTypingContext
 
@@ -120,6 +120,8 @@ class TypedExpression(TypeCheckedInstruction, ABC):
     @staticmethod
     def from_expression(context: SubroutineTypingContext, expression: Expression) -> 'TypedExpression':
         match expression:
+            case ConstantReference(identifier=identifier):
+                return context.namespace.constants[identifier]
             case Char() as char:
                 return LiteralChar.from_char(char)
             case Array() as array:
@@ -284,7 +286,7 @@ class TypedArithmeticExpression(TypedExpression, ABC):
 class TypedUnaryArithmeticExpression(TypedArithmeticExpression):
     def __init__(self, context: SubroutineTypingContext, expression: UnaryArithmeticExpression) -> None:
         super().__init__(expression.location)
-        self.operation: UnaryOperation = expression.operation
+        self.operation: UnaryOperator = expression.operator
         self.operand = TypedExpression.from_expression(context, expression.operand)
         # Type checking: all operations accept characters and return characters
         if self.operand.type() != Types.CHAR:
@@ -305,7 +307,7 @@ class TypedUnaryArithmeticExpression(TypedArithmeticExpression):
 class TypedBinaryArithmeticExpression(TypedArithmeticExpression):
     def __init__(self, context: SubroutineTypingContext, expression: BinaryArithmeticExpression) -> None:
         super().__init__(expression.location)
-        self.operation: BinaryOperation = expression.operation
+        self.operation: BinaryOperator = expression.operator
         self.left = TypedExpression.from_expression(context, expression.left)
         self.right = TypedExpression.from_expression(context, expression.right)
         # Type checking
@@ -328,26 +330,26 @@ class TypedBinaryArithmeticExpression(TypedArithmeticExpression):
         self._expect_right_operand(expected_type)
 
     def _run_type_check(self) -> DataType:
-        if self.operation in (BinaryOperation.EQUALITY_TEST, BinaryOperation.DIFFERENCE_TEST):
+        if self.operation in (BinaryOperator.DOUBLE_EQUAL, BinaryOperator.BANG_EQUAL):
             if self.right.type() != self.left.type():
                 message = f'Expected right operand of {self.operation} to be of the same type as left operand' \
                           f' (expected {self.left.type()} but found {self.right.type()})'
                 raise CompilationException(self.location, message)
             return Types.CHAR
-        if self.operation in (BinaryOperation.STRICT_INEQUALITY_TEST,
-                              BinaryOperation.LARGE_INEQUALITY_TEST,
-                              BinaryOperation.INVERSE_STRICT_INEQUALITY_TEST,
-                              BinaryOperation.INVERSE_LARGE_INEQUALITY_TEST,
-                              BinaryOperation.CONJUNCTION,
-                              BinaryOperation.DISJUNCTION,
-                              BinaryOperation.ADDITION,
-                              BinaryOperation.SUBTRACTION,
-                              BinaryOperation.MULTIPLICATION,
-                              BinaryOperation.DIVISION,
-                              BinaryOperation.MODULO_OPERATION):
+        if self.operation in (BinaryOperator.LESS_THAN,
+                              BinaryOperator.LESS_THAN_EQUAL,
+                              BinaryOperator.GREATER_THAN,
+                              BinaryOperator.GREATER_THAN_EQUAL,
+                              BinaryOperator.DOUBLE_AMPERSAND,
+                              BinaryOperator.DOUBLE_PIPE,
+                              BinaryOperator.PLUS,
+                              BinaryOperator.MINUS,
+                              BinaryOperator.STAR,
+                              BinaryOperator.SLASH,
+                              BinaryOperator.PERCENT):
             self._expect_both_operand(Types.CHAR)
             return Types.CHAR
-        if self.operation is BinaryOperation.CONCATENATION:
+        if self.operation is BinaryOperator.DOUBLE_DOT:
             left_type = self.left.type()
             right_type = self.right.type()
             if not isinstance(left_type, ArrayType):

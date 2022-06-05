@@ -5,7 +5,7 @@ from data_types import *
 from exceptions import *
 from intermediate_representation.assignment_targets import *
 from intermediate_representation.instructions import *
-from operations import *
+from tokenization.operators import *
 from tokenization.tokens import *
 
 
@@ -23,6 +23,20 @@ class NamespaceElement(ABC):
     @abstractmethod
     def __repr__(self, indent: str = '') -> str:
         ...
+
+
+class Constant(NamespaceElement):
+    __slots__ = 'expression'
+
+    def __init__(self, location: Location, identifier: str, expression: Expression) -> None:
+        super().__init__(location, identifier)
+        self.expression = expression
+
+    def __str__(self) -> str:
+        return f'#{self.identifier} = {self.expression}'
+
+    def __repr__(self, indent: str = '') -> str:
+        return f'{self.__class__.__name__}[{self.identifier}, {self.expression!r}]'
 
 
 class SubroutineArgument:
@@ -95,134 +109,64 @@ class Procedure(Subroutine):
         return f'({self._argument_string()}) -> {self.body.__repr__(indent)}'
 
 
+class AlreadyDefinedException(CompilationException):
+    def __init__(self, element_type: str, element: NamespaceElement, redefine_location: Location) -> None:
+        message = f'{element_type} {element.identifier!r} is already defined at {element.location!r}'
+        super().__init__(redefine_location, message)
+
+
 class Namespace:
-    def __init__(self, location: Location, identifier: str | None = None) -> None:
+    def __init__(self, location: Location, identifier: str) -> None:
         self.location = location
-        if identifier is None:
-            identifier = '<' + location.file + '>'
         self.identifier = identifier
         self.elements: list[NamespaceElement] = []
-        self.subroutine_locations: dict[str, Location] = {}
+        self.constants: dict[str, Constant] = {}
+        self.subroutines: dict[str, Subroutine] = {}
 
-    def get_base_type(self, location: Location, identifier: str) -> DataType:
-        return PrimitiveType.of(location, identifier)
+    def register_constant(self, constant: Constant) -> None:
+        identifier = constant.identifier
+        if identifier in self.constants:
+            raise AlreadyDefinedException('Constant', self.constants[identifier], constant.location)
+        self.constants[identifier] = constant
+        self.elements.append(constant)
 
-    def is_valid_base_type(self, identifier: str) -> bool:
-        return PrimitiveType.is_valid_base_type(identifier)
-
-    def add_subroutine(self, subroutine: Subroutine) -> None:
+    def register_subroutine(self, subroutine: Subroutine) -> None:
         identifier = subroutine.identifier
-        if identifier in self.subroutine_locations:
-            message = f'Subroutine {identifier!r} is already defined at {self.subroutine_locations[identifier]!r}'
-            raise CompilationException(subroutine.location, message)
-        self.subroutine_locations[identifier] = subroutine.location
+        if identifier in self.subroutines:
+            raise AlreadyDefinedException('Subroutine', self.subroutines[identifier], subroutine.location)
+        self.subroutines[identifier] = subroutine
         self.elements.append(subroutine)
 
     def __iter__(self) -> Generator[NamespaceElement, None, None]:
         for element in self.elements:
             yield element
 
-    def __repr__(self) -> str:
-        indent = '    '
-        s = f'{self.__class__.__name__}['
+    def __str__(self) -> str:
+        return f'namespace {self.identifier} line {self.location.line}'
+
+    def __repr__(self, indent: str = '') -> str:
+        inner_indent = indent + '    '
+        s = f'{indent}{self.__class__.__name__}['
         if self.elements:
             s += '\n'
-        for element in self.elements:
-            s += f'{indent}{element.identifier} = {element.__repr__(indent)},\n'
+            for element in self.elements:
+                s += f'{inner_indent}{element.identifier} = {element.__repr__(inner_indent)},\n'
+            s += indent
         return s + ']'
 
 
-class Constant:
-    """
-    Temporary hack to evaluate constants at compile time.
-    This is NOT meant to be definitive.
-    TODO: Rewrite this class.
-    """
-
-    @staticmethod
-    def _evaluate_unary_operation(operation: UnaryOperation, operand: int | list) -> int | list:
-        if operation is UnaryOperation.BOOL_NORMALIZATION:
-            return int(bool(operand))
-        if operation is UnaryOperation.NEGATION:
-            return int(not operand)
-        if operation is UnaryOperation.OPPOSITION:
-            return -operand
-        raise ImpossibleException(f'Unknown operation: {operation}')
-
-    @staticmethod
-    def _evaluate_binary_operation(operation: BinaryOperation, left: int | list, right: int | list) -> int | list:
-        if operation is BinaryOperation.EQUALITY_TEST:
-            return left == right
-        if operation is BinaryOperation.DIFFERENCE_TEST:
-            return left != right
-        if operation is BinaryOperation.STRICT_INEQUALITY_TEST:
-            return left < right
-        if operation is BinaryOperation.LARGE_INEQUALITY_TEST:
-            return left <= right
-        if operation is BinaryOperation.INVERSE_STRICT_INEQUALITY_TEST:
-            return left > right
-        if operation is BinaryOperation.INVERSE_LARGE_INEQUALITY_TEST:
-            return left >= right
-        if operation is BinaryOperation.CONJUNCTION:
-            return int(bool(left and right))
-        if operation is BinaryOperation.DISJUNCTION:
-            return int(bool(left or right))
-        if operation is BinaryOperation.ADDITION:
-            return left + right
-        if operation is BinaryOperation.SUBTRACTION:
-            return left - right
-        if operation is BinaryOperation.MULTIPLICATION:
-            return left * right
-        if operation is BinaryOperation.DIVISION:
-            return left // right
-        if operation is BinaryOperation.MODULO_OPERATION:
-            return left % right
-        if operation is BinaryOperation.CONCATENATION:
-            return left + right
-        raise ImpossibleException(f'Unknown operation: {operation}')
-
-    @classmethod
-    def _evaluate(cls, expression: Expression) -> Char | Array:
-        location = expression.location
-        match expression:
-            case Char() as value:
-                return value
-            case Array() as value:
-                return value
-            case UnaryArithmeticExpression(operation=operation, operand=operand):
-                value = cls._evaluate(operand).value
-                return Char(location, cls._evaluate_unary_operation(operation, value))
-            case BinaryArithmeticExpression(operation=operation, left=left, right=right):
-                left_value = cls._evaluate(left).value
-                right_value = cls._evaluate(right).value
-                result = cls._evaluate_binary_operation(operation, left_value, right_value)
-                if isinstance(result, int):
-                    return Char(location, result)
-                if isinstance(result, list):
-                    return Array(location, result)
-                raise ImpossibleException(f'Compile time evaluation of {expression} failed')
-            case _:
-                message = 'Invalid constant: A constant must be evaluable at compile time'
-                raise CompilationException(expression.location, message)
-
-    def __init__(self, location: Location, identifier: str, expression: Expression) -> None:
-        self.location = location
-        self.identifier = identifier
-        self.value = Constant._evaluate(expression)
-
-    def type(self) -> DataType:
-        return self.value.type()
+class File(Namespace):
+    def __init__(self, location: Location) -> None:
+        super().__init__(location, '<global>')
 
 
 class ASTGenerator:
     _T = TypeVar('_T')
 
-    def __init__(self, file: Location, tokens: list[Token]) -> None:
-        self.index = 0
+    def __init__(self, file_location: Location, tokens: list[Token]) -> None:
+        self.file = File(file_location)
         self.tokens = tokens
-        self.constants: dict[str, Constant] = {}
-        self.file = file
-        self.namespace = Namespace(self.file)
+        self.index = 0
 
     def _location(self) -> Location:
         return self.tokens[self.index].location
@@ -291,9 +235,7 @@ class ASTGenerator:
         # Constant
         if self._eat(HashToken):
             identifier = self._expect(IdentifierToken).name
-            if identifier not in self.constants:
-                raise CompilationException(self._location_from(start_location), f'Unknown constant: {identifier!r}')
-            return self.constants[identifier].value
+            return ConstantReference(self._location_from(start_location), identifier)
         # Function call
         if self._is_next(IdentifierToken) and self._is_next(OpenParToken, 1):
             identifier = self._expect(IdentifierToken).name
@@ -330,23 +272,23 @@ class ASTGenerator:
         return expression
 
     def parse_unary_operation(self) -> Expression:
-        if self._peek().is_unary_operation():
+        if self._peek().is_unary_operator():
             token = self._next()
-            return UnaryArithmeticExpression(token.location, token.unary_operation, self.parse_unary_operation())
+            return UnaryArithmeticExpression(token.location, token.unary_operator, self.parse_unary_operation())
         return self.parse_operand()
 
     def parse_binary_operation(self) -> Expression:
         left = self.parse_unary_operation()
         priority = Priority.PARENTHESIS
-        while self._peek().is_binary_operation():
+        while self._peek().is_binary_operator():
             location = self._location()
-            operation = self._next().binary_operation
+            operator = self._next().binary_operator
             right = self.parse_unary_operation()
-            if isinstance(left, BinaryArithmeticExpression) and priority < operation.priority:
-                left.right = BinaryArithmeticExpression(location, operation, left.right, right)
+            if isinstance(left, BinaryArithmeticExpression) and priority < operator.priority:
+                left.right = BinaryArithmeticExpression(location, operator, left.right, right)
             else:
-                left = BinaryArithmeticExpression(location, operation, left, right)
-            priority = left.operation.priority
+                left = BinaryArithmeticExpression(location, operator, left, right)
+            priority = left.operator.priority
         return left
 
     def parse_expression(self) -> Expression:
@@ -499,7 +441,7 @@ class ASTGenerator:
         # Identifier
         start_location = self._location()
         identifier = self._expect(IdentifierToken).name
-        return self.namespace.get_base_type(self._location_from(start_location), identifier)
+        return PrimitiveType.of(self._location_from(start_location), identifier)
 
     def parse_type_operand(self) -> DataType:
         operand = self.parse_base_type()
@@ -517,19 +459,14 @@ class ASTGenerator:
             types.append(self.parse_type_operand())
         return ProductType.from_operands(types)
 
-    def parse_and_define_constant(self) -> None:
-        # Parse constant
+    def parse_constant_definition(self) -> Constant:
         start_location = self._expect(HashToken).location
         identifier = self._expect(IdentifierToken).name
         self._expect(EqualToken)
         expression = self.parse_expression()
         self._expect(SemicolonToken)
-        # Add to list of available constants
         location = self._location_from(start_location)
-        if identifier in self.constants:
-            message = f'Constant {identifier!r} is already defined at {self.constants[identifier].location!r}'
-            raise CompilationException(location, message)
-        self.constants[identifier] = Constant(location, identifier, expression)
+        return Constant(location, identifier, expression)
 
     def parse_subroutine_argument_declaration(self) -> list[SubroutineArgument]:
         self._expect(OpenParToken)
@@ -573,15 +510,32 @@ class ASTGenerator:
         body = self.parse_instruction_block()
         return Procedure(location, identifier, arguments, return_type, body)
 
-    def generate_ast(self) -> Namespace:
+    def parse_namespace_definition(self) -> Namespace:
+        start_location = self._location()
+        self._expect(NamespaceKeyword)
+        identifier = self._expect(IdentifierToken).name
+        location = self._location_from(start_location)
+        self._expect(OpenBraceToken)
+        namespace = Namespace(location, identifier)
+        while not self._eat(CloseBraceToken):
+            self.parse_and_register_namespace_element(namespace)
+        return namespace
+
+    def parse_and_register_namespace_element(self, namespace: Namespace) -> None:
+        # Constant definition
+        if self._is_next(HashToken):
+            constant = self.parse_constant_definition()
+            namespace.register_constant(constant)
+        # Subroutine definition
+        else:
+            subroutine = self.parse_subroutine_definition()
+            namespace.register_subroutine(subroutine)
+
+    def generate(self) -> File:
         while self._has_next():
-            if self._is_next(HashToken):
-                self.parse_and_define_constant()
-            else:
-                subroutine = self.parse_subroutine_definition()
-                self.namespace.add_subroutine(subroutine)
-        return self.namespace
+            self.parse_and_register_namespace_element(self.file)
+        return self.file
 
 
-__all__ = ['NamespaceElement', 'SubroutineArgument', 'Subroutine', 'NativeSubroutine', 'Procedure', 'Namespace',
-           'Constant', 'ASTGenerator']
+__all__ = ['NamespaceElement', 'Constant', 'SubroutineArgument', 'Subroutine', 'NativeSubroutine', 'Procedure',
+           'Namespace', 'File', 'ASTGenerator']

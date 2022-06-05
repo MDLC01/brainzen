@@ -4,7 +4,7 @@ from typing import Generator
 from data_types import DataType
 from exceptions import CompilerException, Location
 from intermediate_representation.assignment_targets import AssignmentTarget
-from operations import *
+from tokenization.operators import *
 
 
 class Instruction(ABC):
@@ -71,6 +71,20 @@ class InstructionBlock(Instruction):
 
 class Expression(Instruction, ABC):
     """An expression is a peace of code that has a value. In Brainzen, every expression is a valid instruction."""
+
+
+class ConstantReference(Expression):
+    """A reference to a constant."""
+
+    def __init__(self, location: Location, identifier: str) -> None:
+        super().__init__(location)
+        self.identifier = identifier
+
+    def __str__(self) -> str:
+        return f'#{self.identifier}'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.identifier}]'
 
 
 class Char(Expression):
@@ -146,30 +160,30 @@ class ArithmeticExpression(Expression, ABC):
 
 
 class UnaryArithmeticExpression(ArithmeticExpression):
-    def __init__(self, location: Location, operation: UnaryOperation, operand: Expression) -> None:
+    def __init__(self, location: Location, operator: UnaryOperator, operand: Expression) -> None:
         super().__init__(location)
-        self.operation = operation
+        self.operator = operator
         self.operand = operand
 
     def __str__(self) -> str:
-        return f'({self.operation}{self.operand})'
+        return f'({self.operator}{self.operand})'
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.operation!r}, {self.operand!r}]'
+        return f'{self.__class__.__name__}[{self.operator!r}, {self.operand!r}]'
 
 
 class BinaryArithmeticExpression(ArithmeticExpression):
-    def __init__(self, location: Location, operation: BinaryOperation, left: Expression, right: Expression) -> None:
+    def __init__(self, location: Location, operator: BinaryOperator, left: Expression, right: Expression) -> None:
         super().__init__(location)
-        self.operation = operation
+        self.operator = operator
         self.left = left
         self.right = right
 
     def __str__(self) -> str:
-        return f'({self.left} {self.operation} {self.right})'
+        return f'({self.left} {self.operator} {self.right})'
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.operation!r}, {self.left!r}, {self.right!r}]'
+        return f'{self.__class__.__name__}[{self.operator!r}, {self.left!r}, {self.right!r}]'
 
 
 class ArrayAccessExpression(Expression):
@@ -384,7 +398,7 @@ class ContextSnapshot(Instruction):
         return f'{self.__class__.__name__}'
 
 
-__all__ = ['Instruction', 'InstructionBlock', 'Expression', 'Char', 'Array', 'Identifier', 'Tuple',
+__all__ = ['Instruction', 'InstructionBlock', 'Expression', 'ConstantReference', 'Char', 'Array', 'Identifier', 'Tuple',
            'ArithmeticExpression', 'UnaryArithmeticExpression', 'BinaryArithmeticExpression', 'ArrayAccessExpression',
            'ProcedureCall', 'FunctionCall', 'Incrementation', 'Decrementation', 'VariableDeclaration', 'Assignment',
            'LoopStatement', 'WhileLoopStatement', 'DoWhileLoopStatement', 'ForLoopStatement', 'ConditionalStatement',

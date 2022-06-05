@@ -10,7 +10,7 @@ from type_checking.type_checker import TypeCheckedNamespace
 def compile_source_code(source_code: str, file_name: str, *, main_procedure: str = 'main',
                         verbose_level: int = CommentLevel.BZ_CODE) -> str:
     tokens = Tokenizer(file_name, source_code).tokenize()
-    ast = ASTGenerator(Location.in_file(file_name), tokens).generate_ast()
+    ast = ASTGenerator(Location.in_file(file_name), tokens).generate()
     typed_ast = TypeCheckedNamespace(ast)
     return generate_program(typed_ast, main_procedure, verbose_level=verbose_level)
 

@@ -1,7 +1,7 @@
 from typing import Optional
 
 from data_types import DataType
-from exceptions import CompilationException, CompilationWarning, CompilerException, Location
+from exceptions import *
 from intermediate_representation import SubroutineArgument
 
 
@@ -25,59 +25,61 @@ class SubroutineSignature:
         return f'({arguments}) -> void'
 
 
-class VariableScope:
-    def __init__(self, parent: Optional['VariableScope'] = None) -> None:
-        self.parent: VariableScope | None = parent
-        self.variables: dict[str, DataType] = {}
-
-    def __getitem__(self, identifier: str) -> DataType:
-        if identifier in self.variables:
-            return self.variables[identifier]
-        if self.parent is not None:
-            return self.parent[identifier]
-        raise CompilerException(f'Variable {identifier!r} is not defined')
-
-    def get_variable_type(self, location: Location, identifier: str) -> DataType:
-        try:
-            return self[identifier]
-        except CompilerException as e:
-            raise CompilationException(location, e.message)
-
-    def __setitem__(self, identifier: str, variable_type: DataType):
-        self.variables[identifier] = variable_type
-
-    def make_child(self) -> 'VariableScope':
-        """Create a child scope that inherit variables from this scope."""
-        return self.__class__(self)
-
-    def is_shadow(self, identifier: str) -> bool:
-        """Test if the passed identifier shadows a variable from an outer scope."""
-        if self.parent is None:
-            return False
-        return identifier in self.parent
-
-    def __contains__(self, identifier: str):
-        if identifier in self.variables:
-            return True
-        if self.parent is not None:
-            return identifier in self.parent
-        return False
-
-
 class SubroutineTypingContext:
-    def __init__(self, subroutines: dict[str, SubroutineSignature]) -> None:
-        self.subroutines = subroutines
-        self.variables = VariableScope()
-        self.expected_return_type: DataType | None = None
+    class Scope:
+        def __init__(self, parent: Optional['SubroutineTypingContext.Scope'] = None) -> None:
+            self.parent: SubroutineTypingContext.Scope | None = parent
+            self.variables: dict[str, DataType] = {}
+
+        def __getitem__(self, identifier: str) -> DataType:
+            if identifier in self.variables:
+                return self.variables[identifier]
+            if self.parent is not None:
+                return self.parent[identifier]
+            raise CompilerException(f'Variable {identifier!r} is not defined')
+
+        def get_variable_type(self, location: Location, identifier: str) -> DataType:
+            try:
+                return self[identifier]
+            except CompilerException as e:
+                raise CompilationException(location, e.message)
+
+        def __setitem__(self, identifier: str, variable_type: DataType):
+            self.variables[identifier] = variable_type
+
+        def make_child(self) -> 'SubroutineTypingContext.Scope':
+            """Create a child scope that inherit variables from this scope."""
+            return self.__class__(self)
+
+        def is_shadow(self, identifier: str) -> bool:
+            """Test if the passed identifier shadows a variable from an outer scope."""
+            if self.parent is None:
+                return False
+            return identifier in self.parent
+
+        def __contains__(self, identifier: str):
+            if identifier in self.variables:
+                return True
+            if self.parent is not None:
+                return identifier in self.parent
+            return False
+
+    def __init__(self, namespace: 'TypeCheckedNamespace', signature: SubroutineSignature) -> None:
+        self.namespace = namespace
+        self.signature = signature
+        self.variables = self.Scope()
+
+    def expected_return_type(self) -> DataType | None:
+        return self.signature.return_type
 
     def get_subroutine_argument_types(self, location: Location, identifier: str) -> list[DataType]:
-        if identifier in self.subroutines:
-            return self.subroutines[identifier].get_argument_types()
+        if identifier in self.namespace.subroutine_signatures:
+            return self.namespace.subroutine_signatures[identifier].get_argument_types()
         raise CompilationException(location, f'Subroutine {identifier!r} is not defined')
 
     def get_function_return_type(self, location: Location, identifier: str) -> DataType:
-        if identifier in self.subroutines:
-            subroutine = self.subroutines[identifier]
+        if identifier in self.namespace.subroutine_signatures:
+            subroutine = self.namespace.subroutine_signatures[identifier]
             if not subroutine.is_function():
                 raise CompilationException(location, f'Subroutine {identifier!r} is not a function')
             return subroutine.return_type

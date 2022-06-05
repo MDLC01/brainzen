@@ -3,7 +3,7 @@ from enum import IntEnum
 from data_types import *
 from exceptions import *
 from generation.name_manager import *
-from operations import *
+from tokenization.operators import *
 from type_checking import *
 
 
@@ -216,14 +216,14 @@ class SubroutineCompiler(NameManager):
             self._reset(evaluation_index)
             # Comments show corresponding Brainfuck code, where the evaluation index is the starting index, and the
             # operand is stored at the index of the pointer when the comma is reached
-            if expression.operation is UnaryOperation.BOOL_NORMALIZATION:
+            if expression.operation is UnaryOperator.DOUBLE_BANG:
                 # >,[<+>[-]]
                 self._loop_start(operand.index)
                 self._goto(evaluation_index)
                 self._increment()
                 self._reset(operand.index)
                 self._loop_end()
-            elif expression.operation is UnaryOperation.NEGATION:
+            elif expression.operation is UnaryOperator.BANG:
                 # >, <+>[<->[-]]
                 self._goto(evaluation_index)
                 self._increment()
@@ -232,7 +232,7 @@ class SubroutineCompiler(NameManager):
                 self._decrement()
                 self._reset(operand.index)
                 self._loop_end()
-            elif expression.operation is UnaryOperation.OPPOSITION:
+            elif expression.operation is UnaryOperator.MINUS:
                 # >, [-<->]
                 self._loop_start(operand.index)
                 self._decrement()
@@ -241,7 +241,7 @@ class SubroutineCompiler(NameManager):
                 self._goto(operand.index)
                 self._loop_end()
             else:
-                raise ImpossibleException(f'Unknown operation: {expression.operation!r}')
+                raise ImpossibleException(f'Unknown unary operation: {expression.operation!r}')
         self._goto(evaluation_index)
 
     def evaluate_binary_arithmetic_expression(self, expression: TypedBinaryArithmeticExpression) -> None:
@@ -253,7 +253,7 @@ class SubroutineCompiler(NameManager):
             # Comments show corresponding Brainfuck code, where the evaluation index is the starting index, the
             # left operand is stored at the index of the pointer when the first comma is reached, and the right
             # operand is stored at the index of the pointer when the second comma is reached
-            if expression.operation is BinaryOperation.EQUALITY_TEST:
+            if expression.operation is BinaryOperator.DOUBLE_EQUAL:
                 # >,>, [-<->] <<+>[<->[-]]
                 # Subtract right from left
                 self._loop_start(right.index)
@@ -269,7 +269,7 @@ class SubroutineCompiler(NameManager):
                 self._decrement()
                 self._reset(left.index)
                 self._loop_end()
-            elif expression.operation is BinaryOperation.DIFFERENCE_TEST:
+            elif expression.operation is BinaryOperator.BANG_EQUAL:
                 # >,>, [-<->] <[<+>[-]]
                 # Subtract right from left
                 self._loop_start(right.index)
@@ -283,7 +283,7 @@ class SubroutineCompiler(NameManager):
                 self._increment()
                 self._reset(left.index)
                 self._loop_end()
-            elif expression.operation is BinaryOperation.STRICT_INEQUALITY_TEST:
+            elif expression.operation is BinaryOperator.LESS_THAN:
                 with self.variable() as tmp1, self.variable() as tmp2:
                     self._loop_start(right.index)
                     # Duplicate right operand
@@ -308,7 +308,7 @@ class SubroutineCompiler(NameManager):
                     self._loop_end()
                     self._goto(right.index)
                     self._loop_end()
-            elif expression.operation is BinaryOperation.LARGE_INEQUALITY_TEST:
+            elif expression.operation is BinaryOperator.LESS_THAN_EQUAL:
                 # Compute !(l > r)
                 with self.variable() as tmp1, self.variable() as tmp2:
                     self._loop_start(left.index)
@@ -342,7 +342,7 @@ class SubroutineCompiler(NameManager):
                     self._decrement()
                     self._goto(tmp1.index)
                     self._loop_end()
-            elif expression.operation is BinaryOperation.INVERSE_STRICT_INEQUALITY_TEST:
+            elif expression.operation is BinaryOperator.GREATER_THAN:
                 with self.variable() as tmp1, self.variable() as tmp2:
                     self._loop_start(left.index)
                     # Duplicate right operand
@@ -367,7 +367,7 @@ class SubroutineCompiler(NameManager):
                     self._loop_end()
                     self._goto(left.index)
                     self._loop_end()
-            elif expression.operation is BinaryOperation.INVERSE_LARGE_INEQUALITY_TEST:
+            elif expression.operation is BinaryOperator.GREATER_THAN_EQUAL:
                 # Compute !(l < r)
                 with self.variable() as tmp1, self.variable() as tmp2:
                     self._loop_start(right.index)
@@ -401,7 +401,7 @@ class SubroutineCompiler(NameManager):
                     self._decrement()
                     self._goto(tmp1.index)
                     self._loop_end()
-            elif expression.operation is BinaryOperation.CONJUNCTION:
+            elif expression.operation is BinaryOperator.DOUBLE_AMPERSAND:
                 # There might be a better way
                 # >,>, >++(tmp1) >+(tmp2) <<<[>>-<<[-]] >[>-<[-]] >[>-<[-]] >[<<<<+>>>>[-]]
                 with self.value(2) as tmp1, self.value(1) as tmp2:
@@ -426,7 +426,7 @@ class SubroutineCompiler(NameManager):
                     self._increment()
                     self._reset(tmp2.index)
                     self._loop_end()
-            elif expression.operation is BinaryOperation.DISJUNCTION:
+            elif expression.operation is BinaryOperator.DOUBLE_PIPE:
                 # There might be a better way
                 # >,>, >+(tmp) <<[>>[-]<<-<+>] >>[<[-<<+>>]>[-]]
                 with self.value(1) as tmp:
@@ -444,7 +444,7 @@ class SubroutineCompiler(NameManager):
                     self._move({evaluation_index})
                     self._reset(tmp.index)
                     self._loop_end()
-            elif expression.operation is BinaryOperation.ADDITION:
+            elif expression.operation is BinaryOperator.PLUS:
                 # >,>, <[-<+>] >[-<<+>>]
                 self._goto(left.index)
                 self._move({evaluation_index})
@@ -454,7 +454,7 @@ class SubroutineCompiler(NameManager):
                 self._increment()
                 self._goto(right.index)
                 self._loop_end()
-            elif expression.operation is BinaryOperation.SUBTRACTION:
+            elif expression.operation is BinaryOperator.MINUS:
                 # >,>, <[-<+>] >[-<<->>]
                 self._goto(left.index)
                 self._move({evaluation_index})
@@ -464,7 +464,7 @@ class SubroutineCompiler(NameManager):
                 self._decrement()
                 self._goto(right.index)
                 self._loop_end()
-            elif expression.operation is BinaryOperation.MULTIPLICATION:
+            elif expression.operation is BinaryOperator.STAR:
                 # >,>, >(tmp) <<[- >[-<<+>>>+<] >[-<+>]<<]
                 with self.variable() as tmp:
                     self._loop_start(left.index)
@@ -475,7 +475,7 @@ class SubroutineCompiler(NameManager):
                     self._move({right.index})
                     self._goto(left.index)
                     self._loop_end()
-            elif expression.operation is BinaryOperation.DIVISION:
+            elif expression.operation is BinaryOperator.SLASH:
                 # >,>, >(tmp1) >(tmp2) >(tmp3) <<<<<[->->+ <[->>+>+<<<]>>>[-<<<+>>>] + <[>-<[-]] >[-<<<<<+>>>[-<+>]>>]<<<<]
                 with self.variable() as tmp1, self.variable() as tmp2, self.variable() as tmp3:
                     self._loop_start(left.index)
@@ -501,7 +501,7 @@ class SubroutineCompiler(NameManager):
                     self._loop_end()
                     self._goto(left.index)
                     self._loop_end()
-            elif expression.operation is BinaryOperation.MODULO_OPERATION:
+            elif expression.operation is BinaryOperator.PERCENT:
                 # Same as division, but result is in tmp1
                 # >,>, >(tmp1) >(tmp2) >(tmp3) <<<<<[->->+ <[->>+>+<<<]>>>[-<<<+>>>] + <[>-<[-]] >[-<<<<<+>>>[-<+>]>>]<<<<]
                 with self.variable() as tmp1, self.variable() as tmp2, self.variable() as tmp3:
@@ -528,25 +528,15 @@ class SubroutineCompiler(NameManager):
                     self._loop_end()
                     self._goto(left.index)
                     self._loop_end()
-            elif expression.operation is BinaryOperation.CONCATENATION:
+            elif expression.operation is BinaryOperator.DOUBLE_DOT:
                 # TODO: Evaluate operands here instead of copying them
                 self._goto(evaluation_index)
                 self.copy_variable(left)
                 self._right(left.size())
                 self.copy_variable(right)
             else:
-                raise ImpossibleException(f'Unknown operation: {expression.operation!r}')
+                raise ImpossibleException(f'Unknown binary operation: {expression.operation!r}')
         self._goto(evaluation_index)
-
-    def evaluate_arithmetic_expression(self, expression: TypedArithmeticExpression) -> None:
-        """Evaluate the passed arithmetic expression at the current location."""
-        match expression:
-            case TypedUnaryArithmeticExpression() as unary_arithmetic_expression:
-                self.evaluate_unary_arithmetic_expression(unary_arithmetic_expression)
-            case TypedBinaryArithmeticExpression() as binary_arithmetic_expression:
-                self.evaluate_binary_arithmetic_expression(binary_arithmetic_expression)
-            case _:
-                raise ImpossibleException(f'Unknown arithmetic expression type: {expression.__class__}')
 
     def evaluate(self, expression: TypedExpression, index: int | None = None) -> None:
         """Evaluate the passed expression at the current location (or `index` if specified)."""
@@ -578,8 +568,10 @@ class SubroutineCompiler(NameManager):
                 self.bf_code += ','
             case TypedFunctionCall(location=location, identifier=identifier, arguments=arguments):
                 self.call(location, identifier, arguments, True)
-            case TypedArithmeticExpression() as arithmetic_expression:
-                self.evaluate_arithmetic_expression(arithmetic_expression)
+            case TypedUnaryArithmeticExpression() as unary_arithmetic_expression:
+                self.evaluate_unary_arithmetic_expression(unary_arithmetic_expression)
+            case TypedBinaryArithmeticExpression() as binary_arithmetic_expression:
+                self.evaluate_binary_arithmetic_expression(binary_arithmetic_expression)
             case _:
                 raise ImpossibleException(f'Unknown expression type: {expression.__class__.__name__}')
         self._goto(index)
@@ -822,11 +814,9 @@ def generate_program(namespace: TypeCheckedNamespace, main_procedure_identifier:
     # Built in procedures
     procedures: dict[str, SubroutineCompiler] = {}
     # Get all elements
-    for element in namespace:
-        if isinstance(element, TypeCheckedSubroutine):
-            procedures[element.identifier] = SubroutineCompiler(element, procedures.copy(), comment_level=verbose_level)
-        else:
-            raise ImpossibleException(f'Unknown element type: {element.__class__.__name__}')
+    for subroutine in namespace:
+        if isinstance(subroutine, TypeCheckedSubroutine):
+            procedures[subroutine.identifier] = SubroutineCompiler(subroutine, procedures.copy(), comment_level=verbose_level)
     # Generate code for main procedure
     if main_procedure_identifier not in procedures:
         raise CompilationException(namespace.location, f'{main_procedure_identifier!r} procedure not found')
