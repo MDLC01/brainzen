@@ -3,6 +3,7 @@ import sys
 from exceptions import *
 from generation.generator import CommentLevel, generate_program
 from intermediate_representation import ASTGenerator
+from reference import Reference
 from tokenization import Tokenizer
 from type_checking.type_checker import TypeCheckedNamespace
 
@@ -12,7 +13,8 @@ def compile_source_code(source_code: str, file_name: str, *, main_procedure: str
     tokens = Tokenizer(file_name, source_code).tokenize()
     ast = ASTGenerator(Location.in_file(file_name), tokens).generate()
     typed_ast = TypeCheckedNamespace(ast)
-    return generate_program(typed_ast, main_procedure, verbose_level=verbose_level)
+    main_procedure_reference = Reference.from_string(main_procedure)
+    return generate_program(typed_ast, main_procedure_reference, comment_level=verbose_level)
 
 
 def main(argv: list[str]) -> int:

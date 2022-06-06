@@ -4,6 +4,7 @@ from typing import Generator
 from data_types import *
 from exceptions import *
 from intermediate_representation.instructions import *
+from reference import Reference
 from tokenization.operators import BinaryOperator, UnaryOperator
 from type_checking.typed_assignment_targets import TypedAssignmentTarget
 from type_checking.typing_context import SubroutineTypingContext
@@ -17,11 +18,11 @@ class TypeCheckedInstruction(ABC):
                 return TypeCheckedInstructionBlock(context, instruction_block)
             case Expression() as expression:
                 return TypedExpression.from_expression(context, expression)
-            case ProcedureCall(identifier='print') as procedure_call:
+            case ProcedureCall(reference=Reference(namespace=None, identifier='print')) as procedure_call:
                 return PrintCall(context, procedure_call)
-            case ProcedureCall(identifier='println') as procedure_call:
+            case ProcedureCall(reference=Reference(namespace=None, identifier='println')) as procedure_call:
                 return PrintCall(context, procedure_call, True)
-            case FunctionCall(identifier='input') as function_call:
+            case FunctionCall(reference=Reference(namespace=None, identifier='input')) as function_call:
                 return InputCall(function_call)
             case ProcedureCall() as procedure_call:
                 return TypeCheckedProcedureCall(context, procedure_call)
@@ -120,8 +121,8 @@ class TypedExpression(TypeCheckedInstruction, ABC):
     @staticmethod
     def from_expression(context: SubroutineTypingContext, expression: Expression) -> 'TypedExpression':
         match expression:
-            case ConstantReference(identifier=identifier):
-                return context.namespace.constants[identifier]
+            case ConstantReference(location=location, identifier=identifier):
+                return context.namespace.get_constant_value(Reference(location, identifier))
             case Char() as char:
                 return LiteralChar.from_char(char)
             case Array() as array:
@@ -136,11 +137,11 @@ class TypedExpression(TypeCheckedInstruction, ABC):
                 return TypedBinaryArithmeticExpression(context, binary_arithmetic_expression)
             case ArrayAccessExpression() as array_access_expression:
                 return TypedArrayAccessExpression(context, array_access_expression)
-            case FunctionCall(location=location, identifier='print'):
+            case FunctionCall(location=location, reference=Reference(namespace=None, identifier='print')):
                 raise CompilationException(location, f"Procedure 'print' does not return anything")
-            case FunctionCall(location=location, identifier='println'):
+            case FunctionCall(location=location, reference=Reference(namespace=None, identifier='println')):
                 raise CompilationException(location, f"Procedure 'println' does not return anything")
-            case FunctionCall(identifier='input') as function_call:
+            case FunctionCall(reference=Reference(namespace=None, identifier='input')) as function_call:
                 return InputCall(function_call)
             case FunctionCall() as function_call:
                 return TypedFunctionCall(context, function_call)
@@ -457,24 +458,24 @@ class InputCall(TypedExpression):
 class TypeCheckedProcedureCall(TypeCheckedInstruction):
     def __init__(self, context: SubroutineTypingContext, procedure_call: ProcedureCall) -> None:
         super().__init__(procedure_call.location)
-        self.identifier: str = procedure_call.identifier
+        self.reference = procedure_call.reference
         # Type checking
-        self.arguments: list[TypedExpression] = self._type_check_arguments(context, procedure_call.arguments)
+        self.arguments = self._type_check_arguments(context, procedure_call.arguments)
 
     def _type_check_arguments(self, context: SubroutineTypingContext,
                               arguments: list[Expression]) -> list[TypedExpression]:
-        expected_types = context.get_subroutine_argument_types(self.location, self.identifier)
+        expected_types = context.get_subroutine_argument_types(self.location, self.reference)
         if len(arguments) != len(expected_types):
             argument_count = f'{len(expected_types)} argument'
             if len(expected_types) > 1:
                 argument_count += 's'
-            message = f'Subroutine {self.identifier!r} accepts {argument_count}, but found {len(arguments)}'
+            message = f'Subroutine {self.reference} accepts {argument_count}, but found {len(arguments)}'
             raise CompilationException(self.location, message)
         typed_arguments: list[TypedExpression] = []
         for i, argument in enumerate(arguments):
             typed_argument = TypedExpression.from_expression(context, argument)
             if typed_argument.type() != expected_types[i]:
-                message = f'Argument {i} of subroutine {self.identifier!r} is expected to be of type' \
+                message = f'Argument {i} of subroutine {self.reference} is expected to be of type' \
                           f' {expected_types[i]}, but found {typed_argument.type()}'
                 raise CompilationException(typed_argument.location, message)
             typed_arguments.append(typed_argument)
@@ -482,20 +483,20 @@ class TypeCheckedProcedureCall(TypeCheckedInstruction):
 
     def __str__(self) -> str:
         arguments = ', '.join(str(argument) for argument in self.arguments)
-        return f'{self.identifier}({arguments})'
+        return f'{self.reference}({arguments})'
 
     def __repr__(self) -> str:
         if self.arguments:
             arguments = ', '.join(repr(argument) for argument in self.arguments)
-            return f'{self.__class__.__name__}[{self.identifier}, {arguments}]'
-        return f'{self.__class__.__name__}[{self.identifier}]'
+            return f'{self.__class__.__name__}[{self.reference}, {arguments}]'
+        return f'{self.__class__.__name__}[{self.reference}]'
 
 
 class TypedFunctionCall(TypeCheckedProcedureCall, TypedExpression):
     def __init__(self, context: SubroutineTypingContext, function_call: FunctionCall) -> None:
         super().__init__(context, function_call)
         # Type checking
-        self.return_type: DataType = context.get_function_return_type(function_call.location, function_call.identifier)
+        self.return_type: DataType = context.get_function_return_type(function_call.location, function_call.reference)
 
     def type(self) -> DataType:
         return self.return_type

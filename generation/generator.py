@@ -3,6 +3,7 @@ from enum import IntEnum
 from data_types import *
 from exceptions import *
 from generation.name_manager import *
+from reference import Reference
 from tokenization.operators import *
 from type_checking import *
 
@@ -14,6 +15,46 @@ class CommentLevel(IntEnum):
     DETAILS = 3
 
 
+class Context:
+    @classmethod
+    def empty(cls) -> 'Context':
+        return Context({}, {})
+
+    @classmethod
+    def with_global(cls, context: 'Context') -> 'Context':
+        return cls(context.namespaces.copy(), context.subroutines.copy())
+
+    def __init__(self, namespaces: dict[str, 'Context'], subroutines: dict[str, 'SubroutineCompiler']) -> None:
+        self.namespaces = namespaces
+        self.subroutines = subroutines
+
+    def get_namespace(self, reference: Reference) -> 'Context':
+        if reference is None:
+            return self
+        parent = self.get_namespace(reference.namespace)
+        if reference.identifier in parent.namespaces:
+            return parent.namespaces[reference.identifier]
+        raise CompilerException(f'Unable to find namespace {reference}')
+
+    def get_subroutine(self, reference: Reference) -> 'SubroutineCompiler':
+        namespace = self.get_namespace(reference.namespace)
+        if reference.identifier in namespace.subroutines:
+            return namespace.subroutines[reference.identifier]
+        raise CompilerException(f'Unable to find subroutine {reference}')
+
+    def with_namespace(self, identifier: str, namespace: 'Context') -> 'Context':
+        namespaces = self.namespaces.copy()
+        namespaces[identifier] = namespace
+        subroutines = self.subroutines.copy()
+        return type(self)(namespaces, subroutines)
+
+    def with_subroutine(self, identifier: str, subroutine: 'SubroutineCompiler') -> 'Context':
+        namespaces = self.namespaces.copy()
+        subroutines = self.subroutines.copy()
+        subroutines[identifier] = subroutine
+        return type(self)(namespaces, subroutines)
+
+
 class SubroutineCompiler(NameManager):
     """
     A subroutine is only allowed to change cells to the right of where it started, and it
@@ -21,14 +62,14 @@ class SubroutineCompiler(NameManager):
     The return value of a function is defined by the position of the pointer when it ends.
     """
 
-    def __init__(self, subroutine: TypeCheckedSubroutine, context: dict[str, 'SubroutineCompiler'], *,
+    def __init__(self, subroutine: TypeCheckedSubroutine, context: Context, *,
                  comment_level: int = CommentLevel.BZ_CODE) -> None:
         super().__init__(subroutine.arguments, subroutine.return_type)
-        self.context: dict[str, SubroutineCompiler] = context
-        self.subroutine: TypeCheckedSubroutine = subroutine
-        self.comment_level: int = comment_level
-        self.bf_code: str = ''
-        self.index: int = 0
+        self.context = context
+        self.subroutine = subroutine
+        self.comment_level = comment_level
+        self.bf_code = ''
+        self.index = 0
         self._loop_start_indices: list[int] = []
 
     def identifier(self) -> str:
@@ -204,11 +245,6 @@ class SubroutineCompiler(NameManager):
             self._move({source.index + i})
         # Return to the destination cell
         self._goto(destination)
-
-    def get_subroutine(self, location: Location, identifier: str) -> 'SubroutineCompiler':
-        if identifier in self.context:
-            return self.context[identifier]
-        raise CompilationException(location, f'Unknown subroutine: {identifier!r}')
 
     def evaluate_unary_arithmetic_expression(self, expression: TypedUnaryArithmeticExpression) -> None:
         evaluation_index = self.index
@@ -566,8 +602,8 @@ class SubroutineCompiler(NameManager):
                     self._goto(evaluation_index)
             case InputCall():
                 self.bf_code += ','
-            case TypedFunctionCall(location=location, identifier=identifier, arguments=arguments):
-                self.call(location, identifier, arguments, True)
+            case TypedFunctionCall(location=location, reference=reference, arguments=arguments):
+                self.call(location, reference, arguments, True)
             case TypedUnaryArithmeticExpression() as unary_arithmetic_expression:
                 self.evaluate_unary_arithmetic_expression(unary_arithmetic_expression)
             case TypedBinaryArithmeticExpression() as binary_arithmetic_expression:
@@ -609,28 +645,29 @@ class SubroutineCompiler(NameManager):
                     self._right(evaluated_argument.size())
         return subroutine_origin
 
-    def call(self, location: Location, identifier: str, arguments: list[TypedExpression], expect_return: bool) -> None:
+    def call(self, location: Location, reference: Reference, arguments: list[TypedExpression],
+             expect_return: bool) -> None:
         """Call a subroutine and, if specified, get a return value"""
         # Get call context and subroutine
         call_index = self.index
-        subroutine = self.get_subroutine(location, identifier)
+        subroutine = self.context.get_subroutine(reference)
         if expect_return and not subroutine.returns():
-            raise CompilerException(f'Using procedure {identifier!r} as a function should have been caught earlier')
+            raise CompilerException(f'Using procedure {reference} as a function should have been caught earlier')
         # Test if the number of arguments is right
         arity = subroutine.arity()
         if arity != len(arguments):
-            message = f'Subroutine {identifier!r} expects {arity} arguments, found {len(arguments)}'
+            message = f'Subroutine {reference} expects {arity} arguments, found {len(arguments)}'
             raise CompilationException(location, message)
         # First, evaluates the arguments
-        self._comment(f'Preparing call to subroutine {identifier!r} (evaluating arguments)', prefix='\n')
+        self._comment(f'Preparing call to subroutine {reference} (evaluating arguments)', prefix='\n')
         subroutine_origin = self._evaluate_arguments(arguments)
         self._goto(subroutine_origin)
         # Then, call the subroutine
-        self._comment(f'Calling subroutine {identifier!r}', prefix='\n')
+        self._comment(f'Calling subroutine {reference}', prefix='\n')
         self.bf_code += subroutine.generate()
         self.index += subroutine.index
         # Finally, get the return value (if required) and reset the cells to 0
-        self._comment(f'Finalizing call to subroutine {identifier!r}', prefix='\n')
+        self._comment(f'Finalizing call to subroutine {reference}', prefix='\n')
         if expect_return:
             return_index = self.index
             block_size = subroutine.return_type().size()
@@ -770,8 +807,8 @@ class SubroutineCompiler(NameManager):
                     self.assign(target, tmp.index)
             case PrintCall(arguments=arguments, new_line=new_line):
                 self.print(arguments, new_line=new_line)
-            case TypeCheckedProcedureCall(location=location, identifier=identifier, arguments=arguments):
-                self.call(location, identifier, arguments, False)
+            case TypeCheckedProcedureCall(location=location, reference=reference, arguments=arguments):
+                self.call(location, reference, arguments, False)
                 comment_line = False
             case TypedExpression() as expression:
                 self.evaluate(expression)
@@ -797,7 +834,9 @@ class SubroutineCompiler(NameManager):
         if comment_line:
             self._comment(f'{instruction};', CommentLevel.BZ_CODE)
 
-    def generate(self) -> str:
+    def generate(self, *, comment_level: int | None = None) -> str:
+        if comment_level is not None:
+            self.comment_level = comment_level
         if not self.bf_code:
             if isinstance(self.subroutine, TypeCheckedNativeSubroutine):
                 self.bf_code = self.subroutine.bf_code
@@ -810,22 +849,28 @@ class SubroutineCompiler(NameManager):
         return self.bf_code
 
 
-def generate_program(namespace: TypeCheckedNamespace, main_procedure_identifier: str, *, verbose_level: int = 1) -> str:
-    # Built in procedures
-    procedures: dict[str, SubroutineCompiler] = {}
-    # Get all elements
-    for subroutine in namespace:
-        if isinstance(subroutine, TypeCheckedSubroutine):
-            procedures[subroutine.identifier] = SubroutineCompiler(subroutine, procedures.copy(), comment_level=verbose_level)
-    # Generate code for main procedure
-    if main_procedure_identifier not in procedures:
-        raise CompilationException(namespace.location, f'{main_procedure_identifier!r} procedure not found')
-    main = procedures[main_procedure_identifier]
+def generate_namespace_context(namespace: TypeCheckedNamespace, global_context: Context = Context.empty()) -> 'Context':
+    context = Context.with_global(global_context)
+    for element in namespace:
+        if isinstance(element, TypeCheckedNamespace):
+            namespace_context = generate_namespace_context(element, context)
+            context = context.with_namespace(element.identifier, namespace_context)
+        elif isinstance(element, TypeCheckedSubroutine):
+            context = context.with_subroutine(element.identifier, SubroutineCompiler(element, context))
+        else:
+            raise CompilerException(f'Unknown namespace element type: {element.__class__.__name__}')
+    return context
+
+
+def generate_program(namespace: TypeCheckedNamespace, main_procedure_reference: Reference, *,
+                     comment_level: int = CommentLevel.BZ_CODE) -> str:
+    context = generate_namespace_context(namespace)
+    main = context.get_subroutine(main_procedure_reference)
     if main.arity() > 0:
         raise CompilationException(main.subroutine.location, 'Main procedure should not accept arguments')
     if main.returns():
         raise CompilationException(main.subroutine.location, 'Main subroutine should be a procedure')
-    return main.generate().strip() + '\n'
+    return main.generate(comment_level=comment_level).strip() + '\n'
 
 
 __all__ = ['CommentLevel', 'generate_program']

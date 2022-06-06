@@ -4,6 +4,7 @@ from typing import Generator
 from data_types import DataType
 from exceptions import CompilerException, Location
 from intermediate_representation.assignment_targets import AssignmentTarget
+from reference import *
 from tokenization.operators import *
 
 
@@ -202,27 +203,27 @@ class ArrayAccessExpression(Expression):
 class ProcedureCall(Instruction):
     """A procedure call executes the instructions of the subroutine, without expecting a return value"""
 
-    def __init__(self, location: Location, identifier: str, arguments: list[Expression]) -> None:
+    def __init__(self, location: Location, reference: Reference, arguments: list[Expression]) -> None:
         super().__init__(location)
-        self.identifier = identifier
+        self.reference = reference
         self.arguments = arguments
 
     def __str__(self) -> str:
         arguments = ', '.join(str(argument) for argument in self.arguments)
-        return f'{self.identifier}({arguments})'
+        return f'{self.reference}({arguments})'
 
     def __repr__(self) -> str:
         if self.arguments:
             arguments = ', '.join(repr(argument) for argument in self.arguments)
-            return f'{self.__class__.__name__}[{self.identifier}, {arguments}]'
-        return f'{self.__class__.__name__}[{self.identifier}]'
+            return f'{self.__class__.__name__}[{self.reference}, {arguments}]'
+        return f'{self.__class__.__name__}[{self.reference}]'
 
 
 class FunctionCall(ProcedureCall, Expression):
     """A function call executes the instructions of the subroutine and expects a return value."""
 
-    def __init__(self, location: Location, identifier: str, arguments: list[Expression]) -> None:
-        super().__init__(location, identifier, arguments)
+    def __init__(self, location: Location, reference: Reference, arguments: list[Expression]) -> None:
+        super().__init__(location, reference, arguments)
 
 
 class Incrementation(Instruction):

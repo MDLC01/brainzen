@@ -18,6 +18,7 @@ Here is a non-exhaustive list of major available features:
 - Loops.
 - Conditional statements.
 - Types (characters, arrays of fixed length and [product types](https://en.wikipedia.org/wiki/Product_type)).
+- Namespaces.
 
 ## Considered features
 
@@ -25,7 +26,6 @@ Here is a list of considered features in arbitrary order (this list is *not* com
 
 - Type inference.
 - Some form of [overloading](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism).
-- Namespaces.
 - Separating a program in multiple files (import statements).
 - Ternary operator.
 - Python-like array comprehensions.

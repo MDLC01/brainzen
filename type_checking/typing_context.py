@@ -3,6 +3,7 @@ from typing import Optional
 from data_types import DataType
 from exceptions import *
 from intermediate_representation import SubroutineArgument
+from reference import Reference
 
 
 class SubroutineSignature:
@@ -72,18 +73,14 @@ class SubroutineTypingContext:
     def expected_return_type(self) -> DataType | None:
         return self.signature.return_type
 
-    def get_subroutine_argument_types(self, location: Location, identifier: str) -> list[DataType]:
-        if identifier in self.namespace.subroutine_signatures:
-            return self.namespace.subroutine_signatures[identifier].get_argument_types()
-        raise CompilationException(location, f'Subroutine {identifier!r} is not defined')
+    def get_subroutine_argument_types(self, location: Location, reference: Reference) -> list[DataType]:
+        return self.namespace.get_subroutine_signature(reference).get_argument_types()
 
-    def get_function_return_type(self, location: Location, identifier: str) -> DataType:
-        if identifier in self.namespace.subroutine_signatures:
-            subroutine = self.namespace.subroutine_signatures[identifier]
-            if not subroutine.is_function():
-                raise CompilationException(location, f'Subroutine {identifier!r} is not a function')
-            return subroutine.return_type
-        raise CompilationException(location, f'Function {identifier!r} does not exist')
+    def get_function_return_type(self, location: Location, reference: Reference) -> DataType:
+        signature = self.namespace.get_subroutine_signature(reference)
+        if not signature.is_function():
+            raise CompilationException(location, f'Subroutine {reference} is not a function')
+        return signature.return_type
 
     def get_variable_type(self, location: Location, identifier: str) -> DataType:
         if identifier in self.variables:

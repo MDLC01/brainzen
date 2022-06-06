@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Generator
+from typing import Generator, Optional
 
 from data_types import *
 from exceptions import *
 from intermediate_representation import *
+from reference import Reference
 from type_checking.operations import *
 from type_checking.type_checked_instructions import *
 from type_checking.typing_context import SubroutineSignature, SubroutineTypingContext
@@ -115,6 +116,8 @@ class TypeCheckedNamespaceElement(ABC):
             signature = SubroutineSignature(element.arguments, element.return_type)
             context = SubroutineTypingContext(namespace, signature)
             return TypeCheckedProcedure.from_procedure(context, element)
+        if isinstance(element, Namespace):
+            return TypeCheckedNamespace(element, namespace)
         raise ImpossibleException(f'Unknown namespace element type: {element.__class__}')
 
     def __init__(self, location: Location, identifier: str) -> None:
@@ -226,13 +229,14 @@ class TypeCheckedProcedure(TypeCheckedSubroutine):
         return f'({self._argument_string()}) -> {self.body.__repr__(indent)}'
 
 
-class TypeCheckedNamespace:
+class TypeCheckedNamespace(TypeCheckedNamespaceElement):
     """A type checked namespace is a namespace that has been type checked (the type of every expression is known)."""
 
-    def __init__(self, namespace: Namespace) -> None:
-        self.location = namespace.location
-        self.identifier = namespace.identifier
+    def __init__(self, namespace: Namespace, parent: Optional['TypeCheckedNamespace'] = None) -> None:
+        super().__init__(namespace.location, namespace.identifier)
+        self.parent = parent
         self.constants: dict[str, TypedExpression] = {}
+        self.namespaces: dict[str, 'TypeCheckedNamespace'] = {}
         self.subroutine_signatures: dict[str, SubroutineSignature] = {}
         self.elements = [self._type_check_element(element) for element in namespace]
 
@@ -244,13 +248,42 @@ class TypeCheckedNamespace:
         elif isinstance(type_checked_element, TypeCheckedSubroutine):
             self.subroutine_signatures[identifier] = SubroutineSignature(type_checked_element.arguments,
                                                                          type_checked_element.return_type)
+        elif isinstance(type_checked_element, TypeCheckedNamespace):
+            self.namespaces[identifier] = type_checked_element
         else:
             raise ImpossibleException(f'Unknown namespace element type: {type_checked_element.__class__.__name__}')
         return type_checked_element
 
+    def get_namespace(self, reference: Reference | None) -> 'TypeCheckedNamespace':
+        if reference is None:
+            return self
+        parent = self.get_namespace(reference.namespace)
+        if reference.identifier in parent.namespaces:
+            return parent.namespaces[reference.identifier]
+        if self.parent is not None:
+            return self.parent.get_namespace(reference)
+        raise CompilationException(reference.location, f'Unknown namespace: {reference}')
+
+    def get_constant_value(self, reference: Reference) -> TypedExpression:
+        namespace = self.get_namespace(reference.namespace)
+        if reference.identifier in namespace.constants:
+            return namespace.constants[reference.identifier]
+        if self.parent is not None:
+            return self.parent.get_constant_value(reference)
+        raise CompilationException(reference.location, f'Unknown constant: #{reference}')
+
+    def get_subroutine_signature(self, reference: Reference) -> SubroutineSignature:
+        namespace = self.get_namespace(reference.namespace)
+        if reference.identifier in namespace.subroutine_signatures:
+            return namespace.subroutine_signatures[reference.identifier]
+        if self.parent is not None:
+            return self.parent.get_subroutine_signature(reference)
+        raise CompilationException(reference.location, f'Unknown subroutine: {reference}')
+
     def __iter__(self) -> Generator[TypeCheckedNamespaceElement, None, None]:
         for element in self.elements:
-            yield element
+            if not isinstance(element, TypeCheckedConstant):
+                yield element
 
     def __str__(self) -> str:
         return f'namespace {self.identifier} line {self.location.line}'

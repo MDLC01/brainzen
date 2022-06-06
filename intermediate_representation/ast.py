@@ -5,6 +5,7 @@ from data_types import *
 from exceptions import *
 from intermediate_representation.assignment_targets import *
 from intermediate_representation.instructions import *
+from reference import *
 from tokenization.operators import *
 from tokenization.tokens import *
 
@@ -115,12 +116,12 @@ class AlreadyDefinedException(CompilationException):
         super().__init__(redefine_location, message)
 
 
-class Namespace:
+class Namespace(NamespaceElement):
     def __init__(self, location: Location, identifier: str) -> None:
-        self.location = location
-        self.identifier = identifier
+        super().__init__(location, identifier)
         self.elements: list[NamespaceElement] = []
         self.constants: dict[str, Constant] = {}
+        self.namespaces: dict[str, Namespace] = {}
         self.subroutines: dict[str, Subroutine] = {}
 
     def register_constant(self, constant: Constant) -> None:
@@ -136,6 +137,13 @@ class Namespace:
             raise AlreadyDefinedException('Subroutine', self.subroutines[identifier], subroutine.location)
         self.subroutines[identifier] = subroutine
         self.elements.append(subroutine)
+
+    def register_namespace(self, namespace: 'Namespace') -> None:
+        identifier = namespace.identifier
+        if identifier in self.namespaces:
+            raise AlreadyDefinedException('Namespace', self.namespaces[identifier], namespace.location)
+        self.namespaces[identifier] = namespace
+        self.elements.append(namespace)
 
     def __iter__(self) -> Generator[NamespaceElement, None, None]:
         for element in self.elements:
@@ -237,11 +245,11 @@ class ASTGenerator:
             identifier = self._expect(IdentifierToken).name
             return ConstantReference(self._location_from(start_location), identifier)
         # Function call
-        if self._is_next(IdentifierToken) and self._is_next(OpenParToken, 1):
-            identifier = self._expect(IdentifierToken).name
+        if self._is_next(IdentifierToken) and (self._is_next(OpenParToken, 1) or self._is_next(DoubleColonToken, 1)):
+            reference = self.parse_reference()
             self._expect(OpenParToken)
             arguments = self.parse_sequence(CloseParToken)
-            return FunctionCall(self._location_from(start_location), identifier, arguments)
+            return FunctionCall(self._location_from(start_location), reference, arguments)
         # Identifier
         if self._is_next(IdentifierToken):
             identifier = self._expect(IdentifierToken).name
@@ -320,8 +328,18 @@ class ASTGenerator:
                 break
         return TupleAssignmentTarget(self._location_from(start_location), targets)
 
+    def parse_reference(self) -> Reference:
+        """Parse a reference to a namespace element."""
+        start_location = self._location()
+        identifier = self._expect(IdentifierToken).name
+        reference = Reference(self._location_from(start_location), identifier)
+        while self._eat(DoubleColonToken):
+            identifier = self._expect(IdentifierToken).name
+            reference = Reference(self._location_from(start_location), identifier, reference)
+        return reference
+
     def parse_instruction(self) -> Instruction:
-        """Parse an instruction (does not expect a semicolon at the end)"""
+        """Parse an instruction (does not expect a semicolon at the end)."""
         start_location = self._location()
         # Incrementation
         if self._is_next(IdentifierToken) and self._is_next(DoublePlusToken, 1):
@@ -334,11 +352,11 @@ class ASTGenerator:
             self._expect(DoubleMinusToken)
             return Decrementation(self._location_from(start_location), identifier)
         # Procedure call
-        if self._is_next(IdentifierToken) and self._is_next(OpenParToken, 1):
-            identifier = self._expect(IdentifierToken).name
+        if self._is_next(IdentifierToken) and (self._is_next(OpenParToken, 1) or self._is_next(DoubleColonToken, 1)):
+            reference = self.parse_reference()
             self._expect(OpenParToken)
             arguments = self.parse_sequence(CloseParToken)
-            return ProcedureCall(self._location_from(start_location), identifier, arguments)
+            return ProcedureCall(self._location_from(start_location), reference, arguments)
         # Variable declaration
         if self._eat(LetKeyword):
             variable_type = self.parse_type()
@@ -526,6 +544,10 @@ class ASTGenerator:
         if self._is_next(HashToken):
             constant = self.parse_constant_definition()
             namespace.register_constant(constant)
+        # Namespace definition
+        elif self._is_next(NamespaceKeyword):
+            child_namespace = self.parse_namespace_definition()
+            namespace.register_namespace(child_namespace)
         # Subroutine definition
         else:
             subroutine = self.parse_subroutine_definition()
