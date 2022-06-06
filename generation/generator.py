@@ -865,7 +865,10 @@ def generate_namespace_context(namespace: TypeCheckedNamespace, global_context: 
 def generate_program(namespace: TypeCheckedNamespace, main_procedure_reference: Reference, *,
                      comment_level: int = CommentLevel.BZ_CODE) -> str:
     context = generate_namespace_context(namespace)
-    main = context.get_subroutine(main_procedure_reference)
+    try:
+        main = context.get_subroutine(main_procedure_reference)
+    except CompilerException:
+        raise CompilationException(Location.unknown(), 'Unable to locate main procedure')
     if main.arity() > 0:
         raise CompilationException(main.subroutine.location, 'Main procedure should not accept arguments')
     if main.returns():
