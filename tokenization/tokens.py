@@ -357,7 +357,7 @@ class IdentifierToken(Token):
 
 
 class NativeCodeBlock(Token):
-    """native code"""
+    """native code fragment"""
 
     def __init__(self, location: Location, bf_code: str) -> None:
         super().__init__(location)
