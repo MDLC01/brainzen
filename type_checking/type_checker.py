@@ -35,45 +35,51 @@ def expression_of(location: Location, value: Value) -> TypedExpression:
     raise CompilerException(f'Invalid Python equivalent: {value!r}')
 
 
-def compute_unary_operation(operation: UnaryOperationType, operand: Value) -> Value:
-    if operation is UnaryOperationType.NEGATION:
-        return int(not operand)
-    if operation is UnaryOperationType.BOOL_NORMALIZATION:
-        return int(bool(operand))
-    if operation is UnaryOperationType.OPPOSITION:
-        return -operand
+def compute_unary_operation(operation: UnaryOperation, operand: Value) -> Value:
+    match operation:
+        case NegationOperation():
+            return int(not operand)
+        case BoolNormalizationOperation():
+            return int(bool(operand))
+        case OppositionOperation():
+            return -operand
+        case UnaryTermByTermArrayOperation(operation=base_operation):
+            return [compute_unary_operation(base_operation, element) for element in operand]
     raise CompilerException(f'Unknown unary operation: {operation!r}')
 
 
-def compute_binary_operation(operation: BinaryOperationType, left: Value, right: Value) -> Value:
-    if operation is BinaryOperationType.EQUALITY_TEST:
-        return int(left == right)
-    if operation is BinaryOperationType.DIFFERENCE_TEST:
-        return int(left != right)
-    if operation is BinaryOperationType.STRICT_INEQUALITY_TEST:
-        return int(left < right)
-    if operation is BinaryOperationType.LARGE_INEQUALITY_TEST:
-        return int(left <= right)
-    if operation is BinaryOperationType.INVERSE_STRICT_INEQUALITY_TEST:
-        return int(left > right)
-    if operation is BinaryOperationType.INVERSE_LARGE_INEQUALITY_TEST:
-        return int(left >= right)
-    if operation is BinaryOperationType.CONJUNCTION:
-        return int(left and right)
-    if operation is BinaryOperationType.DISJUNCTION:
-        return int(left or right)
-    if operation is BinaryOperationType.ADDITION:
-        return left + right
-    if operation is BinaryOperationType.SUBTRACTION:
-        return left - right
-    if operation is BinaryOperationType.MULTIPLICATION:
-        return left * right
-    if operation is BinaryOperationType.DIVISION:
-        return left // right
-    if operation is BinaryOperationType.MODULO_OPERATION:
-        return left % right
-    if operation is BinaryOperationType.CONCATENATION:
-        return left + right
+def compute_binary_operation(operation: BinaryOperation, left: Value, right: Value) -> Value:
+    match operation:
+        case EqualityTestOperation():
+            return int(left == right)
+        case DifferenceTestOperation():
+            return int(left != right)
+        case StrictInequalityTestOperation():
+            return int(left < right)
+        case LargeInequalityTestOperation():
+            return int(left <= right)
+        case InverseStrictInequalityTestOperation():
+            return int(left > right)
+        case InverseLargeInequalityTestOperation():
+            return int(left >= right)
+        case ConjunctionOperation():
+            return int(left and right)
+        case DisjunctionOperation():
+            return int(left or right)
+        case AdditionOperation():
+            return left + right
+        case SubtractionOperation():
+            return left - right
+        case MultiplicationOperation():
+            return left * right
+        case DivisionOperation():
+            return left // right
+        case ModuloOperation():
+            return left % right
+        case ConcatenationOperation():
+            return left + right
+        case BinaryTermByTermArrayOperation(operation=base_operation):
+            return [compute_binary_operation(base_operation, left, element) for element in right]
     raise CompilerException(f'Unknown binary operation: {operation!r}')
 
 
@@ -90,13 +96,13 @@ def evaluate(constants: dict[str, TypedExpression], expression: Expression) -> T
         case UnaryArithmeticExpression(location=location, operator=operator, operand=operand):
             typed_operand = evaluate(constants, operand)
             operation = UnaryOperation.from_operator(location, operator, typed_operand.type())
-            result = compute_unary_operation(operation.operation_type, value_of(typed_operand))
+            result = compute_unary_operation(operation, value_of(typed_operand))
             return expression_of(location, result)
         case BinaryArithmeticExpression(location=location, operator=operator, left=left, right=right):
             typed_left = evaluate(constants, left)
             typed_right = evaluate(constants, right)
             operation = BinaryOperation.from_operator(location, operator, typed_left.type(), typed_right.type())
-            result = compute_binary_operation(operation.operation_type, value_of(typed_left), value_of(typed_right))
+            result = compute_binary_operation(operation, value_of(typed_left), value_of(typed_right))
             return expression_of(location, result)
     message = f'Invalid expression type for compile time evaluation: {expression.__class__.__name__}'
     raise CompilationException(expression.location, message)

@@ -289,11 +289,10 @@ class TypedUnaryArithmeticExpression(TypedArithmeticExpression):
         super().__init__(expression.location)
         self.operand = TypedExpression.from_expression(context, expression.operand)
         # Type checking
-        self.operation: UnaryOperation = UnaryOperation.from_operator(self.location, expression.operator,
-                                                                      self.operand.type())
+        self.operation = UnaryOperation.from_operator(self.location, expression.operator, self.operand.type())
 
     def type(self) -> DataType:
-        return self.operation.return_type
+        return self.operation.type()
 
     def __str__(self) -> str:
         return f'({self.operation}{self.operand})'
@@ -312,7 +311,7 @@ class TypedBinaryArithmeticExpression(TypedArithmeticExpression):
                                                        self.right.type())
 
     def type(self) -> DataType:
-        return self.operation.return_type
+        return self.operation.type()
 
     def __str__(self) -> str:
         return f'({self.left} {self.operation} {self.right})'

@@ -5,6 +5,7 @@ from exceptions import *
 from generation.name_manager import *
 from reference import Reference
 from type_checking import *
+from type_checking.operations import *
 
 
 class CommentLevel(IntEnum):
@@ -245,130 +246,130 @@ class SubroutineCompiler(NameManager):
         # Return to the destination cell
         self._goto(destination)
 
-    def evaluate_unary_arithmetic_expression(self, expression: TypedUnaryArithmeticExpression) -> None:
+    def evaluate_unary_operation(self, operation: UnaryOperation, operand: int) -> None:
         evaluation_index = self.index
-        operation = expression.operation.operation_type
-        with self.evaluate_in_new_variable(expression.operand) as operand:
-            self._reset(evaluation_index)
+        match operation:
             # Comments show corresponding Brainfuck code, where the evaluation index is the starting index, and the
             # operand is stored at the index of the pointer when the comma is reached
-            if operation is UnaryOperationType.NEGATION:
+            case NegationOperation():
                 # >, <+>[<->[-]]
                 self._goto(evaluation_index)
                 self._increment()
-                self._loop_start(operand.index)
+                self._loop_start(operand)
                 self._goto(evaluation_index)
                 self._decrement()
-                self._reset(operand.index)
+                self._reset(operand)
                 self._loop_end()
-            elif operation is UnaryOperationType.BOOL_NORMALIZATION:
+            case BoolNormalizationOperation():
                 # >,[<+>[-]]
-                self._loop_start(operand.index)
+                self._loop_start(operand)
                 self._goto(evaluation_index)
                 self._increment()
-                self._reset(operand.index)
+                self._reset(operand)
                 self._loop_end()
-            elif operation is UnaryOperationType.OPPOSITION:
+            case OppositionOperation():
                 # >, [-<->]
-                self._loop_start(operand.index)
+                self._loop_start(operand)
                 self._decrement()
                 self._goto(evaluation_index)
                 self._decrement()
-                self._goto(operand.index)
+                self._goto(operand)
                 self._loop_end()
-            else:
-                raise ImpossibleException(f'Unknown unary operation: {expression.operation!r}')
-        self._goto(evaluation_index)
+            case UnaryTermByTermArrayOperation(operation=base_operation, array_count=count):
+                # Apply operation to each element of the array
+                initial_element_type = base_operation.operand_type()
+                final_element_type = base_operation.type()
+                for i in range(count):
+                    self._goto(evaluation_index + i * final_element_type.size())
+                    self.evaluate_unary_operation(base_operation, operand + i * initial_element_type.size())
+            case _:
+                raise ImpossibleException(f'Unknown unary operation: {operation!r}')
 
-    def evaluate_binary_arithmetic_expression(self, expression: TypedBinaryArithmeticExpression) -> None:
-        """Evaluate the passed binary arithmetic expression in the current cell."""
+    def evaluate_binary_operation(self, operation: BinaryOperation, left: int, right: int) -> None:
         evaluation_index = self.index
-        operation = expression.operation.operation_type
-        with (self.evaluate_in_new_variable(expression.left) as left,
-              self.evaluate_in_new_variable(expression.right) as right):
-            self._reset(evaluation_index)
+        match operation:
             # Comments show corresponding Brainfuck code, where the evaluation index is the starting index, the
             # left operand is stored at the index of the pointer when the first comma is reached, and the right
             # operand is stored at the index of the pointer when the second comma is reached
-            if operation is BinaryOperationType.EQUALITY_TEST:
+            case EqualityTestOperation():
                 # >,>, [-<->] <<+>[<->[-]]
                 # Subtract right from left
-                self._loop_start(right.index)
+                self._loop_start(right)
                 self._decrement()
-                self._decrement(left.index)
-                self._goto(right.index)
+                self._decrement(left)
+                self._goto(right)
                 self._loop_end()
                 # Test if the result is zero
                 self._goto(evaluation_index)
                 self._increment()
-                self._loop_start(left.index)
+                self._loop_start(left)
                 self._goto(evaluation_index)
                 self._decrement()
-                self._reset(left.index)
+                self._reset(left)
                 self._loop_end()
-            elif operation is BinaryOperationType.DIFFERENCE_TEST:
+            case DifferenceTestOperation():
                 # >,>, [-<->] <[<+>[-]]
                 # Subtract right from left
-                self._loop_start(right.index)
+                self._loop_start(right)
                 self._decrement()
-                self._decrement(left.index)
-                self._goto(right.index)
+                self._decrement(left)
+                self._goto(right)
                 self._loop_end()
                 # Test if the result is non-zero
-                self._loop_start(left.index)
+                self._loop_start(left)
                 self._goto(evaluation_index)
                 self._increment()
-                self._reset(left.index)
+                self._reset(left)
                 self._loop_end()
-            elif operation is BinaryOperationType.STRICT_INEQUALITY_TEST:
+            case StrictInequalityTestOperation():
                 with self.variable() as tmp1, self.variable() as tmp2:
-                    self._loop_start(right.index)
+                    self._loop_start(right)
                     # Duplicate right operand
-                    self._goto(left.index)
+                    self._goto(left)
                     self._move({tmp1.index, tmp2.index})
                     self._goto(tmp2.index)
-                    self._move({left.index})
+                    self._move({left})
                     self._increment(tmp2.index)
                     # Do stuff
                     self._loop_start(tmp1.index)
-                    self._decrement(right.index)
-                    self._decrement(left.index)
+                    self._decrement(right)
+                    self._decrement(left)
                     self._decrement(tmp2.index)
                     self._reset(tmp1.index)
                     self._loop_end()
                     # Do other stuff
                     self._loop_start(tmp2.index)
-                    self._reset(right.index)
+                    self._reset(right)
                     self._goto(evaluation_index)
                     self._increment()
                     self._decrement(tmp2.index)
                     self._loop_end()
-                    self._goto(right.index)
+                    self._goto(right)
                     self._loop_end()
-            elif operation is BinaryOperationType.LARGE_INEQUALITY_TEST:
+            case LargeInequalityTestOperation():
                 # Compute !(l > r)
                 with self.variable() as tmp1, self.variable() as tmp2:
-                    self._loop_start(left.index)
+                    self._loop_start(left)
                     # Duplicate right operand
-                    self._goto(right.index)
+                    self._goto(right)
                     self._move({tmp1.index, tmp2.index})
                     self._goto(tmp2.index)
-                    self._move({right.index})
+                    self._move({right})
                     self._increment(tmp2.index)
                     # Do stuff
                     self._loop_start(tmp1.index)
-                    self._decrement(left.index)
-                    self._decrement(right.index)
+                    self._decrement(left)
+                    self._decrement(right)
                     self._decrement(tmp2.index)
                     self._reset(tmp1.index)
                     self._loop_end()
                     # Do other stuff
                     self._loop_start(tmp2.index)
-                    self._reset(left.index)
+                    self._reset(left)
                     self._increment(tmp1.index)
                     self._decrement(tmp2.index)
                     self._loop_end()
-                    self._goto(left.index)
+                    self._goto(left)
                     self._loop_end()
                     # Negate result
                     self._goto(evaluation_index)
@@ -379,55 +380,55 @@ class SubroutineCompiler(NameManager):
                     self._decrement()
                     self._goto(tmp1.index)
                     self._loop_end()
-            elif operation is BinaryOperationType.INVERSE_STRICT_INEQUALITY_TEST:
+            case InverseStrictInequalityTestOperation():
                 with self.variable() as tmp1, self.variable() as tmp2:
-                    self._loop_start(left.index)
+                    self._loop_start(left)
                     # Duplicate right operand
-                    self._goto(right.index)
+                    self._goto(right)
                     self._move({tmp1.index, tmp2.index})
                     self._goto(tmp2.index)
-                    self._move({right.index})
+                    self._move({right})
                     self._increment(tmp2.index)
                     # Do stuff
                     self._loop_start(tmp1.index)
-                    self._decrement(left.index)
-                    self._decrement(right.index)
+                    self._decrement(left)
+                    self._decrement(right)
                     self._decrement(tmp2.index)
                     self._reset(tmp1.index)
                     self._loop_end()
                     # Do other stuff
                     self._loop_start(tmp2.index)
-                    self._reset(left.index)
+                    self._reset(left)
                     self._goto(evaluation_index)
                     self._increment()
                     self._decrement(tmp2.index)
                     self._loop_end()
-                    self._goto(left.index)
+                    self._goto(left)
                     self._loop_end()
-            elif operation is BinaryOperationType.INVERSE_LARGE_INEQUALITY_TEST:
+            case InverseLargeInequalityTestOperation():
                 # Compute !(l < r)
                 with self.variable() as tmp1, self.variable() as tmp2:
-                    self._loop_start(right.index)
+                    self._loop_start(right)
                     # Duplicate right operand
-                    self._goto(left.index)
+                    self._goto(left)
                     self._move({tmp1.index, tmp2.index})
                     self._goto(tmp2.index)
-                    self._move({left.index})
+                    self._move({left})
                     self._increment(tmp2.index)
                     # Do stuff
                     self._loop_start(tmp1.index)
-                    self._decrement(right.index)
-                    self._decrement(left.index)
+                    self._decrement(right)
+                    self._decrement(left)
                     self._decrement(tmp2.index)
                     self._reset(tmp1.index)
                     self._loop_end()
                     # Do other stuff
                     self._loop_start(tmp2.index)
-                    self._reset(right.index)
+                    self._reset(right)
                     self._increment(tmp1.index)
                     self._decrement(tmp2.index)
                     self._loop_end()
-                    self._goto(right.index)
+                    self._goto(right)
                     self._loop_end()
                     # Negate result
                     self._goto(evaluation_index)
@@ -438,19 +439,19 @@ class SubroutineCompiler(NameManager):
                     self._decrement()
                     self._goto(tmp1.index)
                     self._loop_end()
-            elif operation is BinaryOperationType.CONJUNCTION:
+            case ConjunctionOperation():
                 # There might be a better way
                 # >,>, >++(tmp1) >+(tmp2) <<<[>>-<<[-]] >[>-<[-]] >[>-<[-]] >[<<<<+>>>>[-]]
                 with self.value(2) as tmp1, self.value(1) as tmp2:
                     # Test if the left operand is true
-                    self._loop_start(left.index)
+                    self._loop_start(left)
                     self._decrement(tmp1.index)
-                    self._reset(left.index)
+                    self._reset(left)
                     self._loop_end()
                     # Test if the right operand is true
-                    self._loop_start(right.index)
+                    self._loop_start(right)
                     self._decrement(tmp1.index)
-                    self._reset(right.index)
+                    self._reset(right)
                     self._loop_end()
                     # Test if one of the operand is true
                     self._loop_start(tmp1.index)
@@ -463,66 +464,66 @@ class SubroutineCompiler(NameManager):
                     self._increment()
                     self._reset(tmp2.index)
                     self._loop_end()
-            elif operation is BinaryOperationType.DISJUNCTION:
+            case DisjunctionOperation():
                 # There might be a better way
                 # >,>, >+(tmp) <<[>>[-]<<-<+>] >>[<[-<<+>>]>[-]]
                 with self.value(1) as tmp:
                     # If the left operand is truthy, its value is copied
-                    self._loop_start(left.index)
+                    self._loop_start(left)
                     self._reset(tmp.index)
-                    self._decrement(left.index)
+                    self._decrement(left)
                     self._goto(evaluation_index)
                     self._increment()
-                    self._goto(left.index)
+                    self._goto(left)
                     self._loop_end()
                     # Else, the value of the right operand is copied
                     self._loop_start(tmp.index)
-                    self._goto(right.index)
+                    self._goto(right)
                     self._move({evaluation_index})
                     self._reset(tmp.index)
                     self._loop_end()
-            elif operation is BinaryOperationType.ADDITION:
+            case AdditionOperation():
                 # >,>, <[-<+>] >[-<<+>>]
-                self._goto(left.index)
+                self._goto(left)
                 self._move({evaluation_index})
-                self._loop_start(right.index)
+                self._loop_start(right)
                 self._decrement()
                 self._goto(evaluation_index)
                 self._increment()
-                self._goto(right.index)
+                self._goto(right)
                 self._loop_end()
-            elif operation is BinaryOperationType.SUBTRACTION:
+            case SubtractionOperation():
                 # >,>, <[-<+>] >[-<<->>]
-                self._goto(left.index)
+                self._goto(left)
                 self._move({evaluation_index})
-                self._loop_start(right.index)
+                self._loop_start(right)
                 self._decrement()
                 self._goto(evaluation_index)
                 self._decrement()
-                self._goto(right.index)
+                self._goto(right)
                 self._loop_end()
-            elif operation is BinaryOperationType.MULTIPLICATION:
+            case MultiplicationOperation():
                 # >,>, >(tmp) <<[- >[-<<+>>>+<] >[-<+>]<<]
                 with self.variable() as tmp:
-                    self._loop_start(left.index)
+                    self._loop_start(left)
                     self._decrement()
-                    self._goto(right.index)
+                    self._goto(right)
                     self._move({evaluation_index, tmp.index})
                     self._goto(tmp.index)
-                    self._move({right.index})
-                    self._goto(left.index)
+                    self._move({right})
+                    self._goto(left)
                     self._loop_end()
-            elif operation is BinaryOperationType.DIVISION:
+            case DivisionOperation():
                 # >,>, >(tmp1) >(tmp2) >(tmp3) <<<<<[->->+ <[->>+>+<<<]>>>[-<<<+>>>] + <[>-<[-]] >[-<<<<<+>>>[-<+>]>>]<<<<]
                 with self.variable() as tmp1, self.variable() as tmp2, self.variable() as tmp3:
-                    self._loop_start(left.index)
+                    self._loop_start(left)
                     self._decrement()
-                    self._decrement(right.index)
+                    self._decrement(right)
                     self._increment(tmp1.index)
-                    self._goto(right.index)
+                    self._goto(right)
                     self._move({tmp2.index, tmp3.index})
                     self._goto(tmp3.index)
-                    self._move({right.index})
+                    self._move({right})
                     self._increment()
                     self._loop_start(tmp2.index)
                     self._decrement(tmp3.index)
@@ -533,24 +534,24 @@ class SubroutineCompiler(NameManager):
                     self._goto(evaluation_index)
                     self._increment()
                     self._goto(tmp1.index)
-                    self._move({right.index})
+                    self._move({right})
                     self._goto(tmp3.index)
                     self._loop_end()
-                    self._goto(left.index)
+                    self._goto(left)
                     self._loop_end()
-            elif operation is BinaryOperationType.MODULO_OPERATION:
+            case ModuloOperation():
                 # Same as division, but result is in tmp1
                 # >,>, >(tmp1) >(tmp2) >(tmp3) <<<<<[->->+ <[->>+>+<<<]>>>[-<<<+>>>] + <[>-<[-]] >[-<<<<<+>>>[-<+>]>>]<<<<]
                 with self.variable() as tmp1, self.variable() as tmp2, self.variable() as tmp3:
-                    self._loop_start(left.index)
+                    self._loop_start(left)
                     self._decrement()
-                    self._decrement(right.index)
+                    self._decrement(right)
                     self._goto(evaluation_index)
                     self._increment()
-                    self._goto(right.index)
+                    self._goto(right)
                     self._move({tmp1.index, tmp2.index})
                     self._goto(tmp2.index)
-                    self._move({right.index})
+                    self._move({right})
                     self._increment()
                     self._loop_start(tmp1.index)
                     self._decrement(tmp2.index)
@@ -560,20 +561,35 @@ class SubroutineCompiler(NameManager):
                     self._decrement()
                     self._increment(tmp3.index)
                     self._goto(evaluation_index)
-                    self._move({right.index})
+                    self._move({right})
                     self._goto(tmp2.index)
                     self._loop_end()
-                    self._goto(left.index)
+                    self._goto(left)
                     self._loop_end()
-            elif operation is BinaryOperationType.CONCATENATION:
+            case ConcatenationOperation(base_type=base_type, left_array_count=left_count,
+                                        right_array_count=right_count):
                 # TODO: Evaluate operands here instead of copying them
-                self._goto(evaluation_index)
-                self.copy_variable(left)
-                self._right(left.size())
-                self.copy_variable(right)
-            else:
-                raise ImpossibleException(f'Unknown binary operation: {expression.operation!r}')
-        self._goto(evaluation_index)
+                left_array_size = left_count * base_type.size()
+                self._goto(left)
+                self._move({evaluation_index}, block_size=left_array_size)
+                self._goto(right)
+                self._move({evaluation_index + left_array_size}, block_size=right_count * base_type.size())
+            case BinaryTermByTermArrayOperation(operation=base_operation, array_count=count):
+                # Apply operation to each element of the array
+                # Not the best way to do it, but it works
+                left_operand_size = base_operation.left_type().size()
+                initial_element_type = base_operation.right_type()
+                final_element_type = base_operation.type()
+                with self.variable() as left_backup:
+                    self._goto(left)
+                    self._move({left_backup.index}, block_size=left_operand_size)
+                    for i in range(count):
+                        self._goto(left)
+                        self.copy_variable(left_backup)
+                        self._goto(evaluation_index + i * final_element_type.size())
+                        self.evaluate_binary_operation(base_operation, left, right + i * initial_element_type.size())
+            case _:
+                raise ImpossibleException(f'Unknown binary operation: {operation!r}')
 
     def evaluate(self, expression: TypedExpression, index: int | None = None) -> None:
         """Evaluate the passed expression at the current location (or `index` if specified)."""
@@ -605,10 +621,17 @@ class SubroutineCompiler(NameManager):
                 self.bf_code += ','
             case TypedFunctionCall(location=location, reference=reference, arguments=arguments):
                 self.call(location, reference, arguments, True)
-            case TypedUnaryArithmeticExpression() as unary_arithmetic_expression:
-                self.evaluate_unary_arithmetic_expression(unary_arithmetic_expression)
-            case TypedBinaryArithmeticExpression() as binary_arithmetic_expression:
-                self.evaluate_binary_arithmetic_expression(binary_arithmetic_expression)
+            case TypedUnaryArithmeticExpression(operation=operation, operand=operand_expression):
+                with self.evaluate_in_new_variable(operand_expression) as operand_variable:
+                    self._reset(index, block_size=expression.type().size())
+                    self._goto(index)
+                    self.evaluate_unary_operation(operation, operand_variable.index)
+            case TypedBinaryArithmeticExpression(operation=operation, left=left_expression, right=right_expression):
+                with (self.evaluate_in_new_variable(left_expression) as left_variable,
+                      self.evaluate_in_new_variable(right_expression) as right_variable):
+                    self._reset(index, block_size=expression.type().size())
+                    self._goto(index)
+                    self.evaluate_binary_operation(operation, left_variable.index, right_variable.index)
             case _:
                 raise ImpossibleException(f'Unknown expression type: {expression.__class__.__name__}')
         self._goto(index)
