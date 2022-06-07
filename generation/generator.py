@@ -215,7 +215,7 @@ class SubroutineCompiler(NameManager):
         return variable
 
     def clear_variable_memory(self, variable: Variable) -> None:
-        self._reset(variable.index, block_size=variable.size())
+        self.reset_variable(variable)
 
     def get_name(self, location: Location, identifier: str) -> Name:
         if identifier not in self:
