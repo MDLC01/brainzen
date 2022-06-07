@@ -232,6 +232,10 @@ class QuestionMarkToken(Token):
     token = '?'
 
 
+class PrivateKeyword(Token):
+    keyword = 'private'
+
+
 class NamespaceKeyword(Token):
     keyword = 'namespace'
 
@@ -376,7 +380,7 @@ __all__ = ['is_allowed_in_word', 'is_valid_word', 'AnyToken', 'Token', 'OpenBrac
            'BangEqualToken', 'LessThanToken', 'LessThanEqualToken', 'GreaterThanToken', 'GreaterThanEqualToken',
            'DoubleAmpersandToken', 'DoublePipeToken', 'PlusToken', 'MinusToken', 'StarToken', 'SlashToken',
            'PercentToken', 'DoubleDotToken', 'ColonToken', 'DoubleColonToken', 'ArrowToken', 'HashToken',
-           'QuestionMarkToken', 'NamespaceKeyword', 'NativeKeyword', 'TildeToken', 'ProcKeyword', 'FuncKeyword',
-           'LetKeyword', 'LoopKeyword', 'ForKeyword', 'WhileKeyword', 'DoKeyword', 'IfKeyword', 'ElseKeyword',
-           'ReturnKeyword', 'EOFToken', 'NumberLiteral', 'NumericLiteral', 'CharacterLiteral', 'StringLiteral',
-           'IdentifierToken', 'NativeCodeBlock']
+           'QuestionMarkToken', 'PrivateKeyword', 'NamespaceKeyword', 'NativeKeyword', 'TildeToken', 'ProcKeyword',
+           'FuncKeyword', 'LetKeyword', 'LoopKeyword', 'ForKeyword', 'WhileKeyword', 'DoKeyword', 'IfKeyword',
+           'ElseKeyword', 'ReturnKeyword', 'EOFToken', 'NumberLiteral', 'NumericLiteral', 'CharacterLiteral',
+           'StringLiteral', 'IdentifierToken', 'NativeCodeBlock']

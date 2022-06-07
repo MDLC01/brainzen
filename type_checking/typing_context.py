@@ -7,9 +7,11 @@ from reference import Reference
 
 
 class SubroutineSignature:
-    __slots__ = 'arguments', 'return_type'
+    __slots__ = 'is_private', 'arguments', 'return_type'
 
-    def __init__(self, arguments: list[SubroutineArgument], return_type: DataType | None = None) -> None:
+    def __init__(self, is_private: bool, arguments: list[SubroutineArgument],
+                 return_type: DataType | None = None) -> None:
+        self.is_private = is_private
         self.arguments = arguments
         self.return_type = return_type
 

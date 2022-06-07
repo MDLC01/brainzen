@@ -11,11 +11,18 @@ from tokenization.tokens import *
 
 
 class NamespaceElement(ABC):
-    __slots__ = 'location', 'identifier'
+    __slots__ = 'location', 'identifier', 'is_private'
 
-    def __init__(self, location: Location, identifier: str) -> None:
+    def __init__(self, location: Location, identifier: str, is_private: bool) -> None:
         self.location = location
         self.identifier = identifier
+        self.is_private = is_private
+
+    def _modifier_prefix(self) -> str:
+        s = ''
+        if self.is_private:
+            s += 'private '
+        return s
 
     @abstractmethod
     def __str__(self) -> str:
@@ -29,8 +36,8 @@ class NamespaceElement(ABC):
 class Constant(NamespaceElement):
     __slots__ = 'expression'
 
-    def __init__(self, location: Location, identifier: str, expression: Expression) -> None:
-        super().__init__(location, identifier)
+    def __init__(self, location: Location, identifier: str, is_private: bool, expression: Expression) -> None:
+        super().__init__(location, identifier, is_private)
         self.expression = expression
 
     def __str__(self) -> str:
@@ -55,9 +62,9 @@ class SubroutineArgument:
 class Subroutine(NamespaceElement, ABC):
     __slots__ = 'arguments', 'return_type'
 
-    def __init__(self, location: Location, identifier: str, arguments: list[SubroutineArgument],
+    def __init__(self, location: Location, identifier: str, is_private: bool, arguments: list[SubroutineArgument],
                  return_type: DataType | None) -> None:
-        super().__init__(location, identifier)
+        super().__init__(location, identifier, is_private)
         self.arguments = arguments
         self.return_type = return_type
 
@@ -73,23 +80,24 @@ class Subroutine(NamespaceElement, ABC):
         return ', '.join(repr(argument) for argument in self.arguments)
 
     def __str__(self) -> str:
+        prefix = f'{self._modifier_prefix()}{self._keyword()}'
         suffix = ''
         if self.is_function():
             suffix = f' -> {self.return_type}'
-        return f'{self._keyword()} {self.identifier}({self._argument_string()}){suffix} line {self.location.line}'
+        return f'{prefix} {self.identifier}({self._argument_string()}){suffix} line {self.location.line}'
 
 
 class NativeSubroutine(Subroutine):
     __slots__ = 'offset', 'bf_code'
 
-    def __init__(self, location: Location, identifier: str, arguments: list[SubroutineArgument],
+    def __init__(self, location: Location, identifier: str, is_private: bool, arguments: list[SubroutineArgument],
                  return_type: DataType | None, offset: int, bf_code: str) -> None:
-        super().__init__(location, identifier, arguments, return_type)
+        super().__init__(location, identifier, is_private, arguments, return_type)
         self.offset = offset
         self.bf_code = bf_code
 
-    def __str__(self) -> str:
-        return 'native ' + super().__str__()
+    def _modifier_prefix(self) -> str:
+        return super()._modifier_prefix() + 'native '
 
     def __repr__(self, indent: str = '') -> str:
         return f'```{self.bf_code}```'
@@ -98,9 +106,9 @@ class NativeSubroutine(Subroutine):
 class Procedure(Subroutine):
     __slots__ = 'body'
 
-    def __init__(self, location: Location, identifier: str, arguments: list[SubroutineArgument],
+    def __init__(self, location: Location, identifier: str, is_private: bool, arguments: list[SubroutineArgument],
                  return_type: DataType | None, body: InstructionBlock) -> None:
-        super().__init__(location, identifier, arguments, return_type)
+        super().__init__(location, identifier, is_private, arguments, return_type)
         self.body = body
 
     def _argument_string(self) -> str:
@@ -117,8 +125,8 @@ class AlreadyDefinedException(CompilationException):
 
 
 class Namespace(NamespaceElement):
-    def __init__(self, location: Location, identifier: str) -> None:
-        super().__init__(location, identifier)
+    def __init__(self, location: Location, identifier: str, is_private: bool) -> None:
+        super().__init__(location, identifier, is_private)
         self.elements: list[NamespaceElement] = []
         self.constants: dict[str, Constant] = {}
         self.namespaces: dict[str, Namespace] = {}
@@ -131,13 +139,6 @@ class Namespace(NamespaceElement):
         self.constants[identifier] = constant
         self.elements.append(constant)
 
-    def register_subroutine(self, subroutine: Subroutine) -> None:
-        identifier = subroutine.identifier
-        if identifier in self.subroutines:
-            raise AlreadyDefinedException('Subroutine', self.subroutines[identifier], subroutine.location)
-        self.subroutines[identifier] = subroutine
-        self.elements.append(subroutine)
-
     def register_namespace(self, namespace: 'Namespace') -> None:
         identifier = namespace.identifier
         if identifier in self.namespaces:
@@ -145,12 +146,19 @@ class Namespace(NamespaceElement):
         self.namespaces[identifier] = namespace
         self.elements.append(namespace)
 
+    def register_subroutine(self, subroutine: Subroutine) -> None:
+        identifier = subroutine.identifier
+        if identifier in self.subroutines:
+            raise AlreadyDefinedException('Subroutine', self.subroutines[identifier], subroutine.location)
+        self.subroutines[identifier] = subroutine
+        self.elements.append(subroutine)
+
     def __iter__(self) -> Generator[NamespaceElement, None, None]:
         for element in self.elements:
             yield element
 
     def __str__(self) -> str:
-        return f'namespace {self.identifier} line {self.location.line}'
+        return f'{self._modifier_prefix()}namespace {self.identifier} line {self.location.line}'
 
     def __repr__(self, indent: str = '') -> str:
         inner_indent = indent + '    '
@@ -165,7 +173,7 @@ class Namespace(NamespaceElement):
 
 class File(Namespace):
     def __init__(self, location: Location) -> None:
-        super().__init__(location, '<global>')
+        super().__init__(location, '<global>', False)
 
 
 class ASTGenerator:
@@ -477,14 +485,14 @@ class ASTGenerator:
             types.append(self.parse_type_operand())
         return ProductType.from_operands(types)
 
-    def parse_constant_definition(self) -> Constant:
+    def parse_constant_definition(self, is_private: bool) -> Constant:
         start_location = self._expect(HashToken).location
         identifier = self._expect(IdentifierToken).name
         self._expect(EqualToken)
         expression = self.parse_expression()
         self._expect(SemicolonToken)
         location = self._location_from(start_location)
-        return Constant(location, identifier, expression)
+        return Constant(location, identifier, is_private, expression)
 
     def parse_subroutine_argument_declaration(self) -> list[SubroutineArgument]:
         self._expect(OpenParToken)
@@ -501,7 +509,7 @@ class ASTGenerator:
                 break
         return arguments
 
-    def parse_subroutine_definition(self) -> Subroutine:
+    def parse_subroutine_definition(self, is_private: bool) -> Subroutine:
         start_location = self._location()
         # Subroutine type
         is_native = self._eat(NativeKeyword)
@@ -522,35 +530,36 @@ class ASTGenerator:
             offset = self._expect(NumericLiteral).value
             location = self._location_from(start_location)
             bf_code = self._expect(NativeCodeBlock).bf_code
-            return NativeSubroutine(location, identifier, arguments, return_type, offset, bf_code)
+            return NativeSubroutine(location, identifier, is_private, arguments, return_type, offset, bf_code)
         # Subroutine body
         location = self._location_from(start_location)
         body = self.parse_instruction_block()
-        return Procedure(location, identifier, arguments, return_type, body)
+        return Procedure(location, identifier, is_private, arguments, return_type, body)
 
-    def parse_namespace_definition(self) -> Namespace:
+    def parse_namespace_definition(self, is_private: bool) -> Namespace:
         start_location = self._location()
         self._expect(NamespaceKeyword)
         identifier = self._expect(IdentifierToken).name
         location = self._location_from(start_location)
         self._expect(OpenBraceToken)
-        namespace = Namespace(location, identifier)
+        namespace = Namespace(location, identifier, is_private)
         while not self._eat(CloseBraceToken):
             self.parse_and_register_namespace_element(namespace)
         return namespace
 
     def parse_and_register_namespace_element(self, namespace: Namespace) -> None:
+        is_private = self._eat(PrivateKeyword)
         # Constant definition
         if self._is_next(HashToken):
-            constant = self.parse_constant_definition()
+            constant = self.parse_constant_definition(is_private)
             namespace.register_constant(constant)
         # Namespace definition
         elif self._is_next(NamespaceKeyword):
-            child_namespace = self.parse_namespace_definition()
-            namespace.register_namespace(child_namespace)
+            child_namespace = self.parse_namespace_definition(is_private)
+            namespace.register_namespace(child_namespace, )
         # Subroutine definition
         else:
-            subroutine = self.parse_subroutine_definition()
+            subroutine = self.parse_subroutine_definition(is_private)
             namespace.register_subroutine(subroutine)
 
     def generate(self) -> File:
