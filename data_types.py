@@ -120,7 +120,7 @@ class ArrayType(DataType):
     def string(cls, length: int):
         return cls(Types.CHAR, length)
 
-    def __init__(self, base_type: DataType, size: int | None) -> None:
+    def __init__(self, base_type: DataType, size: int) -> None:
         self.base_type = base_type
         self.count = size
         if size < 1:
