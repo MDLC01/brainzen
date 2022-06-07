@@ -187,7 +187,7 @@ class BinaryArithmeticExpression(ArithmeticExpression):
         return f'{self.__class__.__name__}[{self.operator!r}, {self.left!r}, {self.right!r}]'
 
 
-class ArrayAccessExpression(Expression):
+class ArraySubscriptExpression(Expression):
     def __init__(self, location: Location, array: Expression, index: int) -> None:
         super().__init__(location)
         self.array = array
@@ -198,6 +198,20 @@ class ArrayAccessExpression(Expression):
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}[{self.array!r}, {self.index!r}]'
+
+
+class ArraySlicingExpression(Expression):
+    def __init__(self, location: Location, array: Expression, start: int, stop: int) -> None:
+        super().__init__(location)
+        self.array = array
+        self.start = start
+        self.stop = stop
+
+    def __str__(self) -> str:
+        return f'{self.array}[{self.start}:{self.stop}]'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.array!r}, {self.start}, {self.stop}]'
 
 
 class ProcedureCall(Instruction):
@@ -400,7 +414,8 @@ class ContextSnapshot(Instruction):
 
 
 __all__ = ['Instruction', 'InstructionBlock', 'Expression', 'ConstantReference', 'Char', 'Array', 'Identifier', 'Tuple',
-           'ArithmeticExpression', 'UnaryArithmeticExpression', 'BinaryArithmeticExpression', 'ArrayAccessExpression',
-           'ProcedureCall', 'FunctionCall', 'Incrementation', 'Decrementation', 'VariableDeclaration', 'Assignment',
-           'LoopStatement', 'WhileLoopStatement', 'DoWhileLoopStatement', 'ForLoopStatement', 'ConditionalStatement',
-           'ReturnInstruction', 'ContextSnapshot']
+           'ArithmeticExpression', 'UnaryArithmeticExpression', 'BinaryArithmeticExpression',
+           'ArraySubscriptExpression',
+           'ArraySlicingExpression', 'ProcedureCall', 'FunctionCall', 'Incrementation', 'Decrementation',
+           'VariableDeclaration', 'Assignment', 'LoopStatement', 'WhileLoopStatement', 'DoWhileLoopStatement',
+           'ForLoopStatement', 'ConditionalStatement', 'ReturnInstruction', 'ContextSnapshot']

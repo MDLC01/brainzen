@@ -611,12 +611,17 @@ class SubroutineCompiler(NameManager):
                 variable = self.get_name(location, name)
                 self.copy_variable(variable)
                 self._comment(f'Copied {name}', CommentLevel.BZ_CODE_EXTENDED)
-            case TypedArrayAccessExpression(array=array, index=array_index):
-                evaluation_index = self.index
+            case TypedArraySubscriptExpression(array=array, index=array_index):
+                element_size = array.type().base_type.size()
                 with self.evaluate_in_new_variable(array) as tmp:
-                    self._goto(tmp.index + array_index)
-                    self._move({evaluation_index})
-                    self._goto(evaluation_index)
+                    self._goto(tmp.index + array_index * element_size)
+                    self._move({index}, block_size=element_size)
+            case TypedArraySlicingExpression(array=array, start=start, stop=stop):
+                element_size = array.type().base_type.size()
+                with self.evaluate_in_new_variable(array) as tmp:
+                    for i in range(start, stop):
+                        self._goto(tmp.index + i * element_size)
+                        self._move({index + (i - start) * element_size}, block_size=element_size)
             case InputCall():
                 self.bf_code += ','
             case TypedFunctionCall(location=location, reference=reference, arguments=arguments):

@@ -135,8 +135,10 @@ class TypedExpression(TypeCheckedInstruction, ABC):
                 return TypedUnaryArithmeticExpression(context, unary_arithmetic_expression)
             case BinaryArithmeticExpression() as binary_arithmetic_expression:
                 return TypedBinaryArithmeticExpression(context, binary_arithmetic_expression)
-            case ArrayAccessExpression() as array_access_expression:
-                return TypedArrayAccessExpression(context, array_access_expression)
+            case ArraySubscriptExpression() as array_subscript_expression:
+                return TypedArraySubscriptExpression(context, array_subscript_expression)
+            case ArraySlicingExpression() as array_slicing_expression:
+                return TypedArraySlicingExpression(context, array_slicing_expression)
             case FunctionCall(location=location, reference=Reference(namespace=None, identifier='print')):
                 raise CompilationException(location, f"Procedure 'print' does not return anything")
             case FunctionCall(location=location, reference=Reference(namespace=None, identifier='println')):
@@ -320,11 +322,11 @@ class TypedBinaryArithmeticExpression(TypedArithmeticExpression):
         return f'{self.__class__.__name__}[{self.operation!r}, {self.left!r}, {self.right!r}]'
 
 
-class TypedArrayAccessExpression(TypedExpression):
-    def __init__(self, context: SubroutineTypingContext, array_access_expression: ArrayAccessExpression) -> None:
-        super().__init__(array_access_expression.location)
-        self.array = TypedExpression.from_expression(context, array_access_expression.array)
-        self.index = array_access_expression.index
+class TypedArraySubscriptExpression(TypedExpression):
+    def __init__(self, context: SubroutineTypingContext, array_subscript_expression: ArraySubscriptExpression) -> None:
+        super().__init__(array_subscript_expression.location)
+        self.array = TypedExpression.from_expression(context, array_subscript_expression.array)
+        self.index = array_subscript_expression.index
         # Type checking
         array_type = self.array.type()
         if not isinstance(array_type, ArrayType):
@@ -333,7 +335,7 @@ class TypedArrayAccessExpression(TypedExpression):
         if self.index < 0:
             self.index = array_type.count - self.index
         if self.index < 0 or self.index >= array_type.count:
-            raise CompilationException(self.location, f'Array index out of bounds')
+            raise CompilationException(self.location, 'Array index out of bounds')
         self._type = array_type.base_type
 
     def type(self) -> DataType:
@@ -347,6 +349,37 @@ class TypedArrayAccessExpression(TypedExpression):
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}[{self.array!r}, {self.index!r}]'
+
+
+class TypedArraySlicingExpression(TypedExpression):
+    def __init__(self, context: SubroutineTypingContext, array_slicing_expression: ArraySlicingExpression) -> None:
+        super().__init__(array_slicing_expression.location)
+        self.array = TypedExpression.from_expression(context, array_slicing_expression.array)
+        self.start = array_slicing_expression.start
+        self.stop = array_slicing_expression.stop
+        # Type checking
+        array_type = self.array.type()
+        if not isinstance(array_type, ArrayType):
+            raise CompilationException(self.location, f'Can not slice {array_type}')
+        if self.start > self.stop:
+            raise CompilationException(self.location, f'Invalid slice (start index must be smaller than end index)')
+        if self.start < 0 or self.start >= array_type.count:
+            raise CompilationException(self.location, 'Start index out of bounds')
+        if self.stop < 0 or self.stop > array_type.count:
+            raise CompilationException(self.location, 'Stop index out of bounds')
+        self._type = array_type.base_type
+
+    def type(self) -> DataType:
+        return ArrayType(self._type, self.stop - self.start)
+
+    def is_known_at_compile_time(self) -> bool:
+        return self.array.is_known_at_compile_time()
+
+    def __str__(self) -> str:
+        return f'{self.array}[{self.start}:{self.stop}]'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.array!r}, {self.start}, {self.stop}]'
 
 
 class PrintCall(TypeCheckedInstruction):
@@ -667,8 +700,9 @@ class TypeCheckedContextSnapshot(TypeCheckedInstruction):
 
 __all__ = ['TypeCheckedInstruction', 'TypeCheckedInstructionBlock', 'TypedExpression', 'LiteralChar', 'LiteralArray',
            'LiteralTuple', 'TypedIdentifier', 'TypedArithmeticExpression', 'TypedUnaryArithmeticExpression',
-           'TypedBinaryArithmeticExpression', 'TypedArrayAccessExpression', 'PrintCall', 'InputCall',
-           'TypeCheckedProcedureCall', 'TypedFunctionCall', 'TypeCheckedIncrementation', 'TypeCheckedDecrementation',
-           'TypeCheckedVariableDeclaration', 'TypeCheckedAssignment', 'TypeCheckedLoopStatement',
-           'TypeCheckedWhileLoopStatement', 'TypeCheckedDoWhileLoopStatement', 'TypeCheckedForLoopStatement',
-           'TypeCheckedConditionalStatement', 'TypeCheckedReturnInstruction', 'TypeCheckedContextSnapshot']
+           'TypedBinaryArithmeticExpression', 'TypedArraySubscriptExpression', 'TypedArraySlicingExpression',
+           'PrintCall', 'InputCall', 'TypeCheckedProcedureCall', 'TypedFunctionCall', 'TypeCheckedIncrementation',
+           'TypeCheckedDecrementation', 'TypeCheckedVariableDeclaration', 'TypeCheckedAssignment',
+           'TypeCheckedLoopStatement', 'TypeCheckedWhileLoopStatement', 'TypeCheckedDoWhileLoopStatement',
+           'TypeCheckedForLoopStatement', 'TypeCheckedConditionalStatement', 'TypeCheckedReturnInstruction',
+           'TypeCheckedContextSnapshot']

@@ -278,13 +278,18 @@ class ASTGenerator:
 
     def parse_operand(self) -> Expression:
         expression = self.parse_value()
-        # Subscripts
+        # Subscripts / slices
         while self._is_next(OpenBracketToken):
             start_location = self._location()
             self._expect(OpenBracketToken)
             index = self._expect(NumericLiteral).value
-            self._expect(CloseBracketToken)
-            expression = ArrayAccessExpression(self._location_from(start_location), expression, index)
+            if self._eat(ColonToken):
+                end = self._expect(NumericLiteral).value
+                self._expect(CloseBracketToken)
+                expression = ArraySlicingExpression(self._location_from(start_location), expression, index, end)
+            else:
+                self._expect(CloseBracketToken)
+                expression = ArraySubscriptExpression(self._location_from(start_location), expression, index)
         return expression
 
     def parse_unary_operation(self) -> Expression:

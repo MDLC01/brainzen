@@ -29,7 +29,6 @@ Here is a list of considered features in arbitrary order (this list is *not* com
 - Separating a program in multiple files (import statements).
 - Ternary operator.
 - Python-like array comprehensions.
-- Python-like array slicing operations.
 - Python-like chained comparison (granted it preserves transitivity).
 - [String interpolation](https://en.wikipedia.org/wiki/String_interpolation).
 - Some form of named tuples (records or interfaces, depending on whether duck typing is used).
