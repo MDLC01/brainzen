@@ -5,7 +5,7 @@ from data_types import *
 from exceptions import *
 from intermediate_representation.instructions import *
 from reference import Reference
-from tokenization.operators import BinaryOperator, UnaryOperator
+from type_checking.operations import *
 from type_checking.typed_assignment_targets import TypedAssignmentTarget
 from type_checking.typing_context import SubroutineTypingContext
 
@@ -287,16 +287,13 @@ class TypedArithmeticExpression(TypedExpression, ABC):
 class TypedUnaryArithmeticExpression(TypedArithmeticExpression):
     def __init__(self, context: SubroutineTypingContext, expression: UnaryArithmeticExpression) -> None:
         super().__init__(expression.location)
-        self.operation: UnaryOperator = expression.operator
         self.operand = TypedExpression.from_expression(context, expression.operand)
-        # Type checking: all operations accept characters and return characters
-        if self.operand.type() != Types.CHAR:
-            message = f'Operand was expected to be a character, but found {self.operand.type()}'
-            raise CompilationException(self.operand.location, message)
-        self._type: DataType = Types.CHAR
+        # Type checking
+        self.operation: UnaryOperation = UnaryOperation.from_operator(self.location, expression.operator,
+                                                                      self.operand.type())
 
     def type(self) -> DataType:
-        return self._type
+        return self.operation.return_type
 
     def __str__(self) -> str:
         return f'({self.operation}{self.operand})'
@@ -308,66 +305,14 @@ class TypedUnaryArithmeticExpression(TypedArithmeticExpression):
 class TypedBinaryArithmeticExpression(TypedArithmeticExpression):
     def __init__(self, context: SubroutineTypingContext, expression: BinaryArithmeticExpression) -> None:
         super().__init__(expression.location)
-        self.operation: BinaryOperator = expression.operator
         self.left = TypedExpression.from_expression(context, expression.left)
         self.right = TypedExpression.from_expression(context, expression.right)
         # Type checking
-        self._type: DataType = self._run_type_check()
-
-    def _expect_left_operand(self, expected_type: DataType):
-        if self.left.type() != expected_type:
-            message = f'Left operand of {self.operation} was expected to be a character,' \
-                      f' but found {self.left.type()}'
-            raise CompilationException(self.left.location, message)
-
-    def _expect_right_operand(self, expected_type: DataType):
-        if self.right.type() != expected_type:
-            message = f'Right operand of {self.operation} was expected to be a character,' \
-                      f' but found {self.right.type()}'
-            raise CompilationException(self.right.location, message)
-
-    def _expect_both_operand(self, expected_type: DataType):
-        self._expect_left_operand(expected_type)
-        self._expect_right_operand(expected_type)
-
-    def _run_type_check(self) -> DataType:
-        if self.operation in (BinaryOperator.DOUBLE_EQUAL, BinaryOperator.BANG_EQUAL):
-            if self.right.type() != self.left.type():
-                message = f'Expected right operand of {self.operation} to be of the same type as left operand' \
-                          f' (expected {self.left.type()} but found {self.right.type()})'
-                raise CompilationException(self.location, message)
-            return Types.CHAR
-        if self.operation in (BinaryOperator.LESS_THAN,
-                              BinaryOperator.LESS_THAN_EQUAL,
-                              BinaryOperator.GREATER_THAN,
-                              BinaryOperator.GREATER_THAN_EQUAL,
-                              BinaryOperator.DOUBLE_AMPERSAND,
-                              BinaryOperator.DOUBLE_PIPE,
-                              BinaryOperator.PLUS,
-                              BinaryOperator.MINUS,
-                              BinaryOperator.STAR,
-                              BinaryOperator.SLASH,
-                              BinaryOperator.PERCENT):
-            self._expect_both_operand(Types.CHAR)
-            return Types.CHAR
-        if self.operation is BinaryOperator.DOUBLE_DOT:
-            left_type = self.left.type()
-            right_type = self.right.type()
-            if not isinstance(left_type, ArrayType):
-                message = f'Expected left operand of {self.operation} to be an array, but found {left_type}'
-                raise CompilationException(self.left.location, message)
-            if not isinstance(right_type, ArrayType):
-                message = f'Expected right operand of {self.operation} to be an array, but found {right_type}'
-                raise CompilationException(self.right.location, message)
-            if left_type.base_type != right_type.base_type:
-                message = f'Expected left and right operands of {self.operation} to be arrays of the same type,' \
-                          f' but found {left_type} and {right_type}'
-                raise CompilationException(self.location, message)
-            return ArrayType(left_type.base_type, left_type.count + right_type.count)
-        raise ImpossibleException(f'Unknown operation: {self.operation}')
+        self.operation = BinaryOperation.from_operator(self.location, expression.operator, self.left.type(),
+                                                       self.right.type())
 
     def type(self) -> DataType:
-        return self._type
+        return self.operation.return_type
 
     def __str__(self) -> str:
         return f'({self.left} {self.operation} {self.right})'
