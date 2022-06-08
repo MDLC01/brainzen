@@ -232,9 +232,7 @@ class ASTGenerator:
         `closing_token_type` is found. Closing token is skipped.
         """
         elements = []
-        while True:
-            if self._eat(closing_token_type):
-                break
+        while not self._eat(closing_token_type):
             elements.append(self.parse_binary_operation())
             if not self._eat(CommaToken):
                 self._expect(closing_token_type)
