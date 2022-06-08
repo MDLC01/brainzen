@@ -609,32 +609,63 @@ class TypeCheckedDoWhileLoopStatement(TypeCheckedInstruction):
         return f'{self.__class__.__name__}[{self.body!r}, {self.test!r}]'
 
 
+class TypedForLoopIterator:
+    __slots__ = 'location', 'identifier', 'array', 'type', 'count'
+
+    @classmethod
+    def from_for_loop_iterator(cls, context: SubroutineTypingContext,
+                               for_loop_iterator: ForLoopIterator) -> 'TypedForLoopIterator':
+        return cls(context, for_loop_iterator.location, for_loop_iterator.identifier, for_loop_iterator.array)
+
+    def __init__(self, context: SubroutineTypingContext, location: Location, identifier: str,
+                 array: Expression) -> None:
+        self.location = location
+        self.identifier = identifier
+        self.array = TypedExpression.from_expression(context, array)
+        array_type = self.array.type()
+        if not isinstance(array_type, ArrayType):
+            raise CompilationException(array.location, f'Expected array but found {array_type}')
+        self.type = array_type.base_type
+        self.count = array_type.count
+
+    def __str__(self) -> str:
+        return f'{self.identifier} : {self.array}'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.identifier!r}, {self.array!r}]'
+
+
 class TypeCheckedForLoopStatement(TypeCheckedInstruction):
+
     def __init__(self, context: SubroutineTypingContext, for_loop_statement: ForLoopStatement) -> None:
         super().__init__(for_loop_statement.location)
-        self.loop_type = for_loop_statement.loop_type
-        self.loop_variable = for_loop_statement.loop_variable
+        if len(for_loop_statement.iterators) <= 0:
+            raise CompilationException(self.location, 'Expected at least one iterator, but found none')
+        self.iterators: list[TypedForLoopIterator] = []
         # Type checking
         context.open_scope()
-        # TODO: Specify a more precise location
-        context.add_variable(self.location, self.loop_variable, self.loop_type)
-        self.loop_array = TypedExpression.from_expression(context, for_loop_statement.loop_array)
-        self.body: TypeCheckedInstructionBlock = TypeCheckedInstructionBlock(context, for_loop_statement.body)
-        loop_array_type = self.loop_array.type()
-        if not isinstance(loop_array_type, ArrayType) or loop_array_type.base_type != self.loop_type:
-            message = f'Expected {self.loop_type} but found {self.loop_array.type()}'
-            raise CompilationException(self.loop_array.location, message)
+        expected_count = None
+        for untyped_iterator in for_loop_statement.iterators:
+            iterator = TypedForLoopIterator.from_for_loop_iterator(context, untyped_iterator)
+            if expected_count is None:
+                expected_count = iterator.count
+            if len(self.iterators) > 0 and iterator.count != expected_count:
+                message = f'Expected iterator of size {expected_count} but found iterator of size {iterator.count}'
+                raise CompilationException(iterator.location, message)
+            self.iterators.append(iterator)
+            context.add_variable(iterator.location, iterator.identifier, iterator.type)
+        self.body = TypeCheckedInstructionBlock(context, for_loop_statement.body)
         context.close_scope()
 
     def may_return(self) -> bool:
         return self.body.may_return()
 
     def __str__(self) -> str:
-        return f'for ({self.loop_type} {self.loop_variable} : {self.loop_array}) line {self.location.line}'
+        loop_description = ' & '.join(str(iterator) for iterator in self.iterators)
+        return f'for ({loop_description}) line {self.location.line}'
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.loop_type!r}, {self.loop_variable!r}, {self.loop_array!r},' \
-               f' {self.body!r}]'
+        return f'{self.__class__.__name__}[{self.iterators!r}, {self.body!r}]'
 
 
 class TypeCheckedConditionalStatement(TypeCheckedInstruction):
@@ -704,5 +735,5 @@ __all__ = ['TypeCheckedInstruction', 'TypeCheckedInstructionBlock', 'TypedExpres
            'PrintCall', 'InputCall', 'TypeCheckedProcedureCall', 'TypedFunctionCall', 'TypeCheckedIncrementation',
            'TypeCheckedDecrementation', 'TypeCheckedVariableDeclaration', 'TypeCheckedAssignment',
            'TypeCheckedLoopStatement', 'TypeCheckedWhileLoopStatement', 'TypeCheckedDoWhileLoopStatement',
-           'TypeCheckedForLoopStatement', 'TypeCheckedConditionalStatement', 'TypeCheckedReturnInstruction',
-           'TypeCheckedContextSnapshot']
+           'TypedForLoopIterator', 'TypeCheckedForLoopStatement', 'TypeCheckedConditionalStatement',
+           'TypeCheckedReturnInstruction', 'TypeCheckedContextSnapshot']

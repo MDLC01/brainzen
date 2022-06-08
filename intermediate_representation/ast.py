@@ -420,13 +420,19 @@ class ASTGenerator:
         # For loop
         if self._eat(ForKeyword):
             self._expect(OpenParToken)
-            loop_variable_type = self.parse_type()
-            loop_variable_identifier = self._expect(IdentifierToken).name
-            self._expect(ColonToken)
-            loop_array = self.parse_expression()
-            self._expect(CloseParToken)
+            iterators = []
+            while not self._eat(CloseParToken):
+                iterator_start_location = self._location()
+                loop_variable = self._expect(IdentifierToken).name
+                self._expect(ColonToken)
+                loop_array = self.parse_binary_operation()
+                iterator_location = self._location_from(iterator_start_location)
+                iterators.append(ForLoopIterator(iterator_location, loop_variable, loop_array))
+                if not self._eat(CommaToken):
+                    self._expect(CloseParToken)
+                    break
             instructions = self.parse_instruction_block()
-            return ForLoopStatement(location, loop_variable_type, loop_variable_identifier, loop_array, instructions)
+            return ForLoopStatement(location, iterators, instructions)
         # Conditional statement
         if self._eat(IfKeyword):
             self._expect(OpenParToken)

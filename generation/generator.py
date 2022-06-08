@@ -763,17 +763,23 @@ class SubroutineCompiler(NameManager):
             self.evaluate(test, condition.index)
             self._loop_end()
 
-    def for_loop(self, loop_type: DataType, loop_variable_identifier: str, loop_array: TypedExpression,
-                 body: TypeCheckedInstructionBlock) -> None:
-        array_type = loop_array.type()
-        if not isinstance(array_type, ArrayType):
-            raise ImpossibleException('For loop iterator is not an array (should have been caught earlier)')
-
-        with (self.evaluate_in_new_variable(loop_array) as array,
-              self.pointer(0, loop_type, loop_variable_identifier) as loop_variable):
-            for i in range(array_type.count):
-                loop_variable.update_index(array.index + i * array_type.base_type.size())
+    def for_loop(self, iterators: list[TypedForLoopIterator], body: TypeCheckedInstructionBlock) -> None:
+        count = iterators[0].count
+        with self.scope():
+            # Evaluate arrays and declare loop variables
+            arrays = []
+            variables = []
+            for iterator in iterators:
+                array = self.scoped_variable(iterator.array.type())
+                self.evaluate(iterator.array, array.index)
+                arrays.append(array)
+                variables.append(self.scoped_pointer(array.index, iterator.type, iterator.identifier))
+            # Run loop
+            for i in range(count):
                 self.compile_instruction(body)
+                # Update loop variable indices
+                for variable in variables:
+                    variable.update_index(variable.index + variable.type.size())
 
     def condition(self, test: TypedExpression, if_body: TypeCheckedInstructionBlock,
                   else_body: TypeCheckedInstructionBlock) -> None:
@@ -847,9 +853,8 @@ class SubroutineCompiler(NameManager):
                 self.while_loop(test, body)
             case TypeCheckedDoWhileLoopStatement(body=body, test=test):
                 self.do_while_loop(body, test)
-            case TypeCheckedForLoopStatement(loop_type=loop_type, loop_variable=loop_variable, loop_array=loop_array,
-                                             body=body):
-                self.for_loop(loop_type, loop_variable, loop_array, body)
+            case TypeCheckedForLoopStatement(iterators=iterators, body=body):
+                self.for_loop(iterators, body)
             case TypeCheckedConditionalStatement(test=test, if_body=if_body, else_body=else_body):
                 self.condition(test, if_body, else_body)
             case TypeCheckedReturnInstruction(value=expression):

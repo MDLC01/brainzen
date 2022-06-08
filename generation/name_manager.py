@@ -185,5 +185,10 @@ class NameManager(ABC):
         self.active_scope().add_name(variable)
         return variable
 
+    def scoped_pointer(self, index: int, data_type: DataType, identifier: str | None = None) -> Pointer:
+        pointer = self.pointer(index, data_type, identifier).__enter__()
+        self.active_scope().add_name(pointer)
+        return pointer
+
 
 __all__ = ['generate_unique_identifier', 'Variable', 'Name', 'NameManager']

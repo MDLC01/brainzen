@@ -340,24 +340,36 @@ class DoWhileLoopStatement(Instruction):
         return f'{self.__class__.__name__}[{self.body!r}, {self.test!r}]'
 
 
+class ForLoopIterator:
+    __slots__ = 'location', 'identifier', 'array'
+
+    def __init__(self, location: Location, identifier: str, array: Expression) -> None:
+        self.location = location
+        self.identifier = identifier
+        self.array = array
+
+    def __str__(self) -> str:
+        return f'{self.identifier} : {self.array}'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.identifier!r}, {self.array!r}]'
+
+
 class ForLoopStatement(Instruction):
-    def __init__(self, location: Location, loop_type: DataType, loop_variable: str,
-                 loop_array: Expression, body: InstructionBlock) -> None:
+    def __init__(self, location: Location, iterators: list[ForLoopIterator], body: InstructionBlock) -> None:
         super().__init__(location)
-        self.loop_type = loop_type
-        self.loop_variable = loop_variable
-        self.loop_array = loop_array
+        self.iterators = iterators
         self.body = body
 
     def may_return(self) -> bool:
         return self.body.may_return()
 
     def __str__(self) -> str:
-        return f'for ({self.loop_type} {self.loop_variable} : {self.loop_array}) line {self.location.line}'
+        loop_description = ' & '.join(str(iterator) for iterator in self.iterators)
+        return f'for ({loop_description}) line {self.location.line}'
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.loop_type!r}, {self.loop_variable!r}, {self.loop_array!r},' \
-               f' {self.body!r}]'
+        return f'{self.__class__.__name__}[{self.iterators!r}, {self.body!r}]'
 
 
 class ConditionalStatement(Instruction):
@@ -415,7 +427,7 @@ class ContextSnapshot(Instruction):
 
 __all__ = ['Instruction', 'InstructionBlock', 'Expression', 'ConstantReference', 'Char', 'Array', 'Identifier', 'Tuple',
            'ArithmeticExpression', 'UnaryArithmeticExpression', 'BinaryArithmeticExpression',
-           'ArraySubscriptExpression',
-           'ArraySlicingExpression', 'ProcedureCall', 'FunctionCall', 'Incrementation', 'Decrementation',
-           'VariableDeclaration', 'Assignment', 'LoopStatement', 'WhileLoopStatement', 'DoWhileLoopStatement',
-           'ForLoopStatement', 'ConditionalStatement', 'ReturnInstruction', 'ContextSnapshot']
+           'ArraySubscriptExpression', 'ArraySlicingExpression', 'ProcedureCall', 'FunctionCall', 'Incrementation',
+           'Decrementation', 'VariableDeclaration', 'Assignment', 'LoopStatement', 'WhileLoopStatement',
+           'DoWhileLoopStatement', 'ForLoopIterator', 'ForLoopStatement', 'ConditionalStatement', 'ReturnInstruction',
+           'ContextSnapshot']
