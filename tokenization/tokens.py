@@ -309,9 +309,12 @@ class NumericLiteral(NumberLiteral):
 
     @classmethod
     def parse(cls, location: Location, word: str) -> 'NumericLiteral':
-        if word.startswith('0x'):
-            return cls(location, int(word[2:], base=16))
-        return cls(location, int(word))
+        try:
+            if word.startswith('0x'):
+                return cls(location, int(word[2:], base=16))
+            return cls(location, int(word))
+        except ValueError:
+            raise CompilationException(location, f'Invalid numeric literal: {word!r}')
 
     def __init__(self, location: Location, value: int) -> None:
         super().__init__(location, value)
