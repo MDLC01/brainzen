@@ -659,7 +659,7 @@ class SubroutineCompiler(NameManager):
                         variable = self.get_name(location, name)
                         evaluated_arguments.append(variable)
                     case _:
-                        arg = self.scoped_variable(generate_unique_identifier(), argument.type())
+                        arg = self.scoped_variable(argument.type())
                         self.evaluate(argument, arg.index)
                         evaluated_arguments.append(arg)
             # Then copy everything at the right place
@@ -822,7 +822,7 @@ class SubroutineCompiler(NameManager):
                     for instruction in instructions:
                         self.compile_instruction(instruction)
             case TypeCheckedVariableDeclaration(identifier=identifier, type=variable_type, value=expression):
-                variable = self.scoped_variable(identifier, variable_type)
+                variable = self.scoped_variable(variable_type, identifier)
                 if expression is not None:
                     self.evaluate(expression, variable.index)
             case TypeCheckedIncrementation(location=location, identifier=identifier):

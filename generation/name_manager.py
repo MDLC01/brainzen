@@ -180,7 +180,7 @@ class NameManager(ABC):
             raise CompilerException('No active scope')
         return self.scopes[-1]
 
-    def scoped_variable(self, identifier: str, variable_type: DataType) -> Variable:
+    def scoped_variable(self, variable_type: DataType, identifier: str | None = None) -> Variable:
         variable = self.variable(variable_type, identifier).__enter__()
         self.active_scope().add_name(variable)
         return variable
