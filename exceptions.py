@@ -64,8 +64,11 @@ class Location:
         if self.line is None or self.column is None:
             return
         line = source_code.splitlines()[self.line - 1]
-        print(line, file=out)
-        print(' ' * (self.column - 1) + '^' * self.length, file=out)
+        stripped_line = line.lstrip()
+        offset = len(line) - len(stripped_line)
+        line_number = str(self.line)
+        print(line_number, '|', stripped_line, file=out)
+        print(' ' * len(line_number), '|', ' ' * (self.column - offset - 1) + '^' * self.length, file=out)
 
 
 class CompilerException(Exception):
@@ -116,10 +119,14 @@ class CompilationWarning(Warning):
 
     @classmethod
     def print_warnings(cls, source_code: str, *, out=sys.stderr):
+        first = True
         for warning in cls.warnings:
+            if first:
+                first = False
+            else:
+                print(file=out)
             print(warning, file=out)
             warning.location.print_position(source_code, out=out)
-            print(file=out)
 
 
 __all__ = ['Location', 'CompilerException', 'ImpossibleException', 'CompilationException', 'CompilationWarning']

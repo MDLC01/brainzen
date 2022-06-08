@@ -119,7 +119,8 @@ class TypeCheckedNamespaceElement(ABC):
         if isinstance(element, NativeSubroutine):
             return TypeCheckedNativeSubroutine.from_native_subroutine(element)
         if isinstance(element, Procedure):
-            signature = SubroutineSignature(element.is_private, element.arguments, element.return_type)
+            signature = SubroutineSignature(element.location, element.is_private, element.arguments,
+                                            element.return_type)
             context = SubroutineTypingContext(namespace, signature)
             return TypeCheckedProcedure.from_procedure(context, element)
         if isinstance(element, Namespace):
@@ -264,7 +265,8 @@ class TypeCheckedNamespace(TypeCheckedNamespaceElement):
         if isinstance(type_checked_element, TypeCheckedConstant):
             self.constants[identifier] = type_checked_element.expression
         elif isinstance(type_checked_element, TypeCheckedSubroutine):
-            self.subroutine_signatures[identifier] = SubroutineSignature(type_checked_element.is_private,
+            self.subroutine_signatures[identifier] = SubroutineSignature(type_checked_element.location,
+                                                                         type_checked_element.is_private,
                                                                          type_checked_element.arguments,
                                                                          type_checked_element.return_type)
             self.elements.append(type_checked_element)
@@ -289,22 +291,24 @@ class TypeCheckedNamespace(TypeCheckedNamespaceElement):
         if reference.identifier in parent.namespaces:
             element = parent.namespaces[reference.identifier]
             if element.is_private and reference.namespace is not None:
-                raise CompilationException(reference.location, f'Namespace {reference} is private')
+                message = f'Namespace {reference.identifier!r} is private (declared at {element.location!r})'
+                raise CompilationException(reference.location, message)
             return element
         if self.parent is not None:
             return self.parent.get_namespace(reference)
-        raise CompilationException(reference.location, f'Unknown namespace: {reference}')
+        raise CompilationException(reference.location, f'Unknown namespace: {reference.identifier!r}')
 
     def get_subroutine_signature(self, reference: Reference) -> SubroutineSignature:
         namespace = self.get_namespace(reference.namespace)
         if reference.identifier in namespace.subroutine_signatures:
-            subroutine_signature = namespace.subroutine_signatures[reference.identifier]
-            if subroutine_signature.is_private and reference.namespace is not None:
-                raise CompilationException(reference.location, f'Subroutine {reference} is private')
-            return subroutine_signature
+            signature = namespace.subroutine_signatures[reference.identifier]
+            if signature.is_private and reference.namespace is not None:
+                message = f'Subroutine {reference.identifier!r} is private (declared at {signature.location!r})'
+                raise CompilationException(reference.location, message)
+            return signature
         if self.parent is not None:
             return self.parent.get_subroutine_signature(reference)
-        raise CompilationException(reference.location, f'Unknown subroutine: {reference}')
+        raise CompilationException(reference.location, f'Unknown subroutine: {reference.identifier!r}')
 
     def __iter__(self) -> Generator[TypeCheckedNamespaceElement, None, None]:
         for element in self.elements:
