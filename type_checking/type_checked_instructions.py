@@ -532,6 +532,8 @@ class TypeCheckedVariableDeclaration(TypeCheckedInstruction):
         context.add_variable(self.location, self.identifier, self.type)
 
     def __str__(self) -> str:
+        if self.value is None:
+            return f'let {self.type} {self.identifier}'
         return f'let {self.type} {self.identifier} = {self.value}'
 
     def __repr__(self) -> str:
