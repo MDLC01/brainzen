@@ -33,8 +33,7 @@ class UnaryOperation(ABC):
             if operand_type == Types.CHAR:
                 return OppositionOperation()
             if isinstance(operand_type, ArrayType):
-                base_operation = cls.from_operator(location, operator, operand_type.base_type)
-                return UnaryTermByTermArrayOperation(base_operation, operand_type.count)
+                return ArrayOppositionOperation(operand_type.count)
             raise InvalidOperandType(location, operator, operand_type)
         raise CompilerException(f'Unknown unary operator: {operator}')
 
@@ -84,20 +83,19 @@ class OppositionOperation(UnaryOperation):
         return '-'
 
 
-class UnaryTermByTermArrayOperation(UnaryOperation):
-    def __init__(self, operation: UnaryOperation, array_count: int) -> None:
-        self.operation = operation
+class ArrayOppositionOperation(UnaryOperation):
+    def __init__(self, array_count: int) -> None:
         self.array_count = array_count
 
     def operand_type(self) -> DataType:
-        return ArrayType(self.operation.operand_type(), self.array_count)
+        return ArrayType(Types.CHAR, self.array_count)
 
     def type(self) -> DataType:
-        return ArrayType(self.operation.type(), self.array_count)
+        return ArrayType(Types.CHAR, self.array_count)
 
     def __str__(self) -> str:
-        return self.operation.__str__()
+        return '-'
 
 
 __all__ = ['UnaryOperation', 'NegationOperation', 'BoolNormalizationOperation', 'OppositionOperation',
-           'UnaryTermByTermArrayOperation']
+           'ArrayOppositionOperation']

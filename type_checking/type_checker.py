@@ -43,8 +43,8 @@ def compute_unary_operation(operation: UnaryOperation, operand: Value) -> Value:
             return int(bool(operand))
         case OppositionOperation():
             return -operand
-        case UnaryTermByTermArrayOperation(operation=base_operation):
-            return [compute_unary_operation(base_operation, element) for element in operand]
+        case ArrayOppositionOperation():
+            return [-element for element in operand]
     raise CompilerException(f'Unknown unary operation: {operation!r}')
 
 

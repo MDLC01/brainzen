@@ -127,7 +127,7 @@ class SubroutineCompiler(NameManager):
         count = self._remove_up_to(count, '-')
         self.bf_code += '+' * count
 
-    def _loop_start(self, index: int | None = None) -> None:
+    def _loop_start(self, index: int | None) -> None:
         self._goto(index)
         self._loop_start_indices.append(self.index)
         self.bf_code += '['
@@ -160,13 +160,13 @@ class SubroutineCompiler(NameManager):
 
     def _reset(self, index: int | None = None, *, block_size: int = 1) -> None:
         """Reset the value of the block starting at `index` (current cell by default) to 0"""
-        self._goto(index)
-        for _ in range(block_size):
-            self._loop_start()
-            self._decrement()
+        if index is None:
+            index = self.index
+        for i in range(block_size):
+            self._loop_start(index + i)
+            self._decrement(index + i)
             self._loop_end()
-            self._right()
-        self._left(block_size)
+        self._goto(index)
 
     def _set(self, value: int, *, index: int | None = None) -> None:
         self._reset(index)
@@ -195,23 +195,20 @@ class SubroutineCompiler(NameManager):
                 self._goto(source + i)
                 self._move({destination + i for destination in destinations})
         else:
-            self._loop_start()
-            self._decrement()
+            self._loop_start(source)
+            self._decrement(source)
             # The destinations are sorted to limit the number of moves
             for destination in sorted(destinations):
                 if destination == source:
                     break
-                self._goto(destination)
-                self._increment()
-            self._goto(source)
+                self._increment(destination)
             self._loop_end()
 
     def value(self, value: int, variable_type: DataType = Types.CHAR, identifier: str = None) -> Variable:
         variable = self.variable(variable_type, identifier)
         if value is not None:
             initial_index = self.index
-            self._goto(variable.index)
-            self._set(value)
+            self._set(value, index=variable.index)
             self._goto(initial_index)
         return variable
 
@@ -231,8 +228,6 @@ class SubroutineCompiler(NameManager):
         """Copy the value of the passed variable to the current location."""
         if destination is None:
             destination = self.index
-        self._goto(destination)
-        backup = self.tmp
         if source == destination:
             return
         size = source.size()
@@ -240,67 +235,71 @@ class SubroutineCompiler(NameManager):
         self._reset(destination, block_size=size)
         # Copy variable cell by cell
         for i in range(size):
-            self._reset(backup.index)
+            self._reset(self.tmp.index)
             self._goto(source.index + i)
-            self._move({destination + i, backup.index})
-            self._goto(backup.index)
+            self._move({destination + i, self.tmp.index})
+            self._goto(self.tmp.index)
             self._move({source.index + i})
         # Return to the destination cell
         self._goto(destination)
 
-    def evaluate_unary_operation(self, operation: UnaryOperation, operand: int) -> None:
-        evaluation_index = self.index
-        match operation:
-            # Comments show corresponding Brainfuck code, where the evaluation index is the starting index, and the
-            # operand is stored at the index of the pointer when the comma is reached
-            case NegationOperation():
-                # >, <+>[<->[-]]
-                self._goto(evaluation_index)
-                self._increment()
-                self._loop_start(operand)
-                self._goto(evaluation_index)
-                self._decrement()
-                self._reset(operand)
-                self._loop_end()
-            case BoolNormalizationOperation():
-                # >,[<+>[-]]
-                self._loop_start(operand)
-                self._goto(evaluation_index)
-                self._increment()
-                self._reset(operand)
-                self._loop_end()
-            case OppositionOperation():
-                # >, [-<->]
-                self._loop_start(operand)
-                self._decrement()
-                self._goto(evaluation_index)
-                self._decrement()
-                self._goto(operand)
-                self._loop_end()
-            case UnaryTermByTermArrayOperation(operation=base_operation, array_count=count):
-                # Apply operation to each element of the array
-                initial_element_type = base_operation.operand_type()
-                final_element_type = base_operation.type()
-                for i in range(count):
-                    self._goto(evaluation_index + i * final_element_type.size())
-                    self.evaluate_unary_operation(base_operation, operand + i * initial_element_type.size())
-            case _:
-                raise ImpossibleException(f'Unknown unary operation: {operation!r}')
+    def compile_negation_operation(self, index: int, operand: int) -> None:
+        # >, <+>[<->[-]]
+        self._increment(index)
+        self._loop_start(operand)
+        self._decrement(index)
+        self._reset(operand)
+        self._loop_end()
+
+    def compile_bool_normalization_operation(self, index: int, operand: int) -> None:
+        # >,[<+>[-]]
+        self._loop_start(operand)
+        self._increment(index)
+        self._reset(operand)
+        self._loop_end()
+
+    def compile_opposition_operation(self, index: int, operand: int) -> None:
+        # >, [-<->]
+        self._loop_start(operand)
+        self._decrement(operand)
+        self._decrement(index)
+        self._loop_end()
+
+    def evaluate_unary_operation(self, operation: UnaryOperation, operand_expression: TypedExpression) -> None:
+        index = self.index
+        # Array opposition
+        if isinstance(operation, ArrayOppositionOperation):
+            with self.evaluate_in_new_variable(operand_expression) as operand:
+                for i in range(operation.array_count):
+                    self.compile_opposition_operation(index + i, operand.index + i)
+        # Other operations don't have fast path
+        else:
+            with self.evaluate_in_new_variable(operand_expression) as operand:
+                # Negation
+                if isinstance(operation, NegationOperation):
+                    self.compile_negation_operation(index, operand.index)
+                # Bool normalization
+                elif isinstance(operation, BoolNormalizationOperation):
+                    self.compile_bool_normalization_operation(index, operand.index)
+                # Opposition
+                elif isinstance(operation, OppositionOperation):
+                    self.compile_opposition_operation(index, operand.index)
+                # Unknown
+                else:
+                    raise ImpossibleException(f'Unknown unary operation: {operation!r}')
+        self._goto(index)
 
     def compile_char_equality_test(self, index: int, left: int, right: int) -> None:
         # >,>, [-<->] <<+>[<->[-]]
         # Subtract right from left
         self._loop_start(right)
-        self._decrement()
+        self._decrement(right)
         self._decrement(left)
-        self._goto(right)
         self._loop_end()
         # Test if the result is zero
-        self._goto(index)
-        self._increment()
+        self._increment(index)
         self._loop_start(left)
-        self._goto(index)
-        self._decrement()
+        self._decrement(index)
         self._reset(left)
         self._loop_end()
 
@@ -323,14 +322,12 @@ class SubroutineCompiler(NameManager):
         # >,>, [-<->] <[<+>[-]]
         # Subtract right from left
         self._loop_start(right)
-        self._decrement()
+        self._decrement(right)
         self._decrement(left)
-        self._goto(right)
         self._loop_end()
         # Test if the result is non-zero
         self._loop_start(left)
-        self._goto(index)
-        self._increment()
+        self._increment(index)
         self._reset(left)
         self._loop_end()
 
@@ -368,11 +365,9 @@ class SubroutineCompiler(NameManager):
             # Do other stuff
             self._loop_start(tmp2.index)
             self._reset(right)
-            self._goto(index)
-            self._increment()
+            self._increment(index)
             self._decrement(tmp2.index)
             self._loop_end()
-            self._goto(right)
             self._loop_end()
 
     def compile_large_inequality_test(self, index: int, left: int, right: int) -> None:
@@ -398,16 +393,12 @@ class SubroutineCompiler(NameManager):
             self._increment(tmp1.index)
             self._decrement(tmp2.index)
             self._loop_end()
-            self._goto(left)
             self._loop_end()
             # Negate result
-            self._goto(index)
-            self._increment()
+            self._increment(index)
             self._loop_start(tmp1.index)
             self._decrement(tmp1.index)
-            self._goto(index)
-            self._decrement()
-            self._goto(tmp1.index)
+            self._decrement(index)
             self._loop_end()
 
     def compile_inverse_strict_inequality_test(self, index: int, left: int, right: int) -> None:
@@ -429,11 +420,9 @@ class SubroutineCompiler(NameManager):
             # Do other stuff
             self._loop_start(tmp2.index)
             self._reset(left)
-            self._goto(index)
-            self._increment()
+            self._increment(index)
             self._decrement(tmp2.index)
             self._loop_end()
-            self._goto(left)
             self._loop_end()
 
     def compile_inverse_large_inequality_test(self, index: int, left: int, right: int) -> None:
@@ -459,16 +448,12 @@ class SubroutineCompiler(NameManager):
             self._increment(tmp1.index)
             self._decrement(tmp2.index)
             self._loop_end()
-            self._goto(right)
             self._loop_end()
             # Negate result
-            self._goto(index)
-            self._increment()
+            self._increment(index)
             self._loop_start(tmp1.index)
             self._decrement(tmp1.index)
-            self._goto(index)
-            self._decrement()
-            self._goto(tmp1.index)
+            self._decrement(index)
             self._loop_end()
 
     def compile_conjunction_operation(self, index: int, left: int, right: int) -> None:
@@ -492,8 +477,7 @@ class SubroutineCompiler(NameManager):
             self._loop_end()
             # Return result
             self._loop_start(tmp2.index)
-            self._goto(index)
-            self._increment()
+            self._increment(index)
             self._reset(tmp2.index)
             self._loop_end()
 
@@ -505,9 +489,7 @@ class SubroutineCompiler(NameManager):
             self._loop_start(left)
             self._reset(tmp.index)
             self._decrement(left)
-            self._goto(index)
-            self._increment()
-            self._goto(left)
+            self._increment(index)
             self._loop_end()
             # Else, the value of the right operand is copied
             self._loop_start(tmp.index)
@@ -521,10 +503,8 @@ class SubroutineCompiler(NameManager):
         self._goto(left)
         self._move({index})
         self._loop_start(right)
-        self._decrement()
-        self._goto(index)
-        self._increment()
-        self._goto(right)
+        self._decrement(right)
+        self._increment(index)
         self._loop_end()
 
     def compile_subtraction_operation(self, index: int, left: int, right: int) -> None:
@@ -532,49 +512,43 @@ class SubroutineCompiler(NameManager):
         self._goto(left)
         self._move({index})
         self._loop_start(right)
-        self._decrement()
-        self._goto(index)
-        self._decrement()
-        self._goto(right)
+        self._decrement(right)
+        self._decrement(index)
         self._loop_end()
 
     def compile_multiplication_operation(self, index: int, left: int, right: int) -> None:
         # >,>, >(tmp) <<[- >[-<<+>>>+<] >[-<+>]<<]
         with self.variable() as tmp:
             self._loop_start(left)
-            self._decrement()
+            self._decrement(left)
             self._goto(right)
             self._move({index, tmp.index})
             self._goto(tmp.index)
             self._move({right})
-            self._goto(left)
             self._loop_end()
 
     def compile_division_operation(self, index: int, left: int, right: int) -> None:
         # >,>, >(tmp1) >(tmp2) >(tmp3) <<<<<[->->+ <[->>+>+<<<]>>>[-<<<+>>>] + <[>-<[-]] >[-<<<<<+>>>[-<+>]>>]<<<<]
         with self.variable() as tmp1, self.variable() as tmp2, self.variable() as tmp3:
             self._loop_start(left)
-            self._decrement()
+            self._decrement(left)
             self._decrement(right)
             self._increment(tmp1.index)
             self._goto(right)
             self._move({tmp2.index, tmp3.index})
             self._goto(tmp3.index)
             self._move({right})
-            self._increment()
+            self._increment(tmp3.index)
             self._loop_start(tmp2.index)
             self._decrement(tmp3.index)
             self._reset(tmp2.index)
             self._loop_end()
             self._loop_start(tmp3.index)
-            self._decrement()
-            self._goto(index)
-            self._increment()
+            self._decrement(tmp3.index)
+            self._increment(index)
             self._goto(tmp1.index)
             self._move({right})
-            self._goto(tmp3.index)
             self._loop_end()
-            self._goto(left)
             self._loop_end()
 
     def compile_modulo_operation(self, index: int, left: int, right: int) -> None:
@@ -582,27 +556,24 @@ class SubroutineCompiler(NameManager):
         # >,>, >(tmp1) >(tmp2) >(tmp3) <<<<<[->->+ <[->>+>+<<<]>>>[-<<<+>>>] + <[>-<[-]] >[-<<<<<+>>>[-<+>]>>]<<<<]
         with self.variable() as tmp1, self.variable() as tmp2, self.variable() as tmp3:
             self._loop_start(left)
-            self._decrement()
+            self._decrement(left)
             self._decrement(right)
-            self._goto(index)
-            self._increment()
+            self._increment(index)
             self._goto(right)
             self._move({tmp1.index, tmp2.index})
             self._goto(tmp2.index)
             self._move({right})
-            self._increment()
+            self._increment(tmp2.index)
             self._loop_start(tmp1.index)
             self._decrement(tmp2.index)
             self._reset(tmp1.index)
             self._loop_end()
             self._loop_start(tmp2.index)
-            self._decrement()
+            self._decrement(tmp2.index)
             self._increment(tmp3.index)
             self._goto(index)
             self._move({right})
-            self._goto(tmp2.index)
             self._loop_end()
-            self._goto(left)
             self._loop_end()
 
     def evaluate_binary_operation(self, operation: BinaryOperation, left_expression: TypedExpression,
@@ -705,10 +676,7 @@ class SubroutineCompiler(NameManager):
             case TypedFunctionCall(location=location, reference=reference, arguments=arguments):
                 self.call(location, reference, arguments, True)
             case TypedUnaryArithmeticExpression(operation=operation, operand=operand_expression):
-                with self.evaluate_in_new_variable(operand_expression) as operand_variable:
-                    self._reset(index, block_size=expression.type().size())
-                    self._goto(index)
-                    self.evaluate_unary_operation(operation, operand_variable.index)
+                self.evaluate_unary_operation(operation, operand_expression)
             case TypedBinaryArithmeticExpression(operation=operation, left=left_expression, right=right_expression):
                 self.evaluate_binary_operation(operation, left_expression, right_expression)
             case _:
@@ -832,7 +800,7 @@ class SubroutineCompiler(NameManager):
 
     def while_loop(self, test: TypedExpression, body: TypeCheckedInstructionBlock) -> None:
         with self.evaluate_in_new_variable(test) as condition:
-            self._loop_start()
+            self._loop_start(condition.index)
             self.compile_instruction(body)
             self.evaluate(test, condition.index)
             self._loop_end()
