@@ -168,8 +168,8 @@ class SubroutineCompiler(NameManager):
             self._right()
         self._left(block_size)
 
-    def _set(self, value: int) -> None:
-        self._reset()
+    def _set(self, value: int, *, index: int | None = None) -> None:
+        self._reset(index)
         if value < 0:
             self._decrement(count=-value)
         else:
@@ -287,7 +287,7 @@ class SubroutineCompiler(NameManager):
             case _:
                 raise ImpossibleException(f'Unknown unary operation: {operation!r}')
 
-    def compile_equality_test(self, index: int, left: int, right: int) -> None:
+    def compile_char_equality_test(self, index: int, left: int, right: int) -> None:
         # >,>, [-<->] <<+>[<->[-]]
         # Subtract right from left
         self._loop_start(right)
@@ -304,7 +304,22 @@ class SubroutineCompiler(NameManager):
         self._reset(left)
         self._loop_end()
 
-    def compile_difference_test(self, index: int, left: int, right: int) -> None:
+    def compile_equality_test(self, index: int, left: int, right: int, block_size: int) -> None:
+        if block_size == 1:
+            return self.compile_char_equality_test(index, left, right)
+        self._set(1, index=index)
+        with self.variable() as tmp:
+            # For each pair of cell, test if they are different
+            for i in range(block_size):
+                # Subtraction is used instead of difference test because the is no need for the result to be normalized
+                self.compile_subtraction_operation(tmp.index, left + i, right + i)
+                # This loop is entered if the current cells are not equal
+                self._loop_start(tmp.index)
+                self._reset(index)
+                self._reset(tmp.index)
+                self._loop_end()
+
+    def compile_char_difference_test(self, index: int, left: int, right: int) -> None:
         # >,>, [-<->] <[<+>[-]]
         # Subtract right from left
         self._loop_start(right)
@@ -318,6 +333,21 @@ class SubroutineCompiler(NameManager):
         self._increment()
         self._reset(left)
         self._loop_end()
+
+    def compile_difference_test(self, index: int, left: int, right: int, block_size: int) -> None:
+        if block_size == 1:
+            return self.compile_char_difference_test(index, left, right)
+        self._reset(index)
+        with self.variable() as tmp:
+            # For each pair of cell, test if they are equal
+            for i in range(block_size):
+                # Subtraction is used instead of difference test because the is no need for the result to be normalized
+                self.compile_subtraction_operation(tmp.index, left + i, right + i)
+                # This loop is entered if the current cells are not equal
+                self._loop_start(tmp.index)
+                self._set(1, index=index)
+                self._reset(tmp.index)
+                self._loop_end()
 
     def compile_strict_inequality_test(self, index: int, left: int, right: int) -> None:
         with self.variable() as tmp1, self.variable() as tmp2:
@@ -597,10 +627,10 @@ class SubroutineCompiler(NameManager):
                   self.evaluate_in_new_variable(right_expression) as right):
                 # Equality test
                 if isinstance(operation, EqualityTestOperation):
-                    self.compile_equality_test(index, left.index, right.index)
+                    self.compile_equality_test(index, left.index, right.index, operation.left_type().size())
                 # Difference test
                 elif isinstance(operation, DifferenceTestOperation):
-                    self.compile_difference_test(index, left.index, right.index)
+                    self.compile_difference_test(index, left.index, right.index, operation.left_type().size())
                 # Strict inequality test
                 elif isinstance(operation, StrictInequalityTestOperation):
                     self.compile_strict_inequality_test(index, left.index, right.index)
