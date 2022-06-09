@@ -1,4 +1,5 @@
 import sys
+import time
 
 from exceptions import *
 from generation.generator import CommentLevel, generate_program
@@ -35,17 +36,21 @@ def main(argv: list[str]) -> int:
     with open(source_file_name, 'r', encoding='UTF-8') as file:
         code = file.read()
 
+    start_time = time.time()
     try:
         program = compile_source_code(code, source_file_name, **kwargs)
     except CompilationException as e:
         print(e, file=sys.stderr)
         e.location.print_position(code)
         return 1
+    end_time = time.time()
 
     with open(destination_file_name, 'w', encoding='UTF-8') as file:
         file.write(program)
 
     CompilationWarning.print_warnings(code)
+
+    print(f'Compiled {source_file_name!r} in {end_time - start_time:0.2f} s')
 
     return 0
 
