@@ -117,12 +117,12 @@ class SubroutineCompiler(NameManager):
                                   .replace('#', '(hash)'))
             self.bf_code += f'{prefix}{serialized_comment}{end}'
 
-    def _decrement(self, index: int | None = None, *, count: int = 1) -> None:
+    def _decrement(self, index: int | None, *, count: int = 1) -> None:
         self._goto(index)
         count = self._remove_up_to(count, '+')
         self.bf_code += '-' * count
 
-    def _increment(self, index: int | None = None, *, count: int = 1) -> None:
+    def _increment(self, index: int | None, *, count: int = 1) -> None:
         self._goto(index)
         count = self._remove_up_to(count, '-')
         self.bf_code += '+' * count
@@ -171,9 +171,9 @@ class SubroutineCompiler(NameManager):
     def _set(self, value: int, *, index: int | None = None) -> None:
         self._reset(index)
         if value < 0:
-            self._decrement(count=-value)
+            self._decrement(index, count=-value)
         else:
-            self._increment(count=value)
+            self._increment(index, count=value)
 
     def _goto(self, index: int | None) -> None:
         """Move the pointer to the passed index (relative to the starting index of the subroutine)."""
@@ -185,15 +185,15 @@ class SubroutineCompiler(NameManager):
         else:
             self._right(delta)
 
-    def _move(self, destinations: set[int], *, block_size: int = 1) -> None:
+    def _move(self, destinations: set[int], source: int | None = None, *, block_size: int = 1) -> None:
         """Destructively add the content of the current cell to the destination cells."""
         if block_size <= 0:
             raise CompilerException('Unable to move block with negative size')
-        source = self.index
+        if source is None:
+            source = self.index
         if block_size > 1:
             for i in range(block_size):
-                self._goto(source + i)
-                self._move({destination + i for destination in destinations})
+                self._move({destination + i for destination in destinations}, source + i)
         else:
             self._loop_start(source)
             self._decrement(source)
@@ -236,10 +236,8 @@ class SubroutineCompiler(NameManager):
         # Copy variable cell by cell
         for i in range(size):
             self._reset(self.tmp.index)
-            self._goto(source.index + i)
-            self._move({destination + i, self.tmp.index})
-            self._goto(self.tmp.index)
-            self._move({source.index + i})
+            self._move({destination + i, self.tmp.index}, source.index + i)
+            self._move({source.index + i}, self.tmp.index)
         # Return to the destination cell
         self._goto(destination)
 
@@ -350,10 +348,8 @@ class SubroutineCompiler(NameManager):
         with self.variable() as tmp1, self.variable() as tmp2:
             self._loop_start(right)
             # Duplicate right operand
-            self._goto(left)
-            self._move({tmp1.index, tmp2.index})
-            self._goto(tmp2.index)
-            self._move({left})
+            self._move({tmp1.index, tmp2.index}, left)
+            self._move({left}, tmp2.index)
             self._increment(tmp2.index)
             # Do stuff
             self._loop_start(tmp1.index)
@@ -375,10 +371,8 @@ class SubroutineCompiler(NameManager):
         with self.variable() as tmp1, self.variable() as tmp2:
             self._loop_start(left)
             # Duplicate right operand
-            self._goto(right)
-            self._move({tmp1.index, tmp2.index})
-            self._goto(tmp2.index)
-            self._move({right})
+            self._move({tmp1.index, tmp2.index}, right)
+            self._move({right}, tmp2.index)
             self._increment(tmp2.index)
             # Do stuff
             self._loop_start(tmp1.index)
@@ -405,10 +399,8 @@ class SubroutineCompiler(NameManager):
         with self.variable() as tmp1, self.variable() as tmp2:
             self._loop_start(left)
             # Duplicate right operand
-            self._goto(right)
-            self._move({tmp1.index, tmp2.index})
-            self._goto(tmp2.index)
-            self._move({right})
+            self._move({tmp1.index, tmp2.index}, right)
+            self._move({right}, tmp2.index)
             self._increment(tmp2.index)
             # Do stuff
             self._loop_start(tmp1.index)
@@ -430,10 +422,8 @@ class SubroutineCompiler(NameManager):
         with self.variable() as tmp1, self.variable() as tmp2:
             self._loop_start(right)
             # Duplicate right operand
-            self._goto(left)
-            self._move({tmp1.index, tmp2.index})
-            self._goto(tmp2.index)
-            self._move({left})
+            self._move({tmp1.index, tmp2.index}, left)
+            self._move({left}, tmp2.index)
             self._increment(tmp2.index)
             # Do stuff
             self._loop_start(tmp1.index)
@@ -493,15 +483,13 @@ class SubroutineCompiler(NameManager):
             self._loop_end()
             # Else, the value of the right operand is copied
             self._loop_start(tmp.index)
-            self._goto(right)
-            self._move({index})
+            self._move({index}, right)
             self._reset(tmp.index)
             self._loop_end()
 
     def compile_addition_operation(self, index: int, left: int, right: int) -> None:
         # >,>, <[-<+>] >[-<<+>>]
-        self._goto(left)
-        self._move({index})
+        self._move({index}, left)
         self._loop_start(right)
         self._decrement(right)
         self._increment(index)
@@ -509,8 +497,7 @@ class SubroutineCompiler(NameManager):
 
     def compile_subtraction_operation(self, index: int, left: int, right: int) -> None:
         # >,>, <[-<+>] >[-<<->>]
-        self._goto(left)
-        self._move({index})
+        self._move({index}, left)
         self._loop_start(right)
         self._decrement(right)
         self._decrement(index)
@@ -521,10 +508,8 @@ class SubroutineCompiler(NameManager):
         with self.variable() as tmp:
             self._loop_start(left)
             self._decrement(left)
-            self._goto(right)
-            self._move({index, tmp.index})
-            self._goto(tmp.index)
-            self._move({right})
+            self._move({index, tmp.index}, right)
+            self._move({right}, tmp.index)
             self._loop_end()
 
     def compile_division_operation(self, index: int, left: int, right: int) -> None:
@@ -534,10 +519,8 @@ class SubroutineCompiler(NameManager):
             self._decrement(left)
             self._decrement(right)
             self._increment(tmp1.index)
-            self._goto(right)
-            self._move({tmp2.index, tmp3.index})
-            self._goto(tmp3.index)
-            self._move({right})
+            self._move({tmp2.index, tmp3.index}, right)
+            self._move({right}, tmp3.index)
             self._increment(tmp3.index)
             self._loop_start(tmp2.index)
             self._decrement(tmp3.index)
@@ -546,8 +529,7 @@ class SubroutineCompiler(NameManager):
             self._loop_start(tmp3.index)
             self._decrement(tmp3.index)
             self._increment(index)
-            self._goto(tmp1.index)
-            self._move({right})
+            self._move({right}, tmp1.index)
             self._loop_end()
             self._loop_end()
 
@@ -559,10 +541,8 @@ class SubroutineCompiler(NameManager):
             self._decrement(left)
             self._decrement(right)
             self._increment(index)
-            self._goto(right)
-            self._move({tmp1.index, tmp2.index})
-            self._goto(tmp2.index)
-            self._move({right})
+            self._move({tmp1.index, tmp2.index}, right)
+            self._move({right}, tmp2.index)
             self._increment(tmp2.index)
             self._loop_start(tmp1.index)
             self._decrement(tmp2.index)
@@ -571,8 +551,7 @@ class SubroutineCompiler(NameManager):
             self._loop_start(tmp2.index)
             self._decrement(tmp2.index)
             self._increment(tmp3.index)
-            self._goto(index)
-            self._move({right})
+            self._move({right}, index)
             self._loop_end()
             self._loop_end()
 
@@ -663,16 +642,15 @@ class SubroutineCompiler(NameManager):
             case TypedArraySubscriptExpression(array=array, index=array_index):
                 element_size = array.type().base_type.size()
                 with self.evaluate_in_new_variable(array) as tmp:
-                    self._goto(tmp.index + array_index * element_size)
-                    self._move({index}, block_size=element_size)
+                    self._move({index}, tmp.index + array_index * element_size, block_size=element_size)
             case TypedArraySlicingExpression(array=array, start=start, stop=stop):
                 element_size = array.type().base_type.size()
                 with self.evaluate_in_new_variable(array) as tmp:
                     for i in range(start, stop):
-                        self._goto(tmp.index + i * element_size)
-                        self._move({index + (i - start) * element_size}, block_size=element_size)
+                        self._move({index + (i - start) * element_size}, tmp.index + i * element_size,
+                                   block_size=element_size)
             case InputCall():
-                self.bf_code += ','
+                self._input()
             case TypedFunctionCall(location=location, reference=reference, arguments=arguments):
                 self.call(location, reference, arguments, True)
             case TypedUnaryArithmeticExpression(operation=operation, operand=operand_expression):
@@ -750,8 +728,7 @@ class SubroutineCompiler(NameManager):
             return_index = self.index
             block_size = subroutine.return_type().size()
             self._reset(call_index, block_size=block_size)
-            self._goto(return_index)
-            self._move({call_index}, block_size=block_size)
+            self._move({call_index}, return_index, block_size=block_size)
             self._comment('Get return value')
         # Clear memory
         self._reset(subroutine_origin, block_size=subroutine.memory_size())
@@ -766,8 +743,7 @@ class SubroutineCompiler(NameManager):
                 variable = self.get_name(location, identifier)
                 destination = variable.index + offset
                 self._reset(destination, block_size=target.type().size())
-                self._goto(index)
-                self._move({destination}, block_size=target.type().size())
+                self._move({destination}, index, block_size=target.type().size())
             case TypedTupleAssignmentTarget(elements=elements) as tuple_target:
                 product_type = tuple_target.type()
                 for i, element in enumerate(elements):
@@ -780,10 +756,8 @@ class SubroutineCompiler(NameManager):
             if not expression.type().is_string():
                 raise CompilationException(expression.location, f'Expected string but found {expression.type()}')
             with self.evaluate_in_new_variable(expression, read_only=True) as tmp:
-                self._goto(tmp.index)
                 for i in range(expression.type().size()):
-                    self._output()
-                    self._right()
+                    self._output(tmp.index + i)
         if new_line:
             with self.value(ord('\n')) as tmp:
                 self._output(tmp.index)
