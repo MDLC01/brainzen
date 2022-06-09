@@ -74,7 +74,7 @@ class Tokenizer:
         word = ''
         while is_allowed_in_word(self._peek()):
             word += self._next()
-        if not word:
+        if len(word) == 0:
             raise CompilationException(self.location, f'Unexpected {self._peek()!r}')
         return word
 
@@ -181,13 +181,13 @@ class Tokenizer:
         word = self._read_word()
         word_location = location.with_length(len(word))
 
-        # Number literal
-        if word[0] in '0123456789':
-            return NumericLiteral.parse(word_location, word)
-
         # Keyword
         if Token.is_valid_keyword(word):
             return Token.of(word, word_location)
+
+        # Number literal
+        if word[0] in '0123456789':
+            return NumericLiteral.parse(word_location, word)
 
         # Identifier
         return IdentifierToken(word_location, word)

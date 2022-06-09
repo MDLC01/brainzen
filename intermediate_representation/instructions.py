@@ -91,9 +91,9 @@ class ConstantReference(Expression):
 class Char(Expression):
     """A character literal."""
 
-    def __init__(self, location: Location, value: int | bool) -> None:
+    def __init__(self, location: Location, value: int) -> None:
         super().__init__(location)
-        self.value = int(value) % 256
+        self.value = value
 
     def __str__(self) -> str:
         return str(self.value)

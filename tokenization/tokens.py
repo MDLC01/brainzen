@@ -294,8 +294,6 @@ class NumberLiteral(Token):
     def __init__(self, location: Location, value: int) -> None:
         super().__init__(location)
         self.value = value
-        if value < 0 or value > 255:
-            raise CompilationException(location, f'Invalid {self.__doc__}: literal must be between 0 and 255')
 
     def __str__(self) -> str:
         return str(self.value)
