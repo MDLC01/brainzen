@@ -98,8 +98,7 @@ class BinaryOperation(ABC):
                 if right_type == Types.CHAR:
                     return MultiplicationOperation()
                 if isinstance(right_type, ArrayType):
-                    base_operation = cls.from_operator(location, operator, left_type, right_type.base_type)
-                    return BinaryTermByTermArrayOperation(base_operation, right_type.count)
+                    return ArrayScalingOperation(right_type.count)
                 raise InvalidRightOperandType(location, operator, right_type)
             raise InvalidLeftOperandType(location, operator, left_type)
         # /
@@ -307,23 +306,22 @@ class ConcatenationOperation(BinaryOperation):
         return ArrayType(self.base_type, self.left_array_count + self.right_array_count)
 
 
-class BinaryTermByTermArrayOperation(BinaryOperation):
-    def __init__(self, operation: BinaryOperation, array_count: int):
-        self.operation = operation
+class ArrayScalingOperation(BinaryOperation):
+    def __init__(self, array_count: int) -> None:
         self.array_count = array_count
 
     def left_type(self) -> DataType:
-        return self.operation.left_type()
+        return Types.CHAR
 
     def right_type(self) -> DataType:
-        return ArrayType(self.operation.right_type(), self.array_count)
+        return ArrayType(Types.CHAR, self.array_count)
 
     def type(self) -> DataType:
-        return ArrayType(self.operation.type(), self.array_count)
+        return ArrayType(Types.CHAR, self.array_count)
 
 
 __all__ = ['BinaryOperation', 'EqualityTestOperation', 'DifferenceTestOperation', 'StrictInequalityTestOperation',
            'LargeInequalityTestOperation', 'InverseStrictInequalityTestOperation',
            'InverseLargeInequalityTestOperation', 'ConjunctionOperation', 'DisjunctionOperation', 'AdditionOperation',
            'SubtractionOperation', 'MultiplicationOperation', 'DivisionOperation', 'ModuloOperation',
-           'ConcatenationOperation', 'BinaryTermByTermArrayOperation']
+           'ConcatenationOperation', 'ArrayScalingOperation']

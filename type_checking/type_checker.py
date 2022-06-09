@@ -78,8 +78,8 @@ def compute_binary_operation(operation: BinaryOperation, left: Value, right: Val
             return left % right
         case ConcatenationOperation():
             return left + right
-        case BinaryTermByTermArrayOperation(operation=base_operation):
-            return [compute_binary_operation(base_operation, left, element) for element in right]
+        case ArrayScalingOperation():
+            return [left * element for element in right]
     raise CompilerException(f'Unknown binary operation: {operation!r}')
 
 
