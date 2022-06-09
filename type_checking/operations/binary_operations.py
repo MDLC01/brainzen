@@ -137,6 +137,10 @@ class BinaryOperation(ABC):
     def type(self) -> DataType:
         ...
 
+    @abstractmethod
+    def __str__(self) -> str:
+        ...
+
 
 class EqualityTestOperation(BinaryOperation):
     def __init__(self, operand_type: DataType) -> None:
@@ -150,6 +154,9 @@ class EqualityTestOperation(BinaryOperation):
 
     def type(self) -> DataType:
         return Types.CHAR
+
+    def __str__(self) -> str:
+        return '=='
 
 
 class DifferenceTestOperation(BinaryOperation):
@@ -165,6 +172,9 @@ class DifferenceTestOperation(BinaryOperation):
     def type(self) -> DataType:
         return Types.CHAR
 
+    def __str__(self) -> str:
+        return '!='
+
 
 class StrictInequalityTestOperation(BinaryOperation):
 
@@ -176,6 +186,9 @@ class StrictInequalityTestOperation(BinaryOperation):
 
     def type(self) -> DataType:
         return Types.CHAR
+
+    def __str__(self) -> str:
+        return '<'
 
 
 class LargeInequalityTestOperation(BinaryOperation):
@@ -189,6 +202,9 @@ class LargeInequalityTestOperation(BinaryOperation):
     def type(self) -> DataType:
         return Types.CHAR
 
+    def __str__(self) -> str:
+        return '<='
+
 
 class InverseStrictInequalityTestOperation(BinaryOperation):
     def left_type(self) -> DataType:
@@ -199,6 +215,9 @@ class InverseStrictInequalityTestOperation(BinaryOperation):
 
     def type(self) -> DataType:
         return Types.CHAR
+
+    def __str__(self) -> str:
+        return '>'
 
 
 class InverseLargeInequalityTestOperation(BinaryOperation):
@@ -212,6 +231,9 @@ class InverseLargeInequalityTestOperation(BinaryOperation):
     def type(self) -> DataType:
         return Types.CHAR
 
+    def __str__(self) -> str:
+        return '>='
+
 
 class ConjunctionOperation(BinaryOperation):
     def left_type(self) -> DataType:
@@ -222,6 +244,9 @@ class ConjunctionOperation(BinaryOperation):
 
     def type(self) -> DataType:
         return Types.CHAR
+
+    def __str__(self) -> str:
+        return '&&'
 
 
 class DisjunctionOperation(BinaryOperation):
@@ -234,6 +259,9 @@ class DisjunctionOperation(BinaryOperation):
     def type(self) -> DataType:
         return Types.CHAR
 
+    def __str__(self) -> str:
+        return '||'
+
 
 class AdditionOperation(BinaryOperation):
     def left_type(self) -> DataType:
@@ -244,6 +272,9 @@ class AdditionOperation(BinaryOperation):
 
     def type(self) -> DataType:
         return Types.CHAR
+
+    def __str__(self) -> str:
+        return '+'
 
 
 class SubtractionOperation(BinaryOperation):
@@ -256,6 +287,9 @@ class SubtractionOperation(BinaryOperation):
     def type(self) -> DataType:
         return Types.CHAR
 
+    def __str__(self) -> str:
+        return '-'
+
 
 class MultiplicationOperation(BinaryOperation):
     def left_type(self) -> DataType:
@@ -266,6 +300,9 @@ class MultiplicationOperation(BinaryOperation):
 
     def type(self) -> DataType:
         return Types.CHAR
+
+    def __str__(self) -> str:
+        return '*'
 
 
 class DivisionOperation(BinaryOperation):
@@ -278,6 +315,9 @@ class DivisionOperation(BinaryOperation):
     def type(self) -> DataType:
         return Types.CHAR
 
+    def __str__(self) -> str:
+        return '/'
+
 
 class ModuloOperation(BinaryOperation):
     def left_type(self) -> DataType:
@@ -288,6 +328,9 @@ class ModuloOperation(BinaryOperation):
 
     def type(self) -> DataType:
         return Types.CHAR
+
+    def __str__(self) -> str:
+        return '%'
 
 
 class ConcatenationOperation(BinaryOperation):
@@ -305,6 +348,9 @@ class ConcatenationOperation(BinaryOperation):
     def type(self) -> DataType:
         return ArrayType(self.base_type, self.left_array_count + self.right_array_count)
 
+    def __str__(self) -> str:
+        return '..'
+
 
 class ArrayScalingOperation(BinaryOperation):
     def __init__(self, array_count: int) -> None:
@@ -318,6 +364,9 @@ class ArrayScalingOperation(BinaryOperation):
 
     def type(self) -> DataType:
         return ArrayType(Types.CHAR, self.array_count)
+
+    def __str__(self) -> str:
+        return '*'
 
 
 __all__ = ['BinaryOperation', 'EqualityTestOperation', 'DifferenceTestOperation', 'StrictInequalityTestOperation',

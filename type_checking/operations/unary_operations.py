@@ -46,6 +46,10 @@ class UnaryOperation(ABC):
     def type(self) -> DataType:
         ...
 
+    @abstractmethod
+    def __str__(self) -> str:
+        ...
+
 
 class NegationOperation(UnaryOperation):
     def operand_type(self) -> DataType:
@@ -53,6 +57,9 @@ class NegationOperation(UnaryOperation):
 
     def type(self) -> DataType:
         return Types.CHAR
+
+    def __str__(self) -> str:
+        return '!'
 
 
 class BoolNormalizationOperation(UnaryOperation):
@@ -62,6 +69,9 @@ class BoolNormalizationOperation(UnaryOperation):
     def type(self) -> DataType:
         return Types.CHAR
 
+    def __str__(self) -> str:
+        return '!!'
+
 
 class OppositionOperation(UnaryOperation):
     def operand_type(self) -> DataType:
@@ -69,6 +79,9 @@ class OppositionOperation(UnaryOperation):
 
     def type(self) -> DataType:
         return Types.CHAR
+
+    def __str__(self) -> str:
+        return '-'
 
 
 class UnaryTermByTermArrayOperation(UnaryOperation):
@@ -81,6 +94,9 @@ class UnaryTermByTermArrayOperation(UnaryOperation):
 
     def type(self) -> DataType:
         return ArrayType(self.operation.type(), self.array_count)
+
+    def __str__(self) -> str:
+        return self.operation.__str__()
 
 
 __all__ = ['UnaryOperation', 'NegationOperation', 'BoolNormalizationOperation', 'OppositionOperation',
