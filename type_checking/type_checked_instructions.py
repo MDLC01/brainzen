@@ -53,15 +53,6 @@ class TypeCheckedInstruction(ABC):
     def __init__(self, location: Location) -> None:
         self.location = location
 
-    def may_return(self) -> bool:
-        return False
-
-    def may_break(self) -> bool:
-        return False
-
-    def early_exists(self) -> bool:
-        return self.may_return() or self.early_exists()
-
     def __repr__(self) -> str:
         return self.__class__.__name__
 
@@ -69,30 +60,13 @@ class TypeCheckedInstruction(ABC):
 class TypeCheckedInstructionBlock(TypeCheckedInstruction):
     def __init__(self, context: SubroutineTypingContext, instruction_block: InstructionBlock) -> None:
         super().__init__(instruction_block.location)
-        self._may_return: bool = False
-        self._may_break: bool = False
         # Type checking
         context.open_scope()
-        self.instructions: list[TypeCheckedInstruction] = self._type_check(context, instruction_block.instructions)
-        context.close_scope()
-
-    def _type_check(self, context: SubroutineTypingContext,
-                    instructions: list[Instruction]) -> list[TypeCheckedInstruction]:
-        type_checked_instructions: list[TypeCheckedInstruction] = []
-        for instruction in instructions:
+        self.instructions: list[TypeCheckedInstruction] = []
+        for instruction in instruction_block.instructions:
             type_checked_instruction = TypeCheckedInstruction.from_instruction(context, instruction)
-            if type_checked_instruction.may_return():
-                self._may_return = True
-            if type_checked_instruction.may_break():
-                self._may_break = True
-            type_checked_instructions.append(type_checked_instruction)
-        return type_checked_instructions
-
-    def may_return(self) -> bool:
-        return self._may_return
-
-    def may_break(self) -> bool:
-        return self._may_break
+            self.instructions.append(type_checked_instruction)
+        context.close_scope()
 
     def is_empty(self) -> bool:
         return len(self.instructions) == 0
@@ -565,9 +539,6 @@ class TypeCheckedLoopStatement(TypeCheckedInstruction):
         if not self.count.type().is_integer():
             raise CompilationException(self.count.location, f'Expected char but found {self.count.type()}')
 
-    def may_return(self) -> bool:
-        return self.body.may_return()
-
     def __str__(self) -> str:
         return f'loop ({self.count}) line {self.location.line}'
 
@@ -584,9 +555,6 @@ class TypeCheckedWhileLoopStatement(TypeCheckedInstruction):
         if self.test.type() != Types.CHAR:
             raise CompilationException(self.test.location, f'Expected char but found {self.test.type()}')
 
-    def may_return(self) -> bool:
-        return self.body.may_return()
-
     def __str__(self) -> str:
         return f'while ({self.test}) line {self.location.line}'
 
@@ -602,9 +570,6 @@ class TypeCheckedDoWhileLoopStatement(TypeCheckedInstruction):
         # Type checking
         if self.test.type() != Types.CHAR:
             raise CompilationException(self.test.location, f'Expected char but found {self.test.type()}')
-
-    def may_return(self) -> bool:
-        return self.body.may_return()
 
     def __str__(self) -> str:
         return f'do while ({self.test}) line {self.location.line}'
@@ -661,9 +626,6 @@ class TypeCheckedForLoopStatement(TypeCheckedInstruction):
         self.body = TypeCheckedInstructionBlock(context, for_loop_statement.body)
         context.close_scope()
 
-    def may_return(self) -> bool:
-        return self.body.may_return()
-
     def __str__(self) -> str:
         loop_description = ' & '.join(str(iterator) for iterator in self.iterators)
         return f'for ({loop_description}) line {self.location.line}'
@@ -681,12 +643,6 @@ class TypeCheckedConditionalStatement(TypeCheckedInstruction):
         # Type checking
         if self.test.type() != Types.CHAR:
             raise CompilationException(self.test.location, f'Expected char but found {self.test.type()}')
-
-    def may_return(self) -> bool:
-        return self.if_body.may_return() or self.else_body.may_return()
-
-    def may_break(self) -> bool:
-        return self.if_body.may_break() or self.else_body.may_break()
 
     def has_else(self) -> bool:
         return not self.else_body.is_empty()
@@ -708,9 +664,6 @@ class TypeCheckedReturnInstruction(TypeCheckedInstruction):
         if self.value.type() != context.expected_return_type:
             message = f'Expected {context.expected_return_type} but found {self.value.type()}'
             raise CompilationException(self.location, message)
-
-    def may_return(self) -> bool:
-        return True
 
     def __str__(self) -> str:
         return f'return {self.value}'

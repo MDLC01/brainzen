@@ -12,15 +12,6 @@ class Instruction(ABC):
     def __init__(self, location: Location) -> None:
         self.location = location
 
-    def may_return(self) -> bool:
-        return False
-
-    def may_break(self) -> bool:
-        return False
-
-    def early_exists(self) -> bool:
-        return self.may_return() or self.early_exists()
-
     def __repr__(self) -> str:
         return self.__class__.__name__
 
@@ -32,15 +23,7 @@ class InstructionBlock(Instruction):
 
     def __init__(self, location: Location, *instructions: Instruction) -> None:
         super().__init__(location)
-        self._may_return: bool = False
-        self._may_break: bool = False
         self.instructions: list[Instruction] = [*instructions]
-
-    def may_return(self) -> bool:
-        return self._may_return
-
-    def may_break(self) -> bool:
-        return self._may_break
 
     def __len__(self) -> int:
         return len(self.instructions)
@@ -50,10 +33,6 @@ class InstructionBlock(Instruction):
 
     def append(self, instruction: Instruction) -> None:
         self.instructions.append(instruction)
-        if instruction.may_return():
-            self._may_return = True
-        if instruction.may_break():
-            self._may_break = True
 
     def __iter__(self) -> Generator[Instruction, None, None]:
         for instruction in self.instructions:
@@ -300,9 +279,6 @@ class LoopStatement(Instruction):
         self.count = count
         self.body = body
 
-    def may_return(self) -> bool:
-        return self.body.may_return()
-
     def __str__(self) -> str:
         return f'loop ({self.count}) line {self.location.line}'
 
@@ -316,9 +292,6 @@ class WhileLoopStatement(Instruction):
         self.test = test
         self.body = body
 
-    def may_return(self) -> bool:
-        return self.body.may_return()
-
     def __str__(self) -> str:
         return f'while ({self.test}) line {self.location.line}'
 
@@ -331,9 +304,6 @@ class DoWhileLoopStatement(Instruction):
         super().__init__(location)
         self.body = body
         self.test = test
-
-    def may_return(self) -> bool:
-        return self.body.may_return()
 
     def __str__(self) -> str:
         return f'do while ({self.test}) line {self.location.line}'
@@ -363,9 +333,6 @@ class ForLoopStatement(Instruction):
         self.iterators = iterators
         self.body = body
 
-    def may_return(self) -> bool:
-        return self.body.may_return()
-
     def __str__(self) -> str:
         loop_description = ' & '.join(str(iterator) for iterator in self.iterators)
         return f'for ({loop_description}) line {self.location.line}'
@@ -382,12 +349,6 @@ class ConditionalStatement(Instruction):
         self.if_body = if_body
         self.else_body = else_body
 
-    def may_return(self) -> bool:
-        return self.if_body.may_return() or self.else_body.may_return()
-
-    def may_break(self) -> bool:
-        return self.if_body.may_break() or self.else_body.may_break()
-
     def has_else(self) -> bool:
         return not self.else_body.is_empty()
 
@@ -402,9 +363,6 @@ class ReturnInstruction(Instruction):
     def __init__(self, location: Location, value: Expression) -> None:
         super().__init__(location)
         self.value = value
-
-    def may_return(self) -> bool:
-        return True
 
     def __str__(self) -> str:
         return f'return {self.value}'
