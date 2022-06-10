@@ -790,12 +790,14 @@ class SubroutineCompiler(NameManager):
         count = iterators[0].count
         with self.scope():
             # Evaluate arrays and declare loop variables
-            arrays = []
             variables = []
             for iterator in iterators:
-                array = self.scoped_variable(iterator.array.type())
-                self.evaluate(iterator.array, array.index)
-                arrays.append(array)
+                # Mutating the loop variable should mutate the corresponding element in the array.
+                if isinstance(iterator.array, TypedIdentifier):
+                    array = self.get_name(iterator.array.location, iterator.array.name)
+                else:
+                    array = self.scoped_variable(iterator.array.type())
+                    self.evaluate(iterator.array, array.index)
                 variables.append(self.scoped_pointer(array.index, iterator.type, iterator.identifier))
             # Run loop
             for i in range(count):
