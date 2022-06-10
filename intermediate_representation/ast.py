@@ -275,20 +275,20 @@ class ASTGenerator:
         return Array(self._location_from(start_location), sequence)
 
     def parse_operand(self) -> Expression:
-        expression = self.parse_value()
+        start_location = self._location()
+        operand = self.parse_value()
         # Subscripts / slices
         while self._is_next(OpenBracketToken):
-            start_location = self._location()
             self._expect(OpenBracketToken)
             index = self._expect(NumericLiteral).value
             if self._eat(ColonToken):
                 end = self._expect(NumericLiteral).value
                 self._expect(CloseBracketToken)
-                expression = ArraySlicingExpression(self._location_from(start_location), expression, index, end)
+                operand = ArraySlicingExpression(self._location_from(start_location), operand, index, end)
             else:
                 self._expect(CloseBracketToken)
-                expression = ArraySubscriptExpression(self._location_from(start_location), expression, index)
-        return expression
+                operand = ArraySubscriptExpression(self._location_from(start_location), operand, index)
+        return operand
 
     def parse_unary_operation(self) -> Expression:
         if self._peek().is_unary_operator():
