@@ -637,15 +637,18 @@ class TypeCheckedForLoopStatement(TypeCheckedInstruction):
 class TypeCheckedConditionalStatement(TypeCheckedInstruction):
     def __init__(self, context: SubroutineTypingContext, statement: ConditionalStatement) -> None:
         super().__init__(statement.location)
-        self.test: TypedExpression = TypedExpression.from_expression(context, statement.test)
-        self.if_body: TypeCheckedInstructionBlock = TypeCheckedInstructionBlock(context, statement.if_body)
-        self.else_body: TypeCheckedInstructionBlock = TypeCheckedInstructionBlock(context, statement.else_body)
+        self.test = TypedExpression.from_expression(context, statement.test)
+        self.if_body = TypeCheckedInstructionBlock(context, statement.if_body)
+        if statement.has_else():
+            self.else_body = TypeCheckedInstructionBlock(context, statement.else_body)
+        else:
+            self.else_body = None
         # Type checking
         if self.test.type() != Types.CHAR:
             raise CompilationException(self.test.location, f'Expected char but found {self.test.type()}')
 
     def has_else(self) -> bool:
-        return not self.else_body.is_empty()
+        return self.else_body is not None
 
     def __str__(self) -> str:
         return f'if ({self.test}) line {self.location.line}'

@@ -17,10 +17,6 @@ class Instruction(ABC):
 
 
 class InstructionBlock(Instruction):
-    @classmethod
-    def empty(cls, location: Location = Location.unknown()):
-        return cls(location)
-
     def __init__(self, location: Location, *instructions: Instruction) -> None:
         super().__init__(location)
         self.instructions: list[Instruction] = [*instructions]
@@ -343,14 +339,14 @@ class ForLoopStatement(Instruction):
 
 class ConditionalStatement(Instruction):
     def __init__(self, location: Location, test: Expression, if_body: InstructionBlock,
-                 else_body: InstructionBlock) -> None:
+                 else_body: InstructionBlock | None) -> None:
         super().__init__(location)
         self.test = test
         self.if_body = if_body
         self.else_body = else_body
 
     def has_else(self) -> bool:
-        return not self.else_body.is_empty()
+        return self.else_body is not None
 
     def __str__(self) -> str:
         return f'if ({self.test}) line {self.location.line}'

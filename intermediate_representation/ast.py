@@ -442,7 +442,7 @@ class ASTGenerator:
             # Instructions if true
             if_instructions = self.parse_instruction_block()
             # Optional else
-            else_instructions = InstructionBlock.empty()
+            else_instructions = None
             if self._eat(ElseKeyword):
                 # Instructions if false
                 else_instructions = self.parse_instruction_block()

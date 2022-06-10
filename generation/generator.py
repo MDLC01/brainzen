@@ -807,18 +807,26 @@ class SubroutineCompiler(NameManager):
     def condition(self, test: TypedExpression, if_body: TypeCheckedInstructionBlock,
                   else_body: TypeCheckedInstructionBlock) -> None:
         self._comment('Initializing conditional statement and evaluating condition', prefix='\n')
-        with self.value(1) as has_entered_if, self.evaluate_in_new_variable(test) as condition:
-            self._comment('Starting if', prefix='\n')
-            self._loop_start(condition.index)
-            self.compile_instruction(if_body)
-            self._decrement(has_entered_if.index)  # Reset
-            self._reset(condition.index)
-            self._loop_end()
-            self._comment('Starting else', prefix='\n')
-            self._loop_start(has_entered_if.index)
-            self.compile_instruction(else_body)
-            self._decrement(has_entered_if.index)  # Reset
-            self._loop_end()
+        with self.evaluate_in_new_variable(test) as condition:
+            if else_body is None:
+                self._comment('Starting if', prefix='\n')
+                self._loop_start(condition.index)
+                self.compile_instruction(if_body)
+                self._reset(condition.index)
+                self._loop_end()
+            else:
+                with self.value(1) as has_entered_if:
+                    self._comment('Starting if', prefix='\n')
+                    self._loop_start(condition.index)
+                    self.compile_instruction(if_body)
+                    self._decrement(has_entered_if.index)  # Reset
+                    self._reset(condition.index)
+                    self._loop_end()
+                    self._comment('Starting else', prefix='\n')
+                    self._loop_start(has_entered_if.index)
+                    self.compile_instruction(else_body)
+                    self._decrement(has_entered_if.index)  # Reset
+                    self._loop_end()
 
     def create_context_snapshot(self, location: Location = Location.unknown(), identifier: str | None = None) -> None:
         current_index = self.index
