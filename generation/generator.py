@@ -619,6 +619,30 @@ class SubroutineCompiler(NameManager):
                     raise ImpossibleException(f'Unknown binary operation: {operation!r}')
         self._goto(index)
 
+    def evaluate_array_comprehension(self, element_format: TypedExpression, iterators: list[TypedForLoopIterator],
+                                     index: int | None = None) -> None:
+        if index is None:
+            index = self.index
+        self._goto(index)
+        count = iterators[0].count
+        with self.scope():
+            # Evaluate arrays and declare loop variables
+            variables = []
+            for iterator in iterators:
+                # There is no need to copy the entire array if it already exists
+                if isinstance(iterator.array, TypedIdentifier):
+                    array = self.get_name(iterator.array.location, iterator.array.name)
+                else:
+                    array = self.scoped_variable(iterator.array.type())
+                    self.evaluate(iterator.array, array.index)
+                variables.append(self.scoped_pointer(array.index, iterator.type, iterator.variable))
+            # Run loop
+            for i in range(count):
+                self.evaluate(element_format, index + i * element_format.type().size())
+                # Update loop variable indices
+                for variable in variables:
+                    variable.update_index(variable.index + variable.type.size())
+
     def evaluate(self, expression: TypedExpression, index: int | None = None) -> None:
         """Evaluate the passed expression at the current location (or `index` if specified)."""
         if index is None:
@@ -631,6 +655,8 @@ class SubroutineCompiler(NameManager):
                 for element in value:
                     self.evaluate(element)
                     self._right(element.type().size())
+            case TypedArrayComprehension(element_format=element_format, iterators=iterators):
+                self.evaluate_array_comprehension(element_format, iterators)
             case LiteralTuple(elements=elements):
                 for element in elements:
                     self.evaluate(element)
@@ -798,7 +824,7 @@ class SubroutineCompiler(NameManager):
                 else:
                     array = self.scoped_variable(iterator.array.type())
                     self.evaluate(iterator.array, array.index)
-                variables.append(self.scoped_pointer(array.index, iterator.type, iterator.identifier))
+                variables.append(self.scoped_pointer(array.index, iterator.type, iterator.variable))
             # Run loop
             for i in range(count):
                 self.compile_instruction(body)

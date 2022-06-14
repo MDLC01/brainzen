@@ -172,6 +172,10 @@ class DoubleAmpersandToken(Token):
     binary_operator = BinaryOperator.DOUBLE_AMPERSAND
 
 
+class PipeToken(Token):
+    token = '|'
+
+
 class DoublePipeToken(Token):
     token = '||'
     binary_operator = BinaryOperator.DOUBLE_PIPE
@@ -379,7 +383,7 @@ __all__ = ['is_allowed_in_word', 'is_valid_word', 'AnyToken', 'Token', 'OpenBrac
            'OpenBracketToken', 'CloseBracketToken', 'OpenParToken', 'CloseParToken', 'SemicolonToken', 'CommaToken',
            'EqualToken', 'DoublePlusToken', 'DoubleMinusToken', 'BangToken', 'DoubleBangToken', 'DoubleEqualToken',
            'BangEqualToken', 'LessThanToken', 'LessThanEqualToken', 'GreaterThanToken', 'GreaterThanEqualToken',
-           'DoubleAmpersandToken', 'DoublePipeToken', 'PlusToken', 'MinusToken', 'StarToken', 'SlashToken',
+           'DoubleAmpersandToken', 'PipeToken', 'DoublePipeToken', 'PlusToken', 'MinusToken', 'StarToken', 'SlashToken',
            'PercentToken', 'DoubleDotToken', 'ColonToken', 'DoubleColonToken', 'ArrowToken', 'HashToken',
            'QuestionMarkToken', 'PrivateKeyword', 'NamespaceKeyword', 'NativeKeyword', 'TildeToken', 'ProcKeyword',
            'FuncKeyword', 'LetKeyword', 'LoopKeyword', 'ForKeyword', 'WhileKeyword', 'DoKeyword', 'IfKeyword',

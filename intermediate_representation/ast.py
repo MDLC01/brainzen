@@ -239,6 +239,43 @@ class ASTGenerator:
                 break
         return elements
 
+    def parse_for_loop_iterator(self) -> ForLoopIterator:
+        start_location = self._location()
+        loop_variable = self._expect(IdentifierToken).name
+        self._expect(ColonToken)
+        loop_array = self.parse_binary_operation()
+        iterator_location = self._location_from(start_location)
+        return ForLoopIterator(iterator_location, loop_variable, loop_array)
+
+    def parse_for_loop_iterators(self, closing_token_type: Type[AnyToken]) -> list[ForLoopIterator]:
+        iterators = []
+        while not self._eat(closing_token_type):
+            iterators.append(self.parse_for_loop_iterator())
+            if not self._eat(CommaToken):
+                self._expect(closing_token_type)
+                break
+        return iterators
+
+    def parse_array_literal_or_comprehension(self) -> Expression:
+        start_location = self._location()
+        self._expect(OpenBracketToken)
+        # Empty array
+        if self._eat(CloseBracketToken):
+            return Array(self._location_from(start_location), [])
+        # Non-empty array or array comprehension
+        element = self.parse_binary_operation()
+        # Array comprehension
+        if self._eat(PipeToken):
+            iterators = self.parse_for_loop_iterators(CloseBracketToken)
+            return ArrayComprehension(self._location_from(start_location), element, iterators)
+        # More than 1 element
+        if self._eat(CommaToken):
+            sequence = self.parse_sequence(CloseBracketToken)
+            return Array(self._location_from(start_location), [element, *sequence])
+        # Array with a single element
+        self._expect(CloseBracketToken)
+        return Array(self._location_from(start_location), [element])
+
     def parse_value(self) -> Expression:
         start_location = self._location()
         # Parenthesised expression
@@ -268,11 +305,10 @@ class ASTGenerator:
         if self._is_next(StringLiteral):
             string_literal = self._expect(StringLiteral)
             return Array.from_string(string_literal.location, string_literal.value)
-        # Array literal
-        start_location = self._location()
-        self._expect(OpenBracketToken)
-        sequence = self.parse_sequence(CloseBracketToken)
-        return Array(self._location_from(start_location), sequence)
+        # Array literal or comprehension
+        if self._is_next(OpenBracketToken):
+            return self.parse_array_literal_or_comprehension()
+        raise CompilationException(self._location(), f'Expected value but found {self._peek().__doc__}')
 
     def parse_operand(self) -> Expression:
         start_location = self._location()
@@ -420,17 +456,7 @@ class ASTGenerator:
         # For loop
         if self._eat(ForKeyword):
             self._expect(OpenParToken)
-            iterators = []
-            while not self._eat(CloseParToken):
-                iterator_start_location = self._location()
-                loop_variable = self._expect(IdentifierToken).name
-                self._expect(ColonToken)
-                loop_array = self.parse_binary_operation()
-                iterator_location = self._location_from(iterator_start_location)
-                iterators.append(ForLoopIterator(iterator_location, loop_variable, loop_array))
-                if not self._eat(CommaToken):
-                    self._expect(CloseParToken)
-                    break
+            iterators = self.parse_for_loop_iterators(CloseParToken)
             instructions = self.parse_instruction_block()
             return ForLoopStatement(location, iterators, instructions)
         # Conditional statement

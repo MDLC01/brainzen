@@ -28,7 +28,6 @@ Here is a list of considered features in arbitrary order (this list is *not* com
 - Some form of [overloading](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism).
 - Separating a program in multiple files (import statements).
 - Ternary operator.
-- Python-like array comprehensions.
 - Python-like chained comparison (granted it preserves transitivity).
 - [String interpolation](https://en.wikipedia.org/wiki/String_interpolation).
 - Some form of named tuples (records or interfaces, depending on whether duck typing is used).

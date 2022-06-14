@@ -101,6 +101,8 @@ class TypedExpression(TypeCheckedInstruction, ABC):
                 return LiteralChar.from_char(char)
             case Array() as array:
                 return LiteralArray.from_array(context, array)
+            case ArrayComprehension() as array_comprehension:
+                return TypedArrayComprehension.from_array_comprehension(context, array_comprehension)
             case Tuple() as tuple_expression:
                 return LiteralTuple.from_tuple_expression(context, tuple_expression)
             case Identifier() as identifier:
@@ -208,6 +210,76 @@ class LiteralArray(TypedExpression):
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}[{self.value!r}]'
+
+
+class TypedForLoopIterator:
+    __slots__ = 'location', 'variable', 'array', 'type', 'count'
+
+    @classmethod
+    def from_for_loop_iterator(cls, context: SubroutineTypingContext,
+                               for_loop_iterator: ForLoopIterator) -> 'TypedForLoopIterator':
+        return cls(context, for_loop_iterator.location, for_loop_iterator.variable, for_loop_iterator.array)
+
+    def __init__(self, context: SubroutineTypingContext, location: Location, variable: str,
+                 array: Expression) -> None:
+        self.location = location
+        self.variable = variable
+        self.array = TypedExpression.from_expression(context, array)
+        array_type = self.array.type()
+        if not isinstance(array_type, ArrayType):
+            raise CompilationException(array.location, f'Expected array but found {array_type}')
+        self.type = array_type.base_type
+        self.count = array_type.count
+
+    def __str__(self) -> str:
+        return f'{self.variable} : {self.array}'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.variable!r}, {self.array!r}]'
+
+
+class TypedArrayComprehension(TypedExpression):
+    @classmethod
+    def from_array_comprehension(cls, context: SubroutineTypingContext,
+                                 array_comprehension: ArrayComprehension) -> 'TypedArrayComprehension':
+        iterators = []
+        expected_count = None
+        context.open_scope()
+        for untyped_iterator in array_comprehension.iterators:
+            iterator = TypedForLoopIterator.from_for_loop_iterator(context, untyped_iterator)
+            if expected_count is None:
+                expected_count = iterator.count
+            elif iterator.count != expected_count:
+                message = f'Expected iterator of size {expected_count} but found iterator of size {iterator.count}'
+                raise CompilationException(iterator.location, message)
+            iterators.append(iterator)
+            context.add_variable(iterator.location, iterator.variable, iterator.type)
+        typed_element_format = TypedExpression.from_expression(context, array_comprehension.element_format)
+        context.close_scope()
+        return cls(array_comprehension.location, typed_element_format, iterators)
+
+    def __init__(self, location: Location, element_format: TypedExpression,
+                 iterators: list[TypedForLoopIterator]) -> None:
+        super().__init__(location)
+        self.element_format = element_format
+        self.iterators = iterators
+        if len(iterators) < 1:
+            raise CompilationException(self.location, 'Expected at least one iterator')
+        self.count = self.iterators[0].count
+
+    def type(self) -> DataType:
+        return ArrayType(self.element_format.type(), self.count)
+
+    def is_known_at_compile_time(self) -> bool:
+        return (self.element_format.is_known_at_compile_time()
+                and all(iterator.array.is_known_at_compile_time() for iterator in self.iterators))
+
+    def __str__(self) -> str:
+        iterators = ', '.join(iterator.__str__() for iterator in self.iterators)
+        return f'[{self.element_format} | {iterators}]'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.element_format!r}, {self.iterators!r}]'
 
 
 class LiteralTuple(TypedExpression):
@@ -578,32 +650,6 @@ class TypeCheckedDoWhileLoopStatement(TypeCheckedInstruction):
         return f'{self.__class__.__name__}[{self.body!r}, {self.test!r}]'
 
 
-class TypedForLoopIterator:
-    __slots__ = 'location', 'identifier', 'array', 'type', 'count'
-
-    @classmethod
-    def from_for_loop_iterator(cls, context: SubroutineTypingContext,
-                               for_loop_iterator: ForLoopIterator) -> 'TypedForLoopIterator':
-        return cls(context, for_loop_iterator.location, for_loop_iterator.identifier, for_loop_iterator.array)
-
-    def __init__(self, context: SubroutineTypingContext, location: Location, identifier: str,
-                 array: Expression) -> None:
-        self.location = location
-        self.identifier = identifier
-        self.array = TypedExpression.from_expression(context, array)
-        array_type = self.array.type()
-        if not isinstance(array_type, ArrayType):
-            raise CompilationException(array.location, f'Expected array but found {array_type}')
-        self.type = array_type.base_type
-        self.count = array_type.count
-
-    def __str__(self) -> str:
-        return f'{self.identifier} : {self.array}'
-
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.identifier!r}, {self.array!r}]'
-
-
 class TypeCheckedForLoopStatement(TypeCheckedInstruction):
 
     def __init__(self, context: SubroutineTypingContext, for_loop_statement: ForLoopStatement) -> None:
@@ -622,7 +668,7 @@ class TypeCheckedForLoopStatement(TypeCheckedInstruction):
                 message = f'Expected iterator of size {expected_count} but found iterator of size {iterator.count}'
                 raise CompilationException(iterator.location, message)
             self.iterators.append(iterator)
-            context.add_variable(iterator.location, iterator.identifier, iterator.type)
+            context.add_variable(iterator.location, iterator.variable, iterator.type)
         self.body = TypeCheckedInstructionBlock(context, for_loop_statement.body)
         context.close_scope()
 
@@ -690,10 +736,11 @@ class TypeCheckedContextSnapshot(TypeCheckedInstruction):
 
 
 __all__ = ['TypeCheckedInstruction', 'TypeCheckedInstructionBlock', 'TypedExpression', 'LiteralChar', 'LiteralArray',
-           'LiteralTuple', 'TypedIdentifier', 'TypedArithmeticExpression', 'TypedUnaryArithmeticExpression',
-           'TypedBinaryArithmeticExpression', 'TypedArraySubscriptExpression', 'TypedArraySlicingExpression',
-           'PrintCall', 'InputCall', 'TypeCheckedProcedureCall', 'TypedFunctionCall', 'TypeCheckedIncrementation',
-           'TypeCheckedDecrementation', 'TypeCheckedVariableDeclaration', 'TypeCheckedAssignment',
-           'TypeCheckedLoopStatement', 'TypeCheckedWhileLoopStatement', 'TypeCheckedDoWhileLoopStatement',
-           'TypedForLoopIterator', 'TypeCheckedForLoopStatement', 'TypeCheckedConditionalStatement',
-           'TypeCheckedReturnInstruction', 'TypeCheckedContextSnapshot']
+           'TypedForLoopIterator', 'TypedArrayComprehension', 'LiteralTuple', 'TypedIdentifier',
+           'TypedArithmeticExpression', 'TypedUnaryArithmeticExpression', 'TypedBinaryArithmeticExpression',
+           'TypedArraySubscriptExpression', 'TypedArraySlicingExpression', 'PrintCall', 'InputCall',
+           'TypeCheckedProcedureCall', 'TypedFunctionCall', 'TypeCheckedIncrementation', 'TypeCheckedDecrementation',
+           'TypeCheckedVariableDeclaration', 'TypeCheckedAssignment', 'TypeCheckedLoopStatement',
+           'TypeCheckedWhileLoopStatement', 'TypeCheckedDoWhileLoopStatement', 'TypedForLoopIterator',
+           'TypeCheckedForLoopStatement', 'TypeCheckedConditionalStatement', 'TypeCheckedReturnInstruction',
+           'TypeCheckedContextSnapshot']
