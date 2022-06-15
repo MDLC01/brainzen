@@ -2,6 +2,7 @@ from enum import IntEnum
 
 from data_types import *
 from exceptions import *
+from generation.brainfuck_code import *
 from generation.name_manager import *
 from reference import Reference
 from type_checking import *
@@ -68,7 +69,8 @@ class SubroutineCompiler(NameManager):
         self.context = context
         self.subroutine = subroutine
         self.comment_level = comment_level
-        self.bf_code = ''
+        self.brainfuck_code = BrainfuckCode()
+        self.generated = False
         self.index = 0
         self._loop_start_indices: list[int] = []
 
@@ -92,71 +94,50 @@ class SubroutineCompiler(NameManager):
         """Return the number of arguments this subroutine expects."""
         return len(self.subroutine.arguments)
 
-    def _remove_up_to(self, count: int, char: str) -> int:
-        """
-        Remove up to `count` times the passed character at the end of the Brainfuck code
-        and return the number of characters that where removed, minus `count`.
-        """
-        i = 0
-        while i < count and len(self.bf_code) > 0 and self.bf_code[-1] == char:
-            self.bf_code = self.bf_code[:-1]
-            i += 1
-        return count - i
-
     def _comment(self, comment: str, level: int = CommentLevel.DETAILS, *, prefix: str = '\t', end: str = '\n') -> None:
         if level <= self.comment_level:
-            serialized_comment = (comment
-                                  .replace('<', '(less than)')
-                                  .replace('>', '(greater than)')
-                                  .replace('+', '(plus)')
-                                  .replace('-', '(minus)')
-                                  .replace('[', '(')
-                                  .replace(']', ')')
-                                  .replace('.', '(period)')
-                                  .replace(',', '(comma)')
-                                  .replace('#', '(hash)'))
-            self.bf_code += f'{prefix}{serialized_comment}{end}'
+            self.brainfuck_code.comment(comment, prefix=prefix, end=end)
 
     def _decrement(self, index: int | None, *, count: int = 1) -> None:
         self._goto(index)
-        count = self._remove_up_to(count, '+')
-        self.bf_code += '-' * count
+        count = self.brainfuck_code.remove_up_to(count, '+')
+        self.brainfuck_code.append('-', count)
 
     def _increment(self, index: int | None, *, count: int = 1) -> None:
         self._goto(index)
-        count = self._remove_up_to(count, '-')
-        self.bf_code += '+' * count
+        count = self.brainfuck_code.remove_up_to(count, '-')
+        self.brainfuck_code.append('+', count)
 
     def _loop_start(self, index: int | None) -> None:
         self._goto(index)
         self._loop_start_indices.append(self.index)
-        self.bf_code += '['
+        self.brainfuck_code.append('[')
 
     def _loop_end(self) -> None:
         if len(self._loop_start_indices) == 0:
             raise CompilerException('Unmatched closing bracket in generated code')
         # Automatically balance loops
         self._goto(self._loop_start_indices.pop())
-        self.bf_code += ']'
+        self.brainfuck_code.append(']')
 
     def _output(self, index: int | None = None) -> None:
         self._goto(index)
-        self.bf_code += '.'
+        self.brainfuck_code.append('.')
 
     def _input(self) -> None:
-        self.bf_code += ','
+        self.brainfuck_code.append(',')
 
     def _left(self, count: int = 1) -> None:
         self.index -= count
-        count = self._remove_up_to(count, '>')
-        self.bf_code += '<' * count
+        count = self.brainfuck_code.remove_up_to(count, '>')
+        self.brainfuck_code.append('<', count)
         if self.index < 0:
             raise CompilerException(f'Subroutine {self.identifier()!r} uses negative indices')
 
     def _right(self, count: int = 1) -> None:
         self.index += count
-        count = self._remove_up_to(count, '<')
-        self.bf_code += '>' * count
+        count = self.brainfuck_code.remove_up_to(count, '<')
+        self.brainfuck_code.append('>', count)
 
     def _reset(self, index: int | None = None, *, block_size: int = 1) -> None:
         """Reset the value of the block starting at `index` (current cell by default) to 0"""
@@ -746,7 +727,7 @@ class SubroutineCompiler(NameManager):
         self._goto(subroutine_origin)
         # Then, call the subroutine
         self._comment(f'Calling subroutine {reference}', prefix='\n')
-        self.bf_code += subroutine.generate()
+        self.brainfuck_code.extend(subroutine.generate(comment_level=self.comment_level))
         self.index += subroutine.index
         # Finally, get the return value (if required) and reset the cells to 0
         self._comment(f'Finalizing call to subroutine {reference}', prefix='\n')
@@ -864,12 +845,12 @@ class SubroutineCompiler(NameManager):
         if identifier is not None:
             variable = self.get_name(location, identifier)
             self._goto(variable.index)
-        self.bf_code += '#'
+        self.brainfuck_code.append('#')
 
         context = f'Currently at index {self.index} in subroutine {self.identifier()!r}'
         self._comment(context, CommentLevel.ONLY_REQUIRED, prefix='\n', end='')
 
-        scopes = 'Active names: ' + str(self.names).replace(',', ';')
+        scopes = 'Active names: ' + str(self.names)
         self._comment(scopes, CommentLevel.ONLY_REQUIRED, prefix='\n', end='')
 
         local_memory_overview = f'Local memory size: {self.memory_size()}'
@@ -927,19 +908,20 @@ class SubroutineCompiler(NameManager):
         if comment_line:
             self._comment(f'{instruction};', CommentLevel.BZ_CODE)
 
-    def generate(self, *, comment_level: int | None = None) -> str:
+    def generate(self, *, comment_level: int | None = None) -> BrainfuckCode:
         if comment_level is not None:
             self.comment_level = comment_level
-        if not self.bf_code:
+        if not self.generated:
             if isinstance(self.subroutine, TypeCheckedNativeSubroutine):
-                self.bf_code = self.subroutine.bf_code
+                self.brainfuck_code.append_raw(self.subroutine.bf_code)
                 self.index = self.subroutine.offset
             elif isinstance(self.subroutine, TypeCheckedProcedure):
                 self.compile_instruction(self.subroutine.body)
                 self._goto(self.return_index)
             else:
                 raise ImpossibleException(f'Unknown subroutine type: {self.subroutine.__class__.__name__}')
-        return self.bf_code
+            self.generated = True
+        return self.brainfuck_code
 
 
 def generate_namespace_context(namespace: TypeCheckedNamespace, global_context: Context = Context.empty()) -> 'Context':
@@ -966,7 +948,7 @@ def generate_program(namespace: TypeCheckedNamespace, main_procedure_reference: 
         raise CompilationException(main.subroutine.location, 'Main procedure should not accept arguments')
     if main.returns():
         raise CompilationException(main.subroutine.location, 'Main subroutine should be a procedure')
-    return main.generate(comment_level=comment_level).strip() + '\n'
+    return str(main.generate(comment_level=comment_level)).strip() + '\n'
 
 
 __all__ = ['CommentLevel', 'generate_program']
