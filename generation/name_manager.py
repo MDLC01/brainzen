@@ -15,36 +15,52 @@ def generate_unique_identifier() -> str:
 
 
 class Memory:
-    def __init__(self, origin: int):
+    def __init__(self, origin: int) -> None:
         self.memory: dict[int, int] = {}
-        self._size = 0
-        self.origin = origin
+        self.available_blocks_by_size: dict[int, set[int]] = {}
+        self.available_block_by_index: dict[int, int] = {}
+        self._size = origin
 
-    def _find_available_block(self, size: int) -> int:
-        i = self.origin
-        current_block_size = 0
-        while True:
-            if i in self.memory and self.memory[i] > 0:
-                i += self.memory[i]
-                current_block_size = 0
-            else:
-                current_block_size += 1
-                i += 1
-            if current_block_size == size:
-                return i - current_block_size
+    def _pop_available_block(self, size: int) -> int:
+        index = self.available_blocks_by_size[size].pop()
+        self.available_block_by_index.pop(index)
+        return index
 
-    def _define_block(self, index: int, size: int) -> None:
-        self._size = max(self._size, index + size)
-        self.memory[index] = size
+    def _add_available_block(self, index: int, size: int) -> None:
+        next_index = index + size
+        # Reduce memory size if possible
+        if next_index == self._size:
+            self._size -= size
+            return
+        # Merge with adjacent available block if possible
+        if next_index in self.available_block_by_index:
+            next_size = self.available_block_by_index.pop(next_index)
+            self.available_blocks_by_size[next_size].remove(next_index)
+            total_size = size + next_size
+        else:
+            total_size = size
+        self.available_blocks_by_size[total_size].add(index)
+        self.available_block_by_index[index] = size
 
     def alloc(self, size: int) -> int:
-        index = self._find_available_block(size)
-        self._define_block(index, size)
+        assert size > 0
+        # Find available block
+        closest_available_size = min((s for s in self.available_blocks_by_size if s >= size), default=-1)
+        if closest_available_size >= size:
+            index = self._pop_available_block(closest_available_size)
+            if closest_available_size != size:
+                self._add_available_block(closest_available_size - size, index + size)
+        else:
+            index = self._size
+            self._size = index + size
+        # Reserve block
+        self.memory[index] = size
         return index
 
     def free(self, index: int) -> None:
-        if self.memory[index] > 0:
-            del self.memory[index]
+        size = self.memory[index]
+        self._add_available_block(index, size)
+        del self.memory[index]
 
     def size(self) -> int:
         return self._size
@@ -65,7 +81,7 @@ class Name:
     def __repr__(self) -> str:
         return f'{self.type} {self.identifier} at {self.index}'
 
-    def __enter__(self) -> 'Name':  # TODO: Replace with Self when updating to Python 3.11
+    def __enter__(self) -> 'Name':
         if self.is_opened:
             raise CompilerException(f'Name {self} is already opened')
         self.is_opened = True
