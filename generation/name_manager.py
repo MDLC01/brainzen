@@ -207,4 +207,4 @@ class NameManager(ABC):
         return pointer
 
 
-__all__ = ['generate_unique_identifier', 'Variable', 'Name', 'NameManager']
+__all__ = ['generate_unique_identifier', 'Name', 'Variable', 'Pointer', 'NameManager']

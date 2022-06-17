@@ -668,14 +668,35 @@ class SubroutineCompiler(NameManager):
                 raise ImpossibleException(f'Unknown expression type: {expression.__class__.__name__}')
         self._goto(index)
 
+    def get_pointer(self, expression: TypedExpression) -> Pointer | None:
+        """Return a pointer to the passed expression if its value is already stored somewhere (None otherwise)."""
+        match expression:
+            case TypedIdentifier(location=location, name=name):
+                variable = self.get_name(location, name)
+                return self.pointer(variable.index, expression.type())
+            case TypedArraySubscriptExpression(array=array, index=index):
+                array_pointer = self.get_pointer(array)
+                if array_pointer is None:
+                    return None
+                base_type_size = expression.type().size()
+                return self.pointer(array_pointer.index + index * base_type_size, expression.type())
+            case TypedArraySlicingExpression(array=array, start=start):
+                array_pointer = self.get_pointer(array)
+                if array_pointer is None:
+                    return None
+                base_type_size = expression.type().size()
+                return self.pointer(array_pointer.index + start * base_type_size, expression.type())
+        return None
+
     def evaluate_in_new_variable(self, expression: TypedExpression, *, read_only: bool = False) -> Name:
         """
         Evaluate the passed expression in a new variable.
-        If `read_only` is True, it might be a pointer to another variable that already contains this value.
+        If `read_only` is True, it might be a pointer to a cell that already contains this value.
         """
-        if read_only and isinstance(expression, TypedIdentifier):
-            variable = self.get_name(expression.location, expression.name)
-            return self.pointer(variable.index, variable.type)
+        if read_only:
+            pointer = self.get_pointer(expression)
+            if pointer is not None:
+                return pointer
         variable = self.variable(expression.type())
         self.evaluate(expression, variable.index)
         return variable
