@@ -192,7 +192,7 @@ class BinaryArithmeticExpression(ArithmeticExpression):
 
 
 class ArraySubscriptExpression(Expression):
-    def __init__(self, location: Location, array: Expression, index: int) -> None:
+    def __init__(self, location: Location, array: Expression, index: Expression) -> None:
         super().__init__(location)
         self.array = array
         self.index = index
@@ -205,7 +205,7 @@ class ArraySubscriptExpression(Expression):
 
 
 class ArraySlicingExpression(Expression):
-    def __init__(self, location: Location, array: Expression, start: int, stop: int) -> None:
+    def __init__(self, location: Location, array: Expression, start: Expression, stop: Expression) -> None:
         super().__init__(location)
         self.array = array
         self.start = start

@@ -316,9 +316,9 @@ class ASTGenerator:
         # Subscripts / slices
         while self._is_next(OpenBracketToken):
             self._expect(OpenBracketToken)
-            index = self._expect(NumericLiteral).value
+            index = self.parse_expression()
             if self._eat(ColonToken):
-                end = self._expect(NumericLiteral).value
+                end = self.parse_expression()
                 self._expect(CloseBracketToken)
                 operand = ArraySlicingExpression(self._location_from(start_location), operand, index, end)
             else:

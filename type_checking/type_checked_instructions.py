@@ -135,6 +135,104 @@ class TypedExpression(TypeCheckedInstruction, ABC):
         ...
 
 
+Value = int | list['Value'] | tuple['Value', ...]
+
+
+def value_of(expression: TypedExpression) -> Value:
+    if isinstance(expression, LiteralChar):
+        return expression.value
+    if isinstance(expression, LiteralArray):
+        return [value_of(element) for element in expression.value]
+    if isinstance(expression, LiteralTuple):
+        return tuple(value_of(element) for element in expression.elements)
+    raise CompilerException('Unable to get value from non-literal types at compile time')
+
+
+def expression_of(location: Location, value: Value) -> TypedExpression:
+    if isinstance(value, bool):
+        return LiteralChar(location, int(value))
+    if isinstance(value, int):
+        return LiteralChar(location, value)
+    if isinstance(value, list):
+        return LiteralArray(location, [expression_of(location, element) for element in value])
+    if isinstance(value, tuple):
+        return LiteralTuple(location, [expression_of(location, element) for element in value])
+    raise CompilerException(f'Invalid Python equivalent: {value!r}')
+
+
+def compute_unary_operation(operation: UnaryOperation, operand: Value) -> Value:
+    match operation:
+        case NegationOperation():
+            return int(not operand)
+        case BoolNormalizationOperation():
+            return int(bool(operand))
+        case OppositionOperation():
+            return -operand
+        case ArrayOppositionOperation():
+            return [-element for element in operand]
+    raise CompilerException(f'Unknown unary operation: {operation!r}')
+
+
+def compute_binary_operation(operation: BinaryOperation, left: Value, right: Value) -> Value:
+    match operation:
+        case EqualityTestOperation():
+            return int(left == right)
+        case DifferenceTestOperation():
+            return int(left != right)
+        case StrictInequalityTestOperation():
+            return int(left < right)
+        case LargeInequalityTestOperation():
+            return int(left <= right)
+        case InverseStrictInequalityTestOperation():
+            return int(left > right)
+        case InverseLargeInequalityTestOperation():
+            return int(left >= right)
+        case ConjunctionOperation():
+            return int(left and right)
+        case DisjunctionOperation():
+            return int(left or right)
+        case AdditionOperation():
+            return left + right
+        case SubtractionOperation():
+            return left - right
+        case MultiplicationOperation():
+            return left * right
+        case DivisionOperation():
+            return left // right
+        case ModuloOperation():
+            return left % right
+        case ConcatenationOperation():
+            return left + right
+        case ArrayScalingOperation():
+            return [left * element for element in right]
+    raise CompilerException(f'Unknown binary operation: {operation!r}')
+
+
+def evaluate(constants: dict[str, TypedExpression], expression: Expression) -> TypedExpression:
+    match expression:
+        case ConstantReference(identifier=identifier):
+            return constants[identifier]
+        case Char() as char:
+            return LiteralChar.from_char(char)
+        case Array(location=location, value=value):
+            return LiteralArray(location, [evaluate(constants, element) for element in value])
+        case Tuple(location=location, elements=elements):
+            return LiteralTuple(location, [evaluate(constants, element) for element in elements])
+        case UnaryArithmeticExpression(location=location, operator=operator, operand=operand):
+            typed_operand = evaluate(constants, operand)
+            operation = UnaryOperation.from_operator(location, operator, typed_operand.type())
+            result = compute_unary_operation(operation, value_of(typed_operand))
+            return expression_of(location, result)
+        case BinaryArithmeticExpression(location=location, operator=operator, left=left, right=right):
+            typed_left = evaluate(constants, left)
+            typed_right = evaluate(constants, right)
+            operation = BinaryOperation.from_operator(location, operator, typed_left.type(), typed_right.type())
+            result = compute_binary_operation(operation, value_of(typed_left), value_of(typed_right))
+            return expression_of(location, result)
+    message = f'Invalid expression type for compile time evaluation: {expression.__class__.__name__}'
+    raise CompilationException(expression.location, message)
+
+
 class LiteralChar(TypedExpression):
     @classmethod
     def from_char(cls, char: Char) -> 'LiteralChar':
@@ -374,7 +472,10 @@ class TypedArraySubscriptExpression(TypedExpression):
     def __init__(self, context: SubroutineTypingContext, array_subscript_expression: ArraySubscriptExpression) -> None:
         super().__init__(array_subscript_expression.location)
         self.array = TypedExpression.from_expression(context, array_subscript_expression.array)
-        self.index = array_subscript_expression.index
+        index = evaluate(context.namespace.constants, array_subscript_expression.index)
+        if not isinstance(index, LiteralChar):
+            raise CompilationException(index.location, f'Invalid expression type for array subscript: {index.type()}')
+        self.index = index.value
         # Type checking
         array_type = self.array.type()
         if not isinstance(array_type, ArrayType):
@@ -403,8 +504,14 @@ class TypedArraySlicingExpression(TypedExpression):
     def __init__(self, context: SubroutineTypingContext, array_slicing_expression: ArraySlicingExpression) -> None:
         super().__init__(array_slicing_expression.location)
         self.array = TypedExpression.from_expression(context, array_slicing_expression.array)
-        self.start = array_slicing_expression.start
-        self.stop = array_slicing_expression.stop
+        start = evaluate(context.namespace.constants, array_slicing_expression.start)
+        if not isinstance(start, LiteralChar):
+            raise CompilationException(start.location, f'Invalid expression type for array index: {start.type()}')
+        self.start = start.value
+        stop = evaluate(context.namespace.constants, array_slicing_expression.stop)
+        if not isinstance(stop, LiteralChar):
+            raise CompilationException(stop.location, f'Invalid expression type for array index: {stop.type()}')
+        self.stop = stop.value
         # Type checking
         array_type = self.array.type()
         if not isinstance(array_type, ArrayType):
@@ -735,8 +842,8 @@ class TypeCheckedContextSnapshot(TypeCheckedInstruction):
         return f'{self.__class__.__name__}'
 
 
-__all__ = ['TypeCheckedInstruction', 'TypeCheckedInstructionBlock', 'TypedExpression', 'LiteralChar', 'LiteralArray',
-           'TypedForLoopIterator', 'TypedArrayComprehension', 'LiteralTuple', 'TypedIdentifier',
+__all__ = ['TypeCheckedInstruction', 'TypeCheckedInstructionBlock', 'TypedExpression', 'evaluate', 'LiteralChar',
+           'LiteralArray', 'TypedForLoopIterator', 'TypedArrayComprehension', 'LiteralTuple', 'TypedIdentifier',
            'TypedArithmeticExpression', 'TypedUnaryArithmeticExpression', 'TypedBinaryArithmeticExpression',
            'TypedArraySubscriptExpression', 'TypedArraySlicingExpression', 'PrintCall', 'InputCall',
            'TypeCheckedProcedureCall', 'TypedFunctionCall', 'TypeCheckedIncrementation', 'TypeCheckedDecrementation',
