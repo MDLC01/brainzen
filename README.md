@@ -1,16 +1,18 @@
+# Brainzen
+
 **Brainzen** is a programming language that compiles to Brainfuck. It has a C-like syntax and allows you to perform arithmetic and manipulate basic objects like numbers, strings and arrays.
 
-# Brainfuck
+## About Brainfuck
 
 Brainfuck is an extremely basic programming language created by Urban Müller in 1993. A Brainfuck program consists of a string of characters each representing a command (or a comment). For the list of available commands, see [the Wikipedia article on Brainfuck](https://en.wikipedia.org/wiki/Brainfuck#Commands). Unlike most languages, there is no official specification for Brainfuck. This means behavior may vary slightly between interpreters. Brainzen uses the original interpreter as the definition of Brainfuck, with the exception that the array is expected to be infinitely expandable to the right (which allows for [Turing-completeness](https://en.wikipedia.org/wiki/Turing_completeness)), although it is not required that the pointer is able to access cells to the left of its starting position. It is also important to note (although this is the behavior of the original interpreter) that numbers are expected to be 8-bit integers, and overflows should result in a wrap around.
 
-# Brainzen
+## Brainzen
 
-## Specification
+### Specification
 
 Brainzen does not have an official specification yet. You can consider the compiler as the definition of the language (bugs aside). However, the language is currently under heavy development, so everything is bound to change at any time (including syntax and major features).
 
-## Features
+### Features
 
 Here is a non-exhaustive list of major available features:
 
@@ -20,7 +22,7 @@ Here is a non-exhaustive list of major available features:
 - Types (characters, static arrays and [product types](https://en.wikipedia.org/wiki/Product_type));
 - Namespaces.
 
-## Considered features
+### Considered features
 
 Here is a list of considered features in arbitrary order (this list is *not* commitment, merely an indication of where the language is heading):
 
@@ -42,11 +44,11 @@ There are also some features that will likely never be added to the language, be
 - Dynamic arrays (including arrays of arbitrary size);
 - Any form of interaction with the operating system (due to the limitations related to the nature of Brainfuck).
 
-## Code examples
+### Code examples
 
 This section contains examples of basic programs and subroutines written in Brainzen.
 
-### Hello world
+#### Hello world
 
 ```brainzen
 proc main() {
@@ -54,7 +56,7 @@ proc main() {
 }
 ```
 
-### Print numbers in base 10
+#### Print numbers in base 10
 
 The following procedure prints the passed number in base 10.
 
@@ -69,7 +71,7 @@ proc print10(char n) {
 }
 ```
 
-### Truth machine
+#### Truth machine
 
 ```braiznen
 proc main() {
@@ -82,7 +84,7 @@ proc main() {
 }
 ```
 
-### Fibonacci
+#### Fibonacci
 
 The following function computes the `n`th number of the [Fibonacci sequence](https://en.wikipedia.org/wiki/Fibonacci_number).
 
@@ -99,7 +101,7 @@ func fibonacci(char n) -> char {
 }
 ```
 
-### Fizz Buzz
+#### Fizz Buzz
 
 ```brainzen
 proc fizzbuzz(char n) {
@@ -120,14 +122,14 @@ proc fizzbuzz(char n) {
 }
 ```
 
-# Contributing
+## Contributing
 
 This is a personal project I want to lead myself. As such, I will likely not be accepting pull requests. But feel free to clone the project and fork it if you wish.
 
-## Project structure
+### Project structure
 
 The current project structure is far from optimal, but structuring a Python project is a real pain. So it's not the priority at the moment to have a better project structure.
 
-# License
+## License
 
 This project is not yet licensed. The general guideline is to always link to this GitHub repo if you use it somewhere (although I have trouble understanding why anyone would do that).
