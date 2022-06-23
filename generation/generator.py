@@ -948,7 +948,9 @@ class SubroutineCompiler(NameManager):
 def generate_namespace_context(namespace: TypeCheckedNamespace, global_context: Context = Context.empty()) -> 'Context':
     context = Context.with_global(global_context)
     for element in namespace:
-        if isinstance(element, TypeCheckedNamespace):
+        if isinstance(element, TypeCheckedConstant):
+            pass
+        elif isinstance(element, TypeCheckedNamespace):
             namespace_context = generate_namespace_context(element, context)
             context = context.with_namespace(element.identifier, namespace_context)
         elif isinstance(element, TypeCheckedSubroutine):

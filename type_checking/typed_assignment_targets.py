@@ -3,12 +3,12 @@ from abc import ABC, abstractmethod
 from data_types import ArrayType, DataType, ProductType
 from exceptions import *
 from intermediate_representation.assignment_targets import *
-from type_checking.typing_context import SubroutineTypingContext
+from type_checking.typing_context import CodeBlockTypingContext
 
 
 class TypedAssignmentTarget(ABC):
     @classmethod
-    def from_assignment_target(cls, context: SubroutineTypingContext,
+    def from_assignment_target(cls, context: CodeBlockTypingContext,
                                assignment_target: AssignmentTarget) -> 'TypedAssignmentTarget':
         match assignment_target:
             case PrimitiveAssignmentTarget() as primitive_assignment_target:
@@ -35,7 +35,7 @@ class TypedAssignmentTarget(ABC):
 
 class TypedPrimitiveAssignmentTarget(TypedAssignmentTarget):
     @classmethod
-    def from_primitive_assignment_target(cls, context: SubroutineTypingContext,
+    def from_primitive_assignment_target(cls, context: CodeBlockTypingContext,
                                          target: PrimitiveAssignmentTarget) -> 'TypedPrimitiveAssignmentTarget':
         location = target.location
         subscripts: list[tuple[Location, int]] = []
@@ -47,7 +47,7 @@ class TypedPrimitiveAssignmentTarget(TypedAssignmentTarget):
             raise ImpossibleException(f'Unknown primitive assignment target type: {target.__class__.__name__}')
         return cls(context, location, target.identifier, subscripts)
 
-    def __init__(self, context: SubroutineTypingContext, location: Location, identifier: str,
+    def __init__(self, context: CodeBlockTypingContext, location: Location, identifier: str,
                  subscripts: list[tuple[Location, int]]) -> None:
         super().__init__(location)
         self.identifier = identifier
@@ -78,13 +78,13 @@ class TypedPrimitiveAssignmentTarget(TypedAssignmentTarget):
 
 class TypedTupleAssignmentTarget(TypedAssignmentTarget):
     @classmethod
-    def of(cls, context: SubroutineTypingContext, location: Location,
+    def of(cls, context: CodeBlockTypingContext, location: Location,
            elements: list[AssignmentTarget]) -> 'TypedAssignmentTarget':
         if len(elements) == 1:
             return TypedAssignmentTarget.from_assignment_target(context, elements[0])
         return cls(context, location, elements)
 
-    def __init__(self, context: SubroutineTypingContext, location: Location, elements: list[AssignmentTarget]) -> None:
+    def __init__(self, context: CodeBlockTypingContext, location: Location, elements: list[AssignmentTarget]) -> None:
         super().__init__(location)
         self.elements = [TypedAssignmentTarget.from_assignment_target(context, element) for element in elements]
         if len(self.elements) < 2:

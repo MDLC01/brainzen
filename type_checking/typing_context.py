@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from data_types import DataType
 from exceptions import *
@@ -6,14 +6,19 @@ from intermediate_representation import SubroutineArgument
 from reference import Reference
 
 
+if TYPE_CHECKING:
+    from type_checked_instructions import TypedExpression
+
+
 class SubroutineSignature:
-    __slots__ = 'location', 'is_private', 'arguments', 'return_type'
+    __slots__ = 'location', 'is_private', 'arguments', 'arguments_by_name', 'return_type'
 
     def __init__(self, location: Location, is_private: bool, arguments: list[SubroutineArgument],
                  return_type: DataType | None = None) -> None:
         self.location = location
         self.is_private = is_private
         self.arguments = arguments
+        self.arguments_by_name = {argument.identifier: argument.type for argument in self.arguments}
         self.return_type = return_type
 
     def get_argument_types(self) -> list[DataType]:
@@ -29,82 +34,128 @@ class SubroutineSignature:
         return f'({arguments}) -> void'
 
 
-class SubroutineTypingContext:
-    class Scope:
-        def __init__(self, parent: Optional['SubroutineTypingContext.Scope'] = None) -> None:
-            self.parent: SubroutineTypingContext.Scope | None = parent
-            self.variables: dict[str, DataType] = {}
+class NamespaceTypingContext:
+    __slots__ = 'identifier', 'parent', 'namespaces', 'constants', 'subroutines'
 
-        def __getitem__(self, identifier: str) -> DataType:
-            if identifier in self.variables:
-                return self.variables[identifier]
-            if self.parent is not None:
-                return self.parent[identifier]
-            raise CompilerException(f'Variable {identifier!r} is not defined')
+    def __init__(self, identifier: str, parent: Optional['NamespaceTypingContext'] = None) -> None:
+        self.identifier = identifier
+        self.parent = parent
+        self.namespaces: dict[str, 'NamespaceTypingContext'] = {}
+        self.constants: dict[str, TypedExpression] = {}
+        self.subroutines: dict[str, SubroutineSignature] = {}
 
-        def get_variable_type(self, location: Location, identifier: str) -> DataType:
-            try:
-                return self[identifier]
-            except CompilerException as e:
-                raise CompilationException(location, e.message)
+    def get_namespace(self, reference: Reference | None) -> 'NamespaceTypingContext':
+        if reference is None:
+            return self
+        parent = self.get_namespace(reference.namespace)
+        if reference.identifier in parent.namespaces:
+            return parent.namespaces[reference.identifier]
+        if self.parent is not None:
+            return self.parent.get_namespace(reference)
+        raise CompilationException(reference.location, f'Unknown namespace: {reference}')
 
-        def __setitem__(self, identifier: str, variable_type: DataType):
-            self.variables[identifier] = variable_type
+    def get_constant_value(self, reference: Reference) -> 'TypedExpression':
+        namespace = self.get_namespace(reference.namespace)
+        if reference.identifier in namespace.constants:
+            return namespace.constants[reference.identifier]
+        if self.parent is not None:
+            return self.parent.get_constant_value(reference)
+        raise CompilationException(reference.location, f'Unknown constant: #{reference}')
 
-        def make_child(self) -> 'SubroutineTypingContext.Scope':
-            """Create a child scope that inherit variables from this scope."""
-            return self.__class__(self)
+    def get_subroutine_signature(self, reference: Reference) -> SubroutineSignature:
+        namespace = self.get_namespace(reference.namespace)
+        if reference.identifier in namespace.subroutines:
+            return namespace.subroutines[reference.identifier]
+        if self.parent is not None:
+            return self.parent.get_subroutine_signature(reference)
+        raise CompilationException(reference.location, f'Unknown subroutine: {reference}')
 
-        def is_shadow(self, identifier: str) -> bool:
-            """Test if the passed identifier shadows a variable from an outer scope."""
-            if self.parent is None:
-                return False
-            return identifier in self.parent
+    def register_constant(self, identifier: str, expression: 'TypedExpression') -> None:
+        """Register a constant value."""
+        self.constants[identifier] = expression
 
-        def __contains__(self, identifier: str):
-            if identifier in self.variables:
-                return True
-            if self.parent is not None:
-                return identifier in self.parent
-            return False
+    def namespace(self, identifier: str) -> 'NamespaceTypingContext':
+        """Create a context for a child namespace."""
+        return NamespaceTypingContext(identifier, self)
 
-    def __init__(self, namespace: 'TypeCheckedNamespace', signature: SubroutineSignature) -> None:
+    def register_namespace(self, identifier: str, namespace: 'NamespaceTypingContext') -> None:
+        """Register a child namespace."""
+        self.namespaces[identifier] = namespace
+
+    def subroutine(self, identifier: str, signature: SubroutineSignature) -> 'SubroutineTypingContext':
+        """Create a context for a subroutine."""
+        return SubroutineTypingContext(self, identifier, signature)
+
+    def register_subroutine(self, identifier: str, signature: SubroutineSignature) -> None:
+        """Register a subroutine."""
+        self.subroutines[identifier] = signature
+
+    def __enter__(self) -> 'NamespaceTypingContext':
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.parent.register_namespace(self.identifier, self)
+
+
+class CodeBlockTypingContext:
+    __slots__ = 'namespace', 'return_type', 'parent', 'variables'
+
+    def __init__(self, namespace: NamespaceTypingContext, parent: Optional['CodeBlockTypingContext'] = None, *,
+                 return_type: DataType | None = None) -> None:
+        """Private constructor"""
         self.namespace = namespace
-        self.signature = signature
-        self.variables = self.Scope()
+        self.return_type = return_type
+        self.parent = parent
+        self.variables: dict[str, DataType] = {}
 
-    def expected_return_type(self) -> DataType | None:
-        return self.signature.return_type
+    def __contains__(self, identifier: str) -> bool:
+        if identifier in self.variables:
+            return True
+        if self.parent is not None:
+            return identifier in self.parent
+        return False
 
-    def get_subroutine_argument_types(self, location: Location, reference: Reference) -> list[DataType]:
-        return self.namespace.get_subroutine_signature(reference).get_argument_types()
-
-    def get_function_return_type(self, location: Location, reference: Reference) -> DataType:
-        signature = self.namespace.get_subroutine_signature(reference)
-        if not signature.is_function():
-            raise CompilationException(location, f'Subroutine {reference} is not a function')
-        return signature.return_type
-
-    def get_variable_type(self, location: Location, identifier: str) -> DataType:
+    def __getitem__(self, identifier: str) -> DataType:
         if identifier in self.variables:
             return self.variables[identifier]
-        raise CompilationException(location, f'Variable {identifier!r} is not defined')
+        if self.parent is not None:
+            return self.parent[identifier]
+        raise CompilerException(f'Unknown identifier: {identifier!r}')
 
-    def add_variable(self, location: Location, identifier: str, variable_type: DataType) -> None:
-        if self.variables.is_shadow(identifier):
-            CompilationWarning.add(location, f'Declaration of {identifier!r} shadows variable from outer scope')
-        elif identifier in self.variables:
-            CompilationWarning.add(location, f'Redeclaration of variable {identifier!r}')
+    def register_variable(self, identifier: str, variable_type: DataType) -> None:
         self.variables[identifier] = variable_type
 
-    def open_scope(self) -> None:
-        self.variables = self.variables.make_child()
+    def get_variable_type(self, location: Location, identifier: str) -> DataType:
+        if identifier in self:
+            return self[identifier]
+        raise CompilationException(location, f'Variable {identifier!r} does not exist')
 
-    def close_scope(self) -> None:
-        self.variables = self.variables.parent
+    def is_shadow(self, identifier: str) -> bool:
+        """Test if the passed identifier shadows a variable from an outer scope."""
+        if self.parent is None:
+            return False
+        return identifier in self.parent
 
-    def __repr__(self) -> str:
-        return repr(self.__dict__)
+    def subscope(self, *, allow_return: bool = False) -> 'CodeBlockTypingContext':
+        return_type = self.return_type if allow_return else None
+        return CodeBlockTypingContext(self.namespace, self, return_type=return_type)
 
 
-__all__ = ['SubroutineArgument', 'SubroutineSignature', 'SubroutineTypingContext']
+class SubroutineTypingContext(CodeBlockTypingContext):
+    __slots__ = 'identifier', 'signature'
+
+    def __init__(self, namespace: NamespaceTypingContext, identifier: str, signature: SubroutineSignature) -> None:
+        super().__init__(namespace, return_type=signature.return_type)
+        self.identifier = identifier
+        self.signature = signature
+        for argument in self.signature.arguments:
+            self.variables[argument.identifier] = argument.type
+
+    def __enter__(self) -> 'SubroutineTypingContext':
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.namespace.register_subroutine(self.identifier, self.signature)
+
+
+__all__ = ['SubroutineArgument', 'SubroutineSignature', 'NamespaceTypingContext', 'CodeBlockTypingContext']

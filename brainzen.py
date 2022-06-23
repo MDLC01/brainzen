@@ -13,7 +13,7 @@ def compile_source_code(source_code: str, file_name: str, *, main_procedure: str
                         verbose_level: int = CommentLevel.BZ_CODE) -> str:
     tokens = Tokenizer(file_name, source_code).tokenize()
     ast = ASTGenerator(Location.in_file(file_name), tokens).generate()
-    typed_ast = TypeCheckedNamespace(ast)
+    typed_ast = TypeCheckedNamespace.from_file(ast)
     main_procedure_reference = Reference.from_string(main_procedure)
     return generate_program(typed_ast, main_procedure_reference, comment_level=verbose_level)
 
