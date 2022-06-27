@@ -92,8 +92,8 @@ class TypedExpression(TypeCheckedInstruction, ABC):
     @staticmethod
     def from_expression(context: CodeBlockTypingContext, expression: Expression) -> 'TypedExpression':
         match expression:
-            case ConstantReference(location=location, identifier=identifier):
-                return context.namespace.get_constant_value(Reference(location, identifier))
+            case ConstantReference(reference=reference):
+                return context.namespace.get_constant_value(reference)
             case Char() as char:
                 return LiteralChar.from_char(char)
             case Array() as array:
@@ -202,8 +202,8 @@ def compute_binary_operation(operation: BinaryOperation, left: Value, right: Val
 
 def evaluate(context: NamespaceTypingContext, expression: Expression) -> TypedExpression:
     match expression:
-        case ConstantReference(location=location, identifier=identifier):
-            return context.get_constant_value(Reference(location, identifier))
+        case ConstantReference(reference=reference):
+            return context.get_constant_value(reference)
         case Char() as char:
             return LiteralChar.from_char(char)
         case Array(location=location, value=value):

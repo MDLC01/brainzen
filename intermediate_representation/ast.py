@@ -287,8 +287,8 @@ class ASTGenerator:
             return value
         # Constant
         if self._eat(HashToken):
-            identifier = self._expect(IdentifierToken).name
-            return ConstantReference(self._location_from(start_location), identifier)
+            reference = self.parse_reference()
+            return ConstantReference(self._location_from(start_location), reference)
         # Function call
         if self._is_next(IdentifierToken) and (self._is_next(OpenParToken, 1) or self._is_next(DoubleColonToken, 1)):
             reference = self.parse_reference()

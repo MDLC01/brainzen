@@ -52,15 +52,15 @@ class Expression(Instruction, ABC):
 class ConstantReference(Expression):
     """A reference to a constant."""
 
-    def __init__(self, location: Location, identifier: str) -> None:
+    def __init__(self, location: Location, reference: Reference) -> None:
         super().__init__(location)
-        self.identifier = identifier
+        self.reference = reference
 
     def __str__(self) -> str:
-        return f'#{self.identifier}'
+        return f'#{self.reference}'
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.identifier}]'
+        return f'{self.__class__.__name__}[{self.reference}]'
 
 
 class Char(Expression):
