@@ -156,15 +156,16 @@ class SubroutineCompiler(NameManager):
         else:
             self._increment(index, count=value)
 
-    def _goto(self, index: int | None) -> None:
+    def _goto(self, index: int | None) -> int:
         """Move the pointer to the passed index (relative to the starting index of the subroutine)."""
         if index is None:
-            return
+            return self.index
         delta = index - self.index
         if delta < 0:
             self._left(-delta)
         else:
             self._right(delta)
+        return index
 
     def _move(self, destinations: set[int], source: int | None = None, *, block_size: int = 1) -> None:
         """Destructively add the content of the current cell to the destination cells."""
@@ -602,9 +603,7 @@ class SubroutineCompiler(NameManager):
 
     def evaluate_array_comprehension(self, element_format: TypedExpression, iterators: TypedIteratorChain,
                                      index: int | None = None) -> None:
-        if index is None:
-            index = self.index
-        self._goto(index)
+        index = self._goto(index)
         count = iterators.count()
         with self.scope():
             variables = []
@@ -635,9 +634,7 @@ class SubroutineCompiler(NameManager):
 
     def evaluate(self, expression: TypedExpression, index: int | None = None) -> None:
         """Evaluate the passed expression at the current location (or `index` if specified)."""
-        if index is None:
-            index = self.index
-        self._goto(index)
+        index = self._goto(index)
         match expression:
             case LiteralChar(value=value):
                 self._set(value)
