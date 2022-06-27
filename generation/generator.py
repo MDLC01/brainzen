@@ -600,29 +600,38 @@ class SubroutineCompiler(NameManager):
                     raise ImpossibleException(f'Unknown binary operation: {operation!r}')
         self._goto(index)
 
-    def evaluate_array_comprehension(self, element_format: TypedExpression, iterators: list[TypedForLoopIterator],
+    def evaluate_array_comprehension(self, element_format: TypedExpression, iterators: TypedIteratorChain,
                                      index: int | None = None) -> None:
         if index is None:
             index = self.index
         self._goto(index)
-        count = iterators[0].count
+        count = iterators.count()
         with self.scope():
-            # Evaluate arrays and declare loop variables
             variables = []
-            for iterator in iterators:
+            group = iterators.groups[-1]
+            # Prepare iterators
+            for iterator in group.iterators:
+                if not isinstance(iterator, TypedArrayIterator):
+                    raise ImpossibleException(f'Unknown iterator type: {iterator.__class__.__name__}')
                 # There is no need to copy the entire array if it already exists
                 if isinstance(iterator.array, TypedIdentifier):
                     array = self.get_name(iterator.array.location, iterator.array.name)
                 else:
                     array = self.scoped_variable(iterator.array.type())
                     self.evaluate(iterator.array, array.index)
-                variables.append(self.scoped_pointer(array.index, iterator.type, iterator.variable))
+                variables.append(self.scoped_pointer(array.index, iterator.type(), iterator.variable))
             # Run loop
             for i in range(count):
-                self.evaluate(element_format, index + i * element_format.type().size())
+                if len(iterators.groups) == 1:
+                    offset = element_format.type().size()
+                    self.evaluate(element_format, index + i * offset)
+                else:
+                    chain = TypedIteratorChain(iterators.location, iterators.groups[:-1])
+                    offset = element_format.type().size() * chain.count()
+                    self.evaluate_array_comprehension(element_format, chain, index + i * offset)
                 # Update loop variable indices
                 for variable in variables:
-                    variable.update_index(variable.index + variable.type.size())
+                    variable.update_index(variable.index + variable.size())
 
     def evaluate(self, expression: TypedExpression, index: int | None = None) -> None:
         """Evaluate the passed expression at the current location (or `index` if specified)."""
@@ -814,25 +823,27 @@ class SubroutineCompiler(NameManager):
             self.evaluate(test, condition.index)
             self._loop_end()
 
-    def for_loop(self, iterators: list[TypedForLoopIterator], body: TypeCheckedInstructionBlock) -> None:
-        count = iterators[0].count
+    def for_loop(self, iterators: TypedIteratorGroup, body: TypeCheckedInstructionBlock) -> None:
+        count = iterators.count()
         with self.scope():
             # Evaluate arrays and declare loop variables
             variables = []
-            for iterator in iterators:
+            for iterator in iterators.iterators:
+                if not isinstance(iterator, TypedArrayIterator):
+                    raise ImpossibleException(f'Unknown iterator type: {iterator.__class__.__name__}')
                 # Mutating the loop variable should mutate the corresponding element in the array.
                 if isinstance(iterator.array, TypedIdentifier):
                     array = self.get_name(iterator.array.location, iterator.array.name)
                 else:
                     array = self.scoped_variable(iterator.array.type())
                     self.evaluate(iterator.array, array.index)
-                variables.append(self.scoped_pointer(array.index, iterator.type, iterator.variable))
+                variables.append(self.scoped_pointer(array.index, iterator.type(), iterator.variable))
             # Run loop
             for i in range(count):
                 self.compile_instruction(body)
                 # Update loop variable indices
                 for variable in variables:
-                    variable.update_index(variable.index + variable.type.size())
+                    variable.update_index(variable.index + variable.size())
 
     def condition(self, test: TypedExpression, if_body: TypeCheckedInstructionBlock,
                   else_body: TypeCheckedInstructionBlock) -> None:

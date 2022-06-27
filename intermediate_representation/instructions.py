@@ -96,12 +96,27 @@ class Array(Expression):
         return f'{self.__class__.__name__}[{self.value!r}]'
 
 
-class ForLoopIterator:
-    __slots__ = 'location', 'variable', 'array'
+class Iterator(ABC):
+    __slots__ = 'location', 'variable'
 
-    def __init__(self, location: Location, variable: str, array: Expression) -> None:
+    def __init__(self, location: Location, variable: str) -> None:
         self.location = location
         self.variable = variable
+
+    @abstractmethod
+    def __str__(self) -> str:
+        ...
+
+    @abstractmethod
+    def __repr__(self) -> str:
+        ...
+
+
+class ArrayIterator(Iterator):
+    __slots__ = 'array'
+
+    def __init__(self, location: Location, variable: str, array: Expression) -> None:
+        super().__init__(location, variable)
         self.array = array
 
     def __str__(self) -> str:
@@ -111,15 +126,44 @@ class ForLoopIterator:
         return f'{self.__class__.__name__}[{self.variable!r}, {self.array!r}]'
 
 
+class IteratorGroup:
+    __slots__ = 'location', 'iterators'
+
+    def __init__(self, location: Location, iterators: list[Iterator]) -> None:
+        self.location = location
+        self.iterators = iterators
+
+    def __str__(self) -> str:
+        return ', '.join(iterator.__str__() for iterator in self.iterators)
+
+    def __repr__(self) -> str:
+        iterators = ', '.join(iterator.__repr__() for iterator in self.iterators)
+        return f'{self.__class__.__name__}[{iterators}]'
+
+
+class IteratorChain:
+    __slots__ = 'location', 'groups'
+
+    def __init__(self, location: Location, groups: list[IteratorGroup]) -> None:
+        self.location = location
+        self.groups = groups
+
+    def __str__(self) -> str:
+        return ' | '.join(group.__str__() for group in self.groups)
+
+    def __repr__(self) -> str:
+        groups = ', '.join(group.__repr__() for group in self.groups)
+        return f'{self.__class__.__name__}[{groups}]'
+
+
 class ArrayComprehension(Expression):
-    def __init__(self, location: Location, element_format: Expression, iterators: list[ForLoopIterator]) -> None:
+    def __init__(self, location: Location, element_format: Expression, iterators: IteratorChain) -> None:
         super().__init__(location)
         self.element_format = element_format
         self.iterators = iterators
 
     def __str__(self) -> str:
-        iterators = ', '.join(iterator.__str__() for iterator in self.iterators)
-        return f'[{self.element_format} | {iterators}]'
+        return f'[{self.element_format} | {self.iterators}]'
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}[{self.element_format!r}, {self.iterators!r}]'
@@ -338,14 +382,13 @@ class DoWhileLoopStatement(Instruction):
 
 
 class ForLoopStatement(Instruction):
-    def __init__(self, location: Location, iterators: list[ForLoopIterator], body: InstructionBlock) -> None:
+    def __init__(self, location: Location, iterators: IteratorGroup, body: InstructionBlock) -> None:
         super().__init__(location)
         self.iterators = iterators
         self.body = body
 
     def __str__(self) -> str:
-        loop_description = ' & '.join(str(iterator) for iterator in self.iterators)
-        return f'for ({loop_description}) line {self.location.line}'
+        return f'for ({self.iterators}) line {self.location.line}'
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}[{self.iterators!r}, {self.body!r}]'
@@ -395,9 +438,9 @@ class ContextSnapshot(Instruction):
         return f'{self.__class__.__name__}'
 
 
-__all__ = ['Instruction', 'InstructionBlock', 'Expression', 'ConstantReference', 'Char', 'Array', 'ForLoopIterator',
-           'ArrayComprehension', 'Tuple', 'Identifier', 'ArithmeticExpression', 'UnaryArithmeticExpression',
-           'BinaryArithmeticExpression', 'ArraySubscriptExpression', 'ArraySlicingExpression', 'ProcedureCall',
-           'FunctionCall', 'Incrementation', 'Decrementation', 'VariableDeclaration', 'Assignment', 'LoopStatement',
-           'WhileLoopStatement', 'DoWhileLoopStatement', 'ForLoopStatement', 'ConditionalStatement',
-           'ReturnInstruction', 'ContextSnapshot']
+__all__ = ['Instruction', 'InstructionBlock', 'Expression', 'ConstantReference', 'Char', 'Array', 'Iterator',
+           'ArrayIterator', 'IteratorGroup', 'IteratorChain', 'ArrayComprehension', 'Tuple', 'Identifier',
+           'ArithmeticExpression', 'UnaryArithmeticExpression', 'BinaryArithmeticExpression',
+           'ArraySubscriptExpression', 'ArraySlicingExpression', 'ProcedureCall', 'FunctionCall', 'Incrementation',
+           'Decrementation', 'VariableDeclaration', 'Assignment', 'LoopStatement', 'WhileLoopStatement',
+           'DoWhileLoopStatement', 'ForLoopStatement', 'ConditionalStatement', 'ReturnInstruction', 'ContextSnapshot']

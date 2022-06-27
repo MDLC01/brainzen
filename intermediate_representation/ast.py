@@ -239,22 +239,27 @@ class ASTGenerator:
                 break
         return elements
 
-    def parse_for_loop_iterator(self) -> ForLoopIterator:
+    def parse_iterator(self) -> Iterator:
         start_location = self._location()
         loop_variable = self._expect(IdentifierToken).name
         self._expect(ColonToken)
         loop_array = self.parse_binary_operation()
         iterator_location = self._location_from(start_location)
-        return ForLoopIterator(iterator_location, loop_variable, loop_array)
+        return ArrayIterator(iterator_location, loop_variable, loop_array)
 
-    def parse_for_loop_iterators(self, closing_token_type: Type[AnyToken]) -> list[ForLoopIterator]:
-        iterators = []
-        while not self._eat(closing_token_type):
-            iterators.append(self.parse_for_loop_iterator())
-            if not self._eat(CommaToken):
-                self._expect(closing_token_type)
-                break
-        return iterators
+    def parse_iterator_group(self) -> IteratorGroup:
+        start_location = self._location()
+        iterators = [self.parse_iterator()]
+        while self._eat(CommaToken):
+            iterators.append(self.parse_iterator())
+        return IteratorGroup(self._location_from(start_location), iterators)
+
+    def parse_iterator_chain(self) -> IteratorChain:
+        start_location = self._location()
+        groups = [self.parse_iterator_group()]
+        while self._eat(PipeToken):
+            groups.append(self.parse_iterator_group())
+        return IteratorChain(self._location_from(start_location), groups)
 
     def parse_array_literal_or_comprehension(self) -> Expression:
         start_location = self._location()
@@ -266,7 +271,8 @@ class ASTGenerator:
         element = self.parse_binary_operation()
         # Array comprehension
         if self._eat(PipeToken):
-            iterators = self.parse_for_loop_iterators(CloseBracketToken)
+            iterators = self.parse_iterator_chain()
+            self._expect(CloseBracketToken)
             return ArrayComprehension(self._location_from(start_location), element, iterators)
         # More than 1 element
         if self._eat(CommaToken):
@@ -456,7 +462,8 @@ class ASTGenerator:
         # For loop
         if self._eat(ForKeyword):
             self._expect(OpenParToken)
-            iterators = self.parse_for_loop_iterators(CloseParToken)
+            iterators = self.parse_iterator_group()
+            self._expect(CloseParToken)
             instructions = self.parse_instruction_block()
             return ForLoopStatement(location, iterators, instructions)
         # Conditional statement
