@@ -6,7 +6,6 @@ from exceptions import *
 from intermediate_representation.assignment_targets import *
 from intermediate_representation.instructions import *
 from reference import *
-from tokenization.operators import *
 from tokenization.tokens import *
 
 
@@ -330,8 +329,8 @@ class ASTGenerator:
 
     def parse_unary_operation(self) -> Expression:
         if self._peek().is_unary_operator():
-            token = self._next()
-            return UnaryArithmeticExpression(token.location, token.unary_operator, self.parse_unary_operation())
+            operator = self._next()
+            return UnaryArithmeticExpression(operator.location, operator, self.parse_unary_operation())
         return self.parse_operand()
 
     def parse_binary_operation(self) -> Expression:
@@ -339,13 +338,13 @@ class ASTGenerator:
         priority = Priority.PARENTHESIS
         while self._peek().is_binary_operator():
             location = self._location()
-            operator = self._next().binary_operator
+            operator = self._next()
             right = self.parse_unary_operation()
-            if isinstance(left, BinaryArithmeticExpression) and priority < operator.priority:
+            if isinstance(left, BinaryArithmeticExpression) and priority < operator.binary_operator_priority():
                 left.right = BinaryArithmeticExpression(location, operator, left.right, right)
             else:
                 left = BinaryArithmeticExpression(location, operator, left, right)
-            priority = left.operator.priority
+            priority = left.operator.binary_operator_priority()
         return left
 
     def parse_expression(self) -> Expression:
@@ -594,7 +593,7 @@ class ASTGenerator:
         # Namespace definition
         elif self._is_next(NamespaceKeyword):
             child_namespace = self.parse_namespace_definition(is_private)
-            namespace.register_namespace(child_namespace, )
+            namespace.register_namespace(child_namespace)
         # Subroutine definition
         else:
             subroutine = self.parse_subroutine_definition(is_private)

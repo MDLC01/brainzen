@@ -5,7 +5,7 @@ from data_types import DataType
 from exceptions import CompilerException, Location
 from intermediate_representation.assignment_targets import AssignmentTarget
 from reference import *
-from tokenization.operators import *
+from tokenization import Token
 
 
 class Instruction(ABC):
@@ -209,7 +209,7 @@ class ArithmeticExpression(Expression, ABC):
 
 
 class UnaryArithmeticExpression(ArithmeticExpression):
-    def __init__(self, location: Location, operator: UnaryOperator, operand: Expression) -> None:
+    def __init__(self, location: Location, operator: Token, operand: Expression) -> None:
         super().__init__(location)
         self.operator = operator
         self.operand = operand
@@ -222,7 +222,7 @@ class UnaryArithmeticExpression(ArithmeticExpression):
 
 
 class BinaryArithmeticExpression(ArithmeticExpression):
-    def __init__(self, location: Location, operator: BinaryOperator, left: Expression, right: Expression) -> None:
+    def __init__(self, location: Location, operator: Token, left: Expression, right: Expression) -> None:
         super().__init__(location)
         self.operator = operator
         self.left = left

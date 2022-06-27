@@ -2,34 +2,34 @@ from abc import ABC, abstractmethod
 
 from data_types import *
 from exceptions import *
-from tokenization.operators import UnaryOperator
+from tokenization.tokens import *
 
 
 class InvalidOperandType(CompilationException):
-    def __init__(self, location: Location, operator: UnaryOperator, operand_type: DataType) -> None:
+    def __init__(self, location: Location, operator: Token, operand_type: DataType) -> None:
         super().__init__(location, f'Invalid operand type for {operator}: {operand_type}')
 
 
 class UnaryOperation(ABC):
     @staticmethod
-    def _invalid_operand_type_exception(location: Location, operator: UnaryOperator,
+    def _invalid_operand_type_exception(location: Location, operator: Token,
                                         operand_type: DataType) -> CompilationException:
         return CompilationException(location, f'Invalid operand type for {operator}: {operand_type}')
 
     @classmethod
-    def from_operator(cls, location: Location, operator: UnaryOperator, operand_type: DataType) -> 'UnaryOperation':
+    def from_operator(cls, location: Location, operator: Token, operand_type: DataType) -> 'UnaryOperation':
         # !
-        if operator is UnaryOperator.BANG:
+        if isinstance(operator, BangToken):
             if operand_type == Types.CHAR:
                 return NegationOperation()
             raise InvalidOperandType(location, operator, operand_type)
         # !!
-        if operator is UnaryOperator.DOUBLE_BANG:
+        if isinstance(operator, DoubleBangToken):
             if operand_type == Types.CHAR:
                 return BoolNormalizationOperation()
             raise InvalidOperandType(location, operator, operand_type)
         # -
-        if operator is UnaryOperator.MINUS:
+        if isinstance(operator, MinusToken):
             if operand_type == Types.CHAR:
                 return OppositionOperation()
             if isinstance(operand_type, ArrayType):

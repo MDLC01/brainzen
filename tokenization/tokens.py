@@ -1,7 +1,8 @@
+from abc import ABC
+from enum import IntEnum
 from typing import Type, TypeVar
 
 from exceptions import *
-from tokenization.operators import BinaryOperator, UnaryOperator
 
 
 def is_allowed_in_word(char: str) -> bool:
@@ -12,10 +13,22 @@ def is_valid_word(word: str) -> bool:
     return all(is_allowed_in_word(char) for char in word)
 
 
+class Priority(IntEnum):
+    MIN = 0
+    CONJUNCTION = 1
+    DISJUNCTION = 2
+    COMPARISON = 3
+    ADDITION = 4
+    MULTIPLICATION = 5
+    CONCATENATION = 6
+    PARENTHESIS = 254
+    MAX = 255
+
+
 AnyToken = TypeVar('AnyToken', bound='Token')
 
 
-class Token:
+class Token(ABC):
     __token_map: dict[str, Type[AnyToken]] = {}
     __keyword_map: dict[str, Type[AnyToken]] = {}
 
@@ -57,23 +70,20 @@ class Token:
         else:
             cls.keyword: str | None = None
 
-        if not hasattr(cls, 'binary_operator'):
-            cls.binary_operator: BinaryOperator | None = None
+    def is_unary_operator(self) -> bool:
+        return False
 
-        if not hasattr(cls, 'unary_operator'):
-            cls.unary_operator: UnaryOperator | None = None
+    def binary_operator_priority(self) -> Priority | None:
+        return None
+
+    def is_binary_operator(self) -> bool:
+        return self.binary_operator_priority() is not None
 
     def __init__(self, location: Location) -> None:
         self.location = location
 
     def __repr__(self) -> str:
         return self.__class__.__name__
-
-    def is_unary_operator(self) -> bool:
-        return self.unary_operator is not None
-
-    def is_binary_operator(self) -> bool:
-        return self.binary_operator is not None
 
 
 class OpenBraceToken(Token):
@@ -129,47 +139,65 @@ class DoubleMinusToken(Token):
 
 class BangToken(Token):
     token = '!'
-    unary_operator = UnaryOperator.BANG
+
+    def is_unary_operator(self) -> bool:
+        return True
 
 
 class DoubleBangToken(Token):
     token = '!!'
-    unary_operator = UnaryOperator.DOUBLE_BANG
+
+    def is_unary_operator(self) -> bool:
+        return True
 
 
 class DoubleEqualToken(Token):
     token = '=='
-    binary_operator = BinaryOperator.DOUBLE_EQUAL
+
+    def binary_operator_priority(self) -> Priority | None:
+        return Priority.COMPARISON
 
 
 class BangEqualToken(Token):
     token = '!='
-    binary_operator = BinaryOperator.BANG_EQUAL
+
+    def binary_operator_priority(self) -> Priority | None:
+        return Priority.COMPARISON
 
 
 class LessThanToken(Token):
     token = '<'
-    binary_operator = BinaryOperator.LESS_THAN
+
+    def binary_operator_priority(self) -> Priority | None:
+        return Priority.COMPARISON
 
 
 class LessThanEqualToken(Token):
     token = '<='
-    binary_operator = BinaryOperator.LESS_THAN_EQUAL
+
+    def binary_operator_priority(self) -> Priority | None:
+        return Priority.COMPARISON
 
 
 class GreaterThanToken(Token):
     token = '>'
-    binary_operator = BinaryOperator.GREATER_THAN
+
+    def binary_operator_priority(self) -> Priority | None:
+        return Priority.COMPARISON
 
 
 class GreaterThanEqualToken(Token):
     token = '>='
-    binary_operator = BinaryOperator.GREATER_THAN_EQUAL
+
+    def binary_operator_priority(self) -> Priority | None:
+        return Priority.COMPARISON
 
 
 class DoubleAmpersandToken(Token):
     token = '&&'
-    binary_operator = BinaryOperator.DOUBLE_AMPERSAND
+
+    def binary_operator_priority(self) -> Priority | None:
+        return Priority.CONJUNCTION
 
 
 class PipeToken(Token):
@@ -178,38 +206,54 @@ class PipeToken(Token):
 
 class DoublePipeToken(Token):
     token = '||'
-    binary_operator = BinaryOperator.DOUBLE_PIPE
+
+    def binary_operator_priority(self) -> Priority | None:
+        return Priority.DISJUNCTION
 
 
 class PlusToken(Token):
     token = '+'
-    binary_operator = BinaryOperator.PLUS
+
+    def binary_operator_priority(self) -> Priority | None:
+        return Priority.ADDITION
 
 
 class MinusToken(Token):
     token = '-'
-    binary_operator = BinaryOperator.MINUS
-    unary_operator = UnaryOperator.MINUS
+
+    def is_unary_operator(self) -> bool:
+        return True
+
+    def binary_operator_priority(self) -> Priority | None:
+        return Priority.ADDITION
 
 
 class StarToken(Token):
     token = '*'
-    binary_operator = BinaryOperator.STAR
+
+    def binary_operator_priority(self) -> Priority | None:
+        return Priority.MULTIPLICATION
 
 
 class SlashToken(Token):
     token = '/'
-    binary_operator = BinaryOperator.SLASH
+
+    def binary_operator_priority(self) -> Priority | None:
+        return Priority.MULTIPLICATION
 
 
 class PercentToken(Token):
     token = '%'
-    binary_operator = BinaryOperator.PERCENT
+
+    def binary_operator_priority(self) -> Priority | None:
+        return Priority.MULTIPLICATION
 
 
 class DoubleDotToken(Token):
     token = '..'
-    binary_operator = BinaryOperator.DOUBLE_DOT
+
+    def binary_operator_priority(self) -> Priority | None:
+        return Priority.CONCATENATION
 
 
 class ColonToken(Token):
@@ -379,7 +423,7 @@ class NativeCodeBlock(Token):
         return f'{self.__class__.__name__}[{self.bf_code!r}]'
 
 
-__all__ = ['is_allowed_in_word', 'is_valid_word', 'AnyToken', 'Token', 'OpenBraceToken', 'CloseBraceToken',
+__all__ = ['is_allowed_in_word', 'is_valid_word', 'Priority', 'AnyToken', 'Token', 'OpenBraceToken', 'CloseBraceToken',
            'OpenBracketToken', 'CloseBracketToken', 'OpenParToken', 'CloseParToken', 'SemicolonToken', 'CommaToken',
            'EqualToken', 'DoublePlusToken', 'DoubleMinusToken', 'BangToken', 'DoubleBangToken', 'DoubleEqualToken',
            'BangEqualToken', 'LessThanToken', 'LessThanEqualToken', 'GreaterThanToken', 'GreaterThanEqualToken',
