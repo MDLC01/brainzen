@@ -153,10 +153,6 @@ class Namespace(NamespaceElement):
         self.subroutines[identifier] = subroutine
         self.elements.append(subroutine)
 
-    def __iter__(self) -> Generator[NamespaceElement, None, None]:
-        for element in self.elements:
-            yield element
-
     def __str__(self) -> str:
         return f'{self._modifier_prefix()}namespace {self.identifier} line {self.location.line}'
 
