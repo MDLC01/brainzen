@@ -126,11 +126,6 @@ class TypedExpression(TypeCheckedInstruction, ABC):
     def type(self) -> DataType:
         ...
 
-    @abstractmethod
-    def is_known_at_compile_time(self) -> bool:
-        """Test if the value of this expression is known at compile time."""
-        ...
-
 
 Value = int | list['Value'] | tuple['Value', ...]
 
@@ -244,9 +239,6 @@ class LiteralChar(TypedExpression):
     def type(self) -> DataType:
         return Types.CHAR
 
-    def is_known_at_compile_time(self) -> bool:
-        return True
-
     def __str__(self) -> str:
         return str(self.value)
 
@@ -286,22 +278,14 @@ class LiteralArray(TypedExpression):
     def type(self) -> DataType:
         return ArrayType(self.content_type, len(self.value))
 
-    def is_known_at_compile_time(self) -> bool:
-        return all(element.is_known_at_compile_time() for element in self.value)
-
     def __str__(self) -> str:
-        # If the value is a constant string
-        if self.type().is_string() and self.is_known_at_compile_time():
-            s = '"'
-            for element in self.value:
-                if isinstance(element, LiteralChar):
-                    s += chr(element.value)
-                else:
-                    s += str(element)
-            return s + '"'
-        # If the value is not a constant string
-        elements = ', '.join(str(element) for element in self.value)
-        return f'[{elements}]'
+        s = '"'
+        for element in self.value:
+            if not isinstance(element, LiteralChar):
+                elements = ', '.join(str(element) for element in self.value)
+                return f'[{elements}]'
+            s += chr(element.value)
+        return s + '"'
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}[{self.value!r}]'
@@ -447,9 +431,6 @@ class TypedArrayComprehension(TypedExpression):
     def type(self) -> DataType:
         return ArrayType(self.element_format.type(), self.iterators.count())
 
-    def is_known_at_compile_time(self) -> bool:
-        return False
-
     def __str__(self) -> str:
         return f'[{self.element_format} | {self.iterators}]'
 
@@ -473,9 +454,6 @@ class LiteralTuple(TypedExpression):
     def type(self) -> DataType:
         return ProductType.from_operands(self.types)
 
-    def is_known_at_compile_time(self) -> bool:
-        return all(element.is_known_at_compile_time() for element in self.elements)
-
     def __str__(self) -> str:
         elements = ', '.join(str(element) for element in self.elements)
         return f'({elements})'
@@ -493,9 +471,6 @@ class TypedIdentifier(TypedExpression):
     def type(self) -> DataType:
         return self._type
 
-    def is_known_at_compile_time(self) -> bool:
-        return False
-
     def __str__(self) -> str:
         return self.name
 
@@ -504,9 +479,7 @@ class TypedIdentifier(TypedExpression):
 
 
 class TypedArithmeticExpression(TypedExpression, ABC):
-    def is_known_at_compile_time(self) -> bool:
-        # Could be True in some situation, but it would require compile time evaluation of arithmetic
-        return False
+    pass
 
 
 class TypedUnaryArithmeticExpression(TypedArithmeticExpression):
@@ -567,9 +540,6 @@ class TypedArraySubscriptExpression(TypedExpression):
     def type(self) -> DataType:
         return self._type
 
-    def is_known_at_compile_time(self) -> bool:
-        return self.array.is_known_at_compile_time()
-
     def __str__(self) -> str:
         return f'{self.array}[{self.index}]'
 
@@ -603,9 +573,6 @@ class TypedArraySlicingExpression(TypedExpression):
 
     def type(self) -> DataType:
         return ArrayType(self._type, self.stop - self.start)
-
-    def is_known_at_compile_time(self) -> bool:
-        return self.array.is_known_at_compile_time()
 
     def __str__(self) -> str:
         return f'{self.array}[{self.start}:{self.stop}]'
@@ -653,9 +620,6 @@ class InputCall(TypedExpression):
 
     def type(self) -> DataType:
         return Types.CHAR
-
-    def is_known_at_compile_time(self) -> bool:
-        return False
 
     def __str__(self) -> str:
         return f'input()'
@@ -707,9 +671,6 @@ class TypedFunctionCall(TypeCheckedProcedureCall, TypedExpression):
 
     def type(self) -> DataType:
         return self.return_type
-
-    def is_known_at_compile_time(self) -> bool:
-        return False
 
 
 class TypeCheckedIncrementation(TypeCheckedInstruction):

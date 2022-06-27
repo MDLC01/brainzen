@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Generator, Type, TypeVar
+from typing import Type, TypeVar
 
 from data_types import *
 from exceptions import *
