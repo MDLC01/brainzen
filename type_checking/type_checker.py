@@ -75,6 +75,12 @@ class TypeCheckedSubroutine(TypeCheckedNamespaceElement, ABC):
         super().__init__(location, identifier, is_private)
         self.arguments = arguments
         self.return_type = return_type
+        locations = {}
+        for argument in self.arguments:
+            if argument.identifier in locations:
+                message = f'Argument {argument.identifier!r} is already defined at {locations[argument.identifier]!r}'
+                raise CompilationException(argument.location, message)
+            locations[argument.identifier] = argument.location
 
     def is_function(self) -> bool:
         return self.return_type is not None
