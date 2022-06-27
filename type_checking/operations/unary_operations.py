@@ -35,6 +35,13 @@ class UnaryOperation(ABC):
             if isinstance(operand_type, ArrayType):
                 return ArrayOppositionOperation(operand_type.count)
             raise InvalidOperandType(location, operator, operand_type)
+        # **
+        if isinstance(operator, DoubleStarToken):
+            if isinstance(operand_type, ArrayType):
+                inner_type = operand_type.base_type
+                if isinstance(inner_type, ArrayType):
+                    return ArrayFlatteningOperation(inner_type.base_type, operand_type.count, inner_type.count)
+            raise InvalidOperandType(location, operator, operand_type)
         raise CompilerException(f'Unknown unary operator: {operator}')
 
     @abstractmethod
@@ -97,5 +104,22 @@ class ArrayOppositionOperation(UnaryOperation):
         return '-'
 
 
+class ArrayFlatteningOperation(UnaryOperation):
+    def __init__(self, base_type: DataType, outer_count: int, inner_count: int) -> None:
+        self.base_type = base_type
+        self.outer_count = outer_count
+        self.inner_count = inner_count
+
+    def operand_type(self) -> DataType:
+        inner_type = ArrayType(self.base_type, self.inner_count)
+        return ArrayType(inner_type, self.outer_count)
+
+    def type(self) -> DataType:
+        return ArrayType(self.base_type, self.outer_count * self.inner_count)
+
+    def __str__(self) -> str:
+        return '**'
+
+
 __all__ = ['UnaryOperation', 'NegationOperation', 'BoolNormalizationOperation', 'OppositionOperation',
-           'ArrayOppositionOperation']
+           'ArrayOppositionOperation', 'ArrayFlatteningOperation']

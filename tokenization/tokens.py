@@ -235,6 +235,13 @@ class StarToken(Token):
         return Priority.MULTIPLICATION
 
 
+class DoubleStarToken(Token):
+    token = '**'
+
+    def is_unary_operator(self) -> bool:
+        return True
+
+
 class SlashToken(Token):
     token = '/'
 
@@ -427,9 +434,9 @@ __all__ = ['is_allowed_in_word', 'is_valid_word', 'Priority', 'AnyToken', 'Token
            'OpenBracketToken', 'CloseBracketToken', 'OpenParToken', 'CloseParToken', 'SemicolonToken', 'CommaToken',
            'EqualToken', 'DoublePlusToken', 'DoubleMinusToken', 'BangToken', 'DoubleBangToken', 'DoubleEqualToken',
            'BangEqualToken', 'LessThanToken', 'LessThanEqualToken', 'GreaterThanToken', 'GreaterThanEqualToken',
-           'DoubleAmpersandToken', 'PipeToken', 'DoublePipeToken', 'PlusToken', 'MinusToken', 'StarToken', 'SlashToken',
-           'PercentToken', 'DoubleDotToken', 'ColonToken', 'DoubleColonToken', 'ArrowToken', 'HashToken',
-           'QuestionMarkToken', 'PrivateKeyword', 'NamespaceKeyword', 'NativeKeyword', 'TildeToken', 'ProcKeyword',
-           'FuncKeyword', 'LetKeyword', 'LoopKeyword', 'ForKeyword', 'WhileKeyword', 'DoKeyword', 'IfKeyword',
-           'ElseKeyword', 'ReturnKeyword', 'EOFToken', 'NumberLiteral', 'NumericLiteral', 'CharacterLiteral',
-           'StringLiteral', 'IdentifierToken', 'NativeCodeBlock']
+           'DoubleAmpersandToken', 'PipeToken', 'DoublePipeToken', 'PlusToken', 'MinusToken', 'StarToken',
+           'DoubleStarToken', 'SlashToken', 'PercentToken', 'DoubleDotToken', 'ColonToken', 'DoubleColonToken',
+           'ArrowToken', 'HashToken', 'QuestionMarkToken', 'PrivateKeyword', 'NamespaceKeyword', 'NativeKeyword',
+           'TildeToken', 'ProcKeyword', 'FuncKeyword', 'LetKeyword', 'LoopKeyword', 'ForKeyword', 'WhileKeyword',
+           'DoKeyword', 'IfKeyword', 'ElseKeyword', 'ReturnKeyword', 'EOFToken', 'NumberLiteral', 'NumericLiteral',
+           'CharacterLiteral', 'StringLiteral', 'IdentifierToken', 'NativeCodeBlock']

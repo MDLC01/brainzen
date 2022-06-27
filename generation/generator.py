@@ -264,6 +264,9 @@ class SubroutineCompiler(NameManager):
                 # Opposition
                 elif isinstance(operation, OppositionOperation):
                     self.compile_opposition_operation(index, operand.index)
+                # Array flattening
+                elif isinstance(operation, ArrayFlatteningOperation):
+                    self.evaluate(operand_expression, index)
                 # Unknown
                 else:
                     raise ImpossibleException(f'Unknown unary operation: {operation!r}')
