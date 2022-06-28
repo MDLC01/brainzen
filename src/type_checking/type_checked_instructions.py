@@ -22,8 +22,10 @@ class TypeCheckedInstruction(ABC):
                 return PrintCall(context, procedure_call)
             case ProcedureCall(reference=Reference(namespace=None, identifier='println')) as procedure_call:
                 return PrintCall(context, procedure_call, True)
-            case FunctionCall(reference=Reference(namespace=None, identifier='input')) as function_call:
-                return InputCall(function_call)
+            case ProcedureCall(reference=Reference(namespace=None, identifier='input')) as procedure_call:
+                return InputCall(procedure_call)
+            case ProcedureCall(reference=Reference(namespace=None, identifier='log')) as procedure_call:
+                return LogCall.from_procedure_call(context, procedure_call)
             case ProcedureCall() as procedure_call:
                 return TypeCheckedProcedureCall(context, procedure_call)
             case Incrementation() as incrementation:
@@ -118,6 +120,8 @@ class TypedExpression(TypeCheckedInstruction, ABC):
                 raise CompilationException(location, f"Procedure 'println' does not return anything")
             case FunctionCall(reference=Reference(namespace=None, identifier='input')) as function_call:
                 return InputCall(function_call)
+            case FunctionCall(location=location, reference=Reference(namespace=None, identifier='log')):
+                raise CompilationException(location, f"Procedure 'log' does not return anything")
             case FunctionCall() as function_call:
                 return TypedFunctionCall(context, function_call)
         raise ImpossibleException(f'Unknown expression type: {expression.__class__.__name__}')
@@ -598,7 +602,7 @@ class PrintCall(TypeCheckedInstruction):
             typed_argument = TypedExpression.from_expression(context, argument)
             argument_type = typed_argument.type()
             if not argument_type.is_string():
-                message = f'Procedure {self.procedure!r} only accepts string-like arguments, but found {argument_type}'
+                message = f'Subroutine {self.procedure!r} only accepts string-like arguments, but found {argument_type}'
                 raise CompilationException(argument.location, message)
             typed_arguments.append(typed_argument)
         return typed_arguments
@@ -618,7 +622,7 @@ class InputCall(TypedExpression):
         # Type checking
         arity = len(procedure_call.arguments)
         if arity > 0:
-            raise CompilationException(self.location, f"Function 'input' accepts 0 arguments, but found {arity}")
+            raise CompilationException(self.location, f"Subroutine 'input' accepts 0 arguments, but found {arity}")
 
     def type(self) -> DataType:
         return Types.CHAR
@@ -628,6 +632,26 @@ class InputCall(TypedExpression):
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}'
+
+
+class LogCall(TypeCheckedInstruction):
+    @classmethod
+    def from_procedure_call(cls, context: CodeBlockTypingContext, procedure_call: ProcedureCall) -> 'LogCall':
+        if len(procedure_call.arguments) != 1:
+            message = f"Subroutine 'log' expects a single argument, but found {len(procedure_call.arguments)}"
+            raise CompilationException(procedure_call.location, message)
+        argument = TypedExpression.from_expression(context, procedure_call.arguments[0])
+        return cls(procedure_call.location, argument)
+
+    def __init__(self, location: Location, argument: TypedExpression) -> None:
+        super().__init__(location)
+        self.argument = argument
+
+    def __str__(self) -> str:
+        return f'log({self.argument})'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.argument!r}]'
 
 
 class TypeCheckedProcedureCall(TypeCheckedInstruction):
@@ -875,8 +899,8 @@ __all__ = ['TypeCheckedInstruction', 'TypeCheckedInstructionBlock', 'TypedExpres
            'LiteralArray', 'TypedIterator', 'TypedArrayIterator', 'TypedIteratorGroup', 'TypedIteratorChain',
            'TypedArrayComprehension', 'LiteralTuple', 'TypedIdentifier', 'TypedArithmeticExpression',
            'TypedUnaryArithmeticExpression', 'TypedBinaryArithmeticExpression', 'TypedArraySubscriptExpression',
-           'TypedArraySlicingExpression', 'PrintCall', 'InputCall', 'TypeCheckedProcedureCall', 'TypedFunctionCall',
-           'TypeCheckedIncrementation', 'TypeCheckedDecrementation', 'TypeCheckedVariableDeclaration',
-           'TypeCheckedAssignment', 'TypeCheckedLoopStatement', 'TypeCheckedWhileLoopStatement',
-           'TypeCheckedDoWhileLoopStatement', 'TypeCheckedForLoopStatement', 'TypeCheckedConditionalStatement',
-           'TypeCheckedReturnInstruction', 'TypeCheckedContextSnapshot']
+           'TypedArraySlicingExpression', 'PrintCall', 'InputCall', 'LogCall', 'TypeCheckedProcedureCall',
+           'TypedFunctionCall', 'TypeCheckedIncrementation', 'TypeCheckedDecrementation',
+           'TypeCheckedVariableDeclaration', 'TypeCheckedAssignment', 'TypeCheckedLoopStatement',
+           'TypeCheckedWhileLoopStatement', 'TypeCheckedDoWhileLoopStatement', 'TypeCheckedForLoopStatement',
+           'TypeCheckedConditionalStatement', 'TypeCheckedReturnInstruction', 'TypeCheckedContextSnapshot']

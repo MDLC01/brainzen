@@ -788,6 +788,12 @@ class SubroutineCompiler(NameManager):
             case _:
                 raise ImpossibleException(f'Unknown assignment target type: {target.__class__.__name__}')
 
+    def output_string(self, value: str) -> None:
+        with self.variable() as tmp:
+            for char in value:
+                self._set(ord(char), index=tmp.index)
+                self._output(tmp.index)
+
     def print(self, values: list[TypedExpression], *, new_line: bool = False) -> None:
         for expression in values:
             if not expression.type().is_string():
@@ -796,8 +802,78 @@ class SubroutineCompiler(NameManager):
                 for i in range(expression.type().size()):
                     self._output(tmp.index + i)
         if new_line:
-            with self.value(ord('\n')) as tmp:
-                self._output(tmp.index)
+            self.output_string('\n')
+
+    def print10(self, variable: Name) -> None:
+        assert variable.type == Types.CHAR
+        with self.variable() as digit, self.variable() as value, self.value(0) as is_non_zero:
+            # Get first digit
+            self.clone(variable, value.index)
+            with self.value(100) as h:
+                self.compile_division_operation(digit.index, value.index, h.index)
+            # Print first digit if non-zero
+            self._loop_start(digit.index)
+            self._increment(digit.index, count=ord('0'))
+            self._output(digit.index)
+            self._increment(is_non_zero.index)
+            self.reset_variable(digit)
+            self._loop_end()
+            # Get middle digit
+            self.clone(variable, value.index)
+            with self.value(10) as b, self.variable() as tmp2:
+                self.compile_division_operation(tmp2.index, value.index, b.index)
+                self._set(10, index=b.index)
+                self.compile_modulo_operation(digit.index, tmp2.index, b.index)
+            # Print middle digit if digit is non-zero
+            self._loop_start(digit.index)
+            self._increment(digit.index, count=ord('0'))
+            self._output(digit.index)
+            self.reset_variable(is_non_zero)
+            self.reset_variable(digit)
+            self._loop_end()
+            # Print middle variable if the previous digit was non-zero
+            self._loop_start(is_non_zero.index)
+            self._increment(digit.index, count=ord('0'))
+            self._output(digit.index)
+            self.reset_variable(digit)
+            self.reset_variable(is_non_zero)
+            self._loop_end()
+            # Get last digit
+            self.clone(variable, value.index)
+            with self.value(10) as b:
+                self.compile_modulo_operation(digit.index, value.index, b.index)
+            # Print last digit
+            self._increment(digit.index, count=ord('0'))
+            self._output(digit.index)
+
+    def log_variable(self, variable: Name) -> None:
+        if variable.type == Types.CHAR:
+            # Print character in base 10
+            self.print10(variable)
+        elif isinstance(variable.type, ArrayType):
+            element_type = variable.type.base_type
+            self.output_string('[')
+            for i in range(variable.type.count):
+                if i > 0:
+                    self.output_string(', ')
+                with self.pointer(variable.index + i * element_type.size(), element_type) as element:
+                    self.log_variable(element)
+            self.output_string(']')
+        elif isinstance(variable.type, ProductType):
+            self.output_string('(')
+            for i in range(variable.type.count()):
+                if i > 0:
+                    self.output_string(', ')
+                with self.pointer(variable.index + variable.type.offset_of(i), variable.type.operands[i]) as element:
+                    self.log_variable(element)
+            self.output_string(')')
+        else:
+            raise CompilerException(f'Unsupported expression type for logging {variable.type}')
+
+    def log(self, expression: TypedExpression) -> None:
+        with self.evaluate_in_new_variable(expression, read_only=True) as variable:
+            self.log_variable(variable)
+        self.output_string('\n')
 
     def loop(self, count: TypedExpression, body: TypeCheckedInstructionBlock) -> None:
         self._comment('Initializing loop counter', prefix='\n')
@@ -914,6 +990,8 @@ class SubroutineCompiler(NameManager):
                     self.assign(target, tmp.index)
             case PrintCall(arguments=arguments, new_line=new_line):
                 self.print(arguments, new_line=new_line)
+            case LogCall(argument=argument):
+                self.log(argument)
             case TypeCheckedProcedureCall(location=location, reference=reference, arguments=arguments):
                 self.call(location, reference, arguments, False)
                 comment_line = False
