@@ -261,6 +261,7 @@ class SubroutineCompiler(NameManager):
 
     def evaluate_unary_operation(self, operation: UnaryOperation, operand_expression: TypedExpression) -> None:
         index = self.index
+        self._reset(index)
         # Array opposition
         if isinstance(operation, ArrayOppositionOperation):
             with self.evaluate_in_new_variable(operand_expression) as operand:
@@ -557,6 +558,7 @@ class SubroutineCompiler(NameManager):
     def evaluate_binary_operation(self, operation: BinaryOperation, left_expression: TypedExpression,
                                   right_expression: TypedExpression) -> None:
         index = self.index
+        self._reset(index)
         # Array concatenation
         if isinstance(operation, ConcatenationOperation):
             self.evaluate(left_expression, index)
