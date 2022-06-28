@@ -374,7 +374,7 @@ class ASTGenerator:
                 targets.append(self.parse_primitive_assignment_target())
             if not self._eat(CommaToken):
                 break
-        return TupleAssignmentTarget(self._location_from(start_location), targets)
+        return TupleAssignmentTarget.of(self._location_from(start_location), targets)
 
     def parse_reference(self) -> Reference:
         """Parse a reference to a namespace element."""
@@ -408,11 +408,11 @@ class ASTGenerator:
         # Variable declaration
         if self._eat(LetKeyword):
             variable_type = self.parse_type()
-            variable_name = self._expect(IdentifierToken).name
+            target = self.parse_assignment_target()
             if self._eat(EqualToken):
                 value = self.parse_expression()
-                return VariableDeclaration(self._location_from(start_location), variable_name, variable_type, value)
-            return VariableDeclaration(self._location_from(start_location), variable_name, variable_type)
+                return VariableDeclaration(self._location_from(start_location), target, variable_type, value)
+            return VariableDeclaration(self._location_from(start_location), target, variable_type)
         # Return instruction
         if self._eat(ReturnKeyword):
             expression = self.parse_expression()

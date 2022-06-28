@@ -313,20 +313,20 @@ class Decrementation(Instruction):
 
 
 class VariableDeclaration(Instruction):
-    def __init__(self, location: Location, identifier: str, variable_type: DataType,
+    def __init__(self, location: Location, target: AssignmentTarget, variable_type: DataType,
                  value: Expression | None = None) -> None:
         super().__init__(location)
-        self.identifier = identifier
+        self.target = target
         self.type = variable_type
         self.value = value
 
     def __str__(self) -> str:
         if self.value is None:
-            return f'let {self.type} {self.identifier}'
-        return f'let {self.type} {self.identifier} = {self.value}'
+            return f'let {self.type} {self.target}'
+        return f'let {self.type} {self.target} = {self.value}'
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.identifier}, {self.type!r}, {self.value!r}]'
+        return f'{self.__class__.__name__}[{self.target!r}, {self.type!r}, {self.value!r}]'
 
 
 class Assignment(Instruction):

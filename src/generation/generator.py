@@ -968,6 +968,18 @@ class SubroutineCompiler(NameManager):
 
         self._goto(current_index)
 
+    def declare_names(self, target: TypedDeclarationTarget, origin: int) -> None:
+        match target:
+            case TypedIdentifierDeclarationTarget(identifier=identifier):
+                self.scoped_pointer(origin, target.type, identifier)
+            case TypedTupleDeclarationTarget(elements=elements):
+                index = origin
+                for element in elements:
+                    self.declare_names(element, index)
+                    index += element.type.size()
+            case _:
+                raise ImpossibleException(f'Unknown declaration target type: {target.__class__.__name__}')
+
     def compile_instruction(self, instruction: TypeCheckedInstruction) -> None:
         comment_line = True
         match instruction:
@@ -975,10 +987,11 @@ class SubroutineCompiler(NameManager):
                 with self.scope():
                     for instruction in instructions:
                         self.compile_instruction(instruction)
-            case TypeCheckedVariableDeclaration(identifier=identifier, type=variable_type, value=expression):
-                variable = self.scoped_variable(variable_type, identifier)
+            case TypeCheckedVariableDeclaration(target=target, value=expression):
+                variable = self.scoped_variable(target.type)
                 if expression is not None:
                     self.evaluate(expression, variable.index)
+                self.declare_names(target, variable.index)
             case TypeCheckedIncrementation(location=location, identifier=identifier):
                 variable = self.get_name(location, identifier)
                 self._increment(variable.index)

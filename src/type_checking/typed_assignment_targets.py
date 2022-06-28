@@ -8,15 +8,12 @@ from type_checking.typing_context import CodeBlockTypingContext
 
 class TypedAssignmentTarget(ABC):
     @classmethod
-    def from_assignment_target(cls, context: CodeBlockTypingContext,
-                               assignment_target: AssignmentTarget) -> 'TypedAssignmentTarget':
-        match assignment_target:
-            case PrimitiveAssignmentTarget() as primitive_assignment_target:
-                return TypedPrimitiveAssignmentTarget.from_primitive_assignment_target(context,
-                                                                                       primitive_assignment_target)
-            case TupleAssignmentTarget(location=location, elements=elements):
-                return TypedTupleAssignmentTarget.of(context, location, elements)
-        raise ImpossibleException(f'Unknown assignment target type: {assignment_target.__class__.__name__}')
+    def from_untyped(cls, context: CodeBlockTypingContext, target: AssignmentTarget) -> 'TypedAssignmentTarget':
+        if isinstance(target, PrimitiveAssignmentTarget):
+            return TypedPrimitiveAssignmentTarget.from_untyped(context, target)
+        if isinstance(target, TupleAssignmentTarget):
+            return TypedTupleAssignmentTarget.from_untyped(context, target)
+        raise ImpossibleException(f'Unknown assignment target type: {target.__class__.__name__}')
 
     def __init__(self, location: Location) -> None:
         self.location = location
@@ -35,58 +32,59 @@ class TypedAssignmentTarget(ABC):
 
 class TypedPrimitiveAssignmentTarget(TypedAssignmentTarget):
     @classmethod
-    def from_primitive_assignment_target(cls, context: CodeBlockTypingContext,
-                                         target: PrimitiveAssignmentTarget) -> 'TypedPrimitiveAssignmentTarget':
-        location = target.location
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     target: PrimitiveAssignmentTarget) -> 'TypedPrimitiveAssignmentTarget':
+        # Get list of subscripts
         subscripts: list[tuple[Location, int]] = []
         while isinstance(target, ArrayElementAssignmentTarget):
             subscripts.append((target.location, target.index))
             target = target.array
-        subscripts.reverse()
         if not isinstance(target, IdentifierAssignmentTarget):
             raise ImpossibleException(f'Unknown primitive assignment target type: {target.__class__.__name__}')
-        return cls(context, location, target.identifier, subscripts)
-
-    def __init__(self, context: CodeBlockTypingContext, location: Location, identifier: str,
-                 subscripts: list[tuple[Location, int]]) -> None:
-        super().__init__(location)
-        self.identifier = identifier
-        self._indices = [subscript[1] for subscript in subscripts]
-        self.offset = 0
-        array_type = context.get_variable_type(self.location, self.identifier)
-        for subscript_location, index in subscripts:
-            if not isinstance(array_type, ArrayType):
-                raise CompilationException(subscript_location, f'Can not subscript {array_type}')
+        # Compute offset
+        offset = 0
+        indices = []
+        current_type = context.get_variable_type(target.location, target.identifier)
+        for subscript_location, index in reversed(subscripts):
+            if not isinstance(current_type, ArrayType):
+                raise CompilationException(subscript_location, f'Cannot subscript {current_type}')
             # Negative indices wrap around
             if index < 0:
-                index = array_type.count + index
-            if not (0 <= index < array_type.count):
+                index = current_type.count + index
+            if not (0 <= index < current_type.count):
                 raise CompilationException(subscript_location, 'Array index out of bounds')
-            self.offset += index * array_type.base_type.size()
-            array_type = array_type.base_type
-        self._type = array_type
+            offset += index * current_type.base_type.size()
+            indices.append(index)
+            current_type = current_type.base_type
+        return cls(target.location, target.identifier, current_type, indices, offset)
+
+    def __init__(self, location: Location, identifier: str, data_type: DataType, indices: list[int],
+                 offset: int) -> None:
+        super().__init__(location)
+        self.identifier = identifier
+        self._type = data_type
+        self.indices = indices
+        self.offset = offset
 
     def type(self) -> DataType:
         return self._type
 
     def __str__(self) -> str:
-        if len(self._indices) == 0:
+        if len(self.indices) == 0:
             return self.identifier
-        indices = ']['.join(str(index) for index in self._indices)
+        indices = ']['.join(str(index) for index in self.indices)
         return f'{self.identifier}[{indices}]'
 
 
 class TypedTupleAssignmentTarget(TypedAssignmentTarget):
     @classmethod
-    def of(cls, context: CodeBlockTypingContext, location: Location,
-           elements: list[AssignmentTarget]) -> 'TypedAssignmentTarget':
-        if len(elements) == 1:
-            return TypedAssignmentTarget.from_assignment_target(context, elements[0])
-        return cls(context, location, elements)
+    def from_untyped(cls, context: CodeBlockTypingContext, target: TupleAssignmentTarget) -> 'TypedAssignmentTarget':
+        elements = [TypedAssignmentTarget.from_untyped(context, element) for element in target.elements]
+        return cls(target.location, elements)
 
-    def __init__(self, context: CodeBlockTypingContext, location: Location, elements: list[AssignmentTarget]) -> None:
+    def __init__(self, location: Location, elements: list[TypedAssignmentTarget]) -> None:
         super().__init__(location)
-        self.elements = [TypedAssignmentTarget.from_assignment_target(context, element) for element in elements]
+        self.elements = elements
         if len(self.elements) < 2:
             raise CompilerException('Tuple assignment target must contain at least two elements')
 

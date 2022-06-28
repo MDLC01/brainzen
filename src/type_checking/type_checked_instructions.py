@@ -6,7 +6,8 @@ from exceptions import *
 from intermediate_representation.instructions import *
 from reference import Reference
 from type_checking.operations import *
-from type_checking.typed_assignment_targets import TypedAssignmentTarget
+from type_checking.typed_assignment_targets import *
+from type_checking.typed_declaration_target import *
 from type_checking.typing_context import *
 
 
@@ -33,7 +34,7 @@ class TypeCheckedInstruction(ABC):
             case Decrementation() as decrementation:
                 return TypeCheckedDecrementation(context, decrementation)
             case VariableDeclaration() as variable_declaration:
-                return TypeCheckedVariableDeclaration(context, variable_declaration)
+                return TypeCheckedVariableDeclaration.from_variable_declaration(context, variable_declaration)
             case Assignment() as assignment:
                 return TypeCheckedAssignment(context, assignment)
             case LoopStatement() as loop_statement:
@@ -732,33 +733,38 @@ class TypeCheckedDecrementation(TypeCheckedInstruction):
 
 
 class TypeCheckedVariableDeclaration(TypeCheckedInstruction):
-    def __init__(self, context: CodeBlockTypingContext, variable_declaration: VariableDeclaration) -> None:
-        super().__init__(variable_declaration.location)
-        self.identifier: str = variable_declaration.identifier
-        self.type: DataType = variable_declaration.type
-        # Type checking
-        self.value: TypedExpression | None
+    @classmethod
+    def from_variable_declaration(cls, context: CodeBlockTypingContext,
+                                  variable_declaration: VariableDeclaration) -> 'TypeCheckedVariableDeclaration':
         if variable_declaration.value is None:
-            self.value = None
+            value = None
         else:
-            self.value = TypedExpression.from_expression(context, variable_declaration.value)
-            if not self.value.type() == self.type:
-                raise CompilationException(self.value.location, f'Expected {self.type} but found {self.value.type()}')
-        context.register_variable(self.identifier, self.type)
+            value = TypedExpression.from_expression(context, variable_declaration.value)
+        target = TypedDeclarationTarget.from_untyped(context, variable_declaration.target, variable_declaration.type)
+        return cls(variable_declaration.location, variable_declaration.type, target, value)
+
+    def __init__(self, location: Location, data_type: DataType, target: TypedDeclarationTarget,
+                 value: TypedExpression | None) -> None:
+        super().__init__(location)
+        self.type = data_type
+        self.target = target
+        self.value = value
+        if self.value is not None and self.value.type() != self.type:
+            raise CompilationException(self.value.location, f'Expected {self.type} but found {self.value.type()}')
 
     def __str__(self) -> str:
         if self.value is None:
-            return f'let {self.type} {self.identifier}'
-        return f'let {self.type} {self.identifier} = {self.value}'
+            return f'let {self.type} {self.target}'
+        return f'let {self.type} {self.target} = {self.value}'
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.identifier}, {self.type!r}, {self.value!r}]'
+        return f'{self.__class__.__name__}[{self.target!r}, {self.type!r}, {self.value!r}]'
 
 
 class TypeCheckedAssignment(TypeCheckedInstruction):
     def __init__(self, context: CodeBlockTypingContext, assignment: Assignment) -> None:
         super().__init__(assignment.location)
-        self.target = TypedAssignmentTarget.from_assignment_target(context, assignment.target)
+        self.target = TypedAssignmentTarget.from_untyped(context, assignment.target)
         self.value = TypedExpression.from_expression(context, assignment.value)
         # Type checking
         if self.target.type() != self.value.type():
