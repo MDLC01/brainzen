@@ -360,6 +360,7 @@ class ASTGenerator:
         target = IdentifierAssignmentTarget(self._location_from(start_location), identifier)
         while self._eat(OpenBracketToken):
             index = self._expect(NumericLiteral).value
+            self._expect(CloseBracketToken)
             target = ArrayElementAssignmentTarget(self._location_from(start_location), target, index)
         return target
 
