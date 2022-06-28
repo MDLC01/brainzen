@@ -202,6 +202,20 @@ class SubroutineCompiler(NameManager):
             raise CompilationException(location, f'Unknown variable: {identifier!r}')
         return self[identifier]
 
+    def declare_names(self, target: TypedDeclarationTarget, origin: int) -> list[Pointer]:
+        match target:
+            case TypedIdentifierDeclarationTarget(identifier=identifier):
+                return [self.scoped_pointer(origin, target.type, identifier)]
+            case TypedTupleDeclarationTarget(elements=elements):
+                index = origin
+                names = []
+                for element in elements:
+                    names.extend(self.declare_names(element, index))
+                    index += element.type.size()
+                return names
+            case _:
+                raise ImpossibleException(f'Unknown declaration target type: {target.__class__.__name__}')
+
     def reset_variable(self, variable: Name) -> None:
         """Reset the passed variable to 0 and move the pointer to its position."""
         self._reset(variable.index, block_size=variable.size())
@@ -610,7 +624,7 @@ class SubroutineCompiler(NameManager):
         count = iterators.count()
         with self.scope():
             variables = []
-            group = iterators.groups[-1]
+            group = iterators.groups[0]
             # Prepare iterators
             for iterator in group.iterators:
                 if not isinstance(iterator, TypedArrayIterator):
@@ -621,19 +635,20 @@ class SubroutineCompiler(NameManager):
                 else:
                     array = self.scoped_variable(iterator.array.type())
                     self.evaluate(iterator.array, array.index)
-                variables.append(self.scoped_pointer(array.index, iterator.type(), iterator.variable))
+                variables.append((iterator.target.type.size(), self.declare_names(iterator.target, array.index)))
             # Run loop
             for i in range(count):
                 if len(iterators.groups) == 1:
                     offset = element_format.type().size()
                     self.evaluate(element_format, index + i * offset)
                 else:
-                    chain = TypedIteratorChain(iterators.location, iterators.groups[:-1])
+                    chain = TypedIteratorChain(iterators.location, iterators.groups[1:])
                     offset = element_format.type().size() * chain.count()
                     self.evaluate_array_comprehension(element_format, chain, index + i * offset)
                 # Update loop variable indices
-                for variable in variables:
-                    variable.update_index(variable.index + variable.size())
+                for target_size, bindings in variables:
+                    for binding in bindings:
+                        binding.update_index(binding.index + target_size)
 
     def evaluate(self, expression: TypedExpression, index: int | None = None) -> None:
         """Evaluate the passed expression at the current location (or `index` if specified)."""
@@ -900,7 +915,6 @@ class SubroutineCompiler(NameManager):
             self._loop_end()
 
     def for_loop(self, iterators: TypedIteratorGroup, body: TypeCheckedInstructionBlock) -> None:
-        count = iterators.count()
         with self.scope():
             # Evaluate arrays and declare loop variables
             variables = []
@@ -913,13 +927,15 @@ class SubroutineCompiler(NameManager):
                 else:
                     array = self.scoped_variable(iterator.array.type())
                     self.evaluate(iterator.array, array.index)
-                variables.append(self.scoped_pointer(array.index, iterator.type(), iterator.variable))
+                variables.append((iterator.target.type.size(), self.declare_names(iterator.target, array.index)))
             # Run loop
+            count = iterators.count()
             for i in range(count):
                 self.compile_instruction(body)
                 # Update loop variable indices
-                for variable in variables:
-                    variable.update_index(variable.index + variable.size())
+                for target_size, bindings in variables:
+                    for binding in bindings:
+                        binding.update_index(binding.index + target_size)
 
     def condition(self, test: TypedExpression, if_body: TypeCheckedInstructionBlock,
                   else_body: TypeCheckedInstructionBlock) -> None:
@@ -967,18 +983,6 @@ class SubroutineCompiler(NameManager):
         self._comment('=== CONTEXT SNAPSHOT END ===', CommentLevel.ONLY_REQUIRED, prefix='')
 
         self._goto(current_index)
-
-    def declare_names(self, target: TypedDeclarationTarget, origin: int) -> None:
-        match target:
-            case TypedIdentifierDeclarationTarget(identifier=identifier):
-                self.scoped_pointer(origin, target.type, identifier)
-            case TypedTupleDeclarationTarget(elements=elements):
-                index = origin
-                for element in elements:
-                    self.declare_names(element, index)
-                    index += element.type.size()
-            case _:
-                raise ImpossibleException(f'Unknown declaration target type: {target.__class__.__name__}')
 
     def compile_instruction(self, instruction: TypeCheckedInstruction) -> None:
         comment_line = True

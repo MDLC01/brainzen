@@ -97,11 +97,11 @@ class Array(Expression):
 
 
 class Iterator(ABC):
-    __slots__ = 'location', 'variable'
+    __slots__ = 'location', 'target'
 
-    def __init__(self, location: Location, variable: str) -> None:
+    def __init__(self, location: Location, target: AssignmentTarget) -> None:
         self.location = location
-        self.variable = variable
+        self.target = target
 
     @abstractmethod
     def __str__(self) -> str:
@@ -115,15 +115,15 @@ class Iterator(ABC):
 class ArrayIterator(Iterator):
     __slots__ = 'array'
 
-    def __init__(self, location: Location, variable: str, array: Expression) -> None:
-        super().__init__(location, variable)
+    def __init__(self, location: Location, target: AssignmentTarget, array: Expression) -> None:
+        super().__init__(location, target)
         self.array = array
 
     def __str__(self) -> str:
-        return f'{self.variable} : {self.array}'
+        return f'{self.target} : {self.array}'
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.variable!r}, {self.array!r}]'
+        return f'{self.__class__.__name__}[{self.target!r}, {self.array!r}]'
 
 
 class IteratorGroup:

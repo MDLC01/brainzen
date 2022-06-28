@@ -236,11 +236,11 @@ class ASTGenerator:
 
     def parse_iterator(self) -> Iterator:
         start_location = self._location()
-        loop_variable = self._expect(IdentifierToken).name
+        target = self.parse_assignment_target()
         self._expect(ColonToken)
         loop_array = self.parse_binary_operation()
         iterator_location = self._location_from(start_location)
-        return ArrayIterator(iterator_location, loop_variable, loop_array)
+        return ArrayIterator(iterator_location, target, loop_array)
 
     def parse_iterator_group(self) -> IteratorGroup:
         start_location = self._location()

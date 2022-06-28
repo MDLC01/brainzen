@@ -102,7 +102,7 @@ class TypedExpression(TypeCheckedInstruction, ABC):
             case Array() as array:
                 return LiteralArray.from_array(context, array)
             case ArrayComprehension() as array_comprehension:
-                return TypedArrayComprehension.from_array_comprehension(context, array_comprehension)
+                return TypedArrayComprehension.from_untyped(context, array_comprehension)
             case Tuple() as tuple_expression:
                 return LiteralTuple.from_tuple_expression(context, tuple_expression)
             case Identifier() as identifier:
@@ -299,17 +299,17 @@ class LiteralArray(TypedExpression):
 
 
 class TypedIterator(ABC):
-    __slots__ = 'location', 'variable'
+    __slots__ = 'location', 'target'
 
     @classmethod
-    def from_iterator(cls, context: CodeBlockTypingContext, iterator: Iterator) -> 'TypedIterator':
+    def from_untyped(cls, context: CodeBlockTypingContext, iterator: Iterator) -> 'TypedIterator':
         if isinstance(iterator, ArrayIterator):
-            return TypedArrayIterator.from_array_iterator(context, iterator)
+            return TypedArrayIterator.from_untyped(context, iterator)
         raise ImpossibleException(f'Unknown iterator type: {iterator.__class__.__name__}')
 
-    def __init__(self, location: Location, variable: str) -> None:
+    def __init__(self, location: Location, target: TypedDeclarationTarget) -> None:
         self.location = location
-        self.variable = variable
+        self.target = target
 
     @abstractmethod
     def count(self) -> int:
@@ -332,17 +332,20 @@ class TypedArrayIterator(TypedIterator):
     __slots__ = 'array', 'array_type'
 
     @classmethod
-    def from_array_iterator(cls, context: CodeBlockTypingContext,
-                            array_iterator: ArrayIterator) -> 'TypedArrayIterator':
-        typed_array = TypedExpression.from_expression(context, array_iterator.array)
-        return cls(array_iterator.location, array_iterator.variable, typed_array)
+    def from_untyped(cls, context: CodeBlockTypingContext, array_iterator: ArrayIterator) -> 'TypedArrayIterator':
+        array = TypedExpression.from_expression(context, array_iterator.array)
+        array_type = array.type()
+        if not isinstance(array_type, ArrayType):
+            raise CompilationException(array.location, f'Expected array but found {array_type}')
+        target = TypedDeclarationTarget.from_untyped(context, array_iterator.target, array_type.base_type)
+        return cls(array_iterator.location, target, array)
 
-    def __init__(self, location: Location, variable: str, array: TypedExpression) -> None:
-        super().__init__(location, variable)
+    def __init__(self, location: Location, target: TypedDeclarationTarget, array: TypedExpression) -> None:
+        super().__init__(location, target)
         self.array = array
         array_type = self.array.type()
         if not isinstance(array_type, ArrayType):
-            raise CompilationException(array.location, f'Expected array but found {array_type}')
+            raise CompilerException(f'Expected array but found {array_type}')
         self.array_type = array_type
 
     def count(self) -> int:
@@ -352,31 +355,30 @@ class TypedArrayIterator(TypedIterator):
         return self.array_type.base_type
 
     def __str__(self) -> str:
-        return f'{self.variable} : {self.array}'
+        return f'{self.target} : {self.array}'
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.variable!r}, {self.array!r}]'
+        return f'{self.__class__.__name__}[{self.target!r}, {self.array!r}]'
 
 
 class TypedIteratorGroup:
     __slots__ = 'location', 'iterators'
 
     @classmethod
-    def from_iterator_group(cls, context: CodeBlockTypingContext,
-                            iterator_group: IteratorGroup) -> 'TypedIteratorGroup':
+    def from_untyped(cls, context: CodeBlockTypingContext, iterator_group: IteratorGroup) -> 'TypedIteratorGroup':
         iterators = []
         expected_count = None
         for untyped_iterator in iterator_group.iterators:
-            iterator = TypedIterator.from_iterator(context, untyped_iterator)
+            # FIXME: The code bellow type checks because variables are registered when iterators are type checked:
+            #  for (x : ["Aa", "Bb", "Cc"], y : x) {...}
+            #  This should be invalid because iterators in a group do not interact with each other.
+            iterator = TypedIterator.from_untyped(context, untyped_iterator)
             if expected_count is None:
                 expected_count = iterator.count()
             elif iterator.count() != expected_count:
                 message = f'Expected iterator of size {expected_count} but found iterator of size {iterator.count()}'
                 raise CompilationException(iterator.location, message)
             iterators.append(iterator)
-        # Variables a registered after all iterators in this group are type checked
-        for iterator in iterators:
-            context.register_variable(iterator.variable, iterator.type())
         return cls(iterator_group.location, iterators)
 
     def __init__(self, location: Location, iterators: list[TypedIterator]) -> None:
@@ -398,9 +400,8 @@ class TypedIteratorChain:
     __slots__ = 'location', 'groups'
 
     @classmethod
-    def from_iterator_chain(cls, context: CodeBlockTypingContext,
-                            iterator_chain: IteratorChain) -> 'TypedIteratorChain':
-        groups = [TypedIteratorGroup.from_iterator_group(context, group) for group in iterator_chain.groups]
+    def from_untyped(cls, context: CodeBlockTypingContext, iterator_chain: IteratorChain) -> 'TypedIteratorChain':
+        groups = [TypedIteratorGroup.from_untyped(context, group) for group in reversed(iterator_chain.groups)]
         return cls(iterator_chain.location, groups)
 
     def __init__(self, location: Location, groups: list[TypedIteratorGroup]) -> None:
@@ -423,10 +424,10 @@ class TypedIteratorChain:
 
 class TypedArrayComprehension(TypedExpression):
     @classmethod
-    def from_array_comprehension(cls, context: CodeBlockTypingContext,
-                                 array_comprehension: ArrayComprehension) -> 'TypedArrayComprehension':
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     array_comprehension: ArrayComprehension) -> 'TypedArrayComprehension':
         comprehension_context = context.subscope()
-        iterators = TypedIteratorChain.from_iterator_chain(comprehension_context, array_comprehension.iterators)
+        iterators = TypedIteratorChain.from_untyped(comprehension_context, array_comprehension.iterators)
         element_format = TypedExpression.from_expression(comprehension_context, array_comprehension.element_format)
         return cls(array_comprehension.location, element_format, iterators)
 
@@ -830,7 +831,7 @@ class TypeCheckedForLoopStatement(TypeCheckedInstruction):
     def from_for_loop_statement(cls, context: CodeBlockTypingContext,
                                 for_loop_statement: ForLoopStatement) -> 'TypeCheckedForLoopStatement':
         loop_context = context.subscope()
-        iterators = TypedIteratorGroup.from_iterator_group(loop_context, for_loop_statement.iterators)
+        iterators = TypedIteratorGroup.from_untyped(loop_context, for_loop_statement.iterators)
         body = TypeCheckedInstructionBlock(loop_context, for_loop_statement.body)
         return cls(for_loop_statement.location, iterators, body)
 
