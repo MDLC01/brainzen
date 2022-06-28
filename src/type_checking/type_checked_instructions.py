@@ -162,6 +162,8 @@ def compute_unary_operation(operation: UnaryOperation, operand: Value) -> Value:
             return -operand
         case ArrayOppositionOperation():
             return [-element for element in operand]
+        case ArrayFlatteningOperation():
+            return [element for inner_array in operand for element in inner_array]
     raise CompilerException(f'Unknown unary operation: {operation!r}')
 
 
