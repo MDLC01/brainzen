@@ -56,7 +56,7 @@ class Location:
 
     def extend_to(self, location: 'Location') -> 'Location':
         if self.file != location.file:
-            raise CompilerException('Can not extend location to multiple files')
+            raise CompilerException('Cannot extend location to multiple files')
         end = location.column + location.length
         return Location(self.file, self.line, self.column, end - self.column)
 

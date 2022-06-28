@@ -537,7 +537,7 @@ class TypedArraySubscriptExpression(TypedExpression):
         # Type checking
         array_type = self.array.type()
         if not isinstance(array_type, ArrayType):
-            raise CompilationException(self.location, f'Can not subscript {array_type}')
+            raise CompilationException(self.location, f'Cannot subscript {array_type}')
         # Negative indices start wrap around
         if self.index < 0:
             self.index = array_type.count - self.index
@@ -570,7 +570,7 @@ class TypedArraySlicingExpression(TypedExpression):
         # Type checking
         array_type = self.array.type()
         if not isinstance(array_type, ArrayType):
-            raise CompilationException(self.location, f'Can not slice {array_type}')
+            raise CompilationException(self.location, f'Cannot slice {array_type}')
         if self.start > self.stop:
             raise CompilationException(self.location, f'Invalid slice (start index must be smaller than end index)')
         if self.start < 0 or self.start >= array_type.count:
@@ -708,7 +708,7 @@ class TypeCheckedIncrementation(TypeCheckedInstruction):
         variable_type = context.get_variable_type(incrementation.location, self.identifier)
         # Type checking
         if variable_type != Types.CHAR:
-            raise CompilationException(self.location, f'Can not increment {variable_type}')
+            raise CompilationException(self.location, f'Cannot increment {variable_type}')
 
     def __str__(self) -> str:
         return f'{self.identifier}++'
@@ -724,7 +724,7 @@ class TypeCheckedDecrementation(TypeCheckedInstruction):
         variable_type = context.get_variable_type(decrementation.location, self.identifier)
         # Type checking
         if variable_type != Types.CHAR:
-            raise CompilationException(self.location, f'Can not decrement {variable_type}')
+            raise CompilationException(self.location, f'Cannot decrement {variable_type}')
 
     def __str__(self) -> str:
         return f'{self.identifier}--'
