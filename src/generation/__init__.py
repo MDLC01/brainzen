@@ -1,2 +1,2 @@
 from generation.generator import *
-from generation.name_manager import *
+from generation.brainfuck_code import *

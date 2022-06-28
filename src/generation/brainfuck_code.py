@@ -1,3 +1,6 @@
+from typing import TextIO
+
+
 class BrainfuckCode:
     __slots__ = 'instructions'
 
@@ -63,8 +66,10 @@ class BrainfuckCode:
                               .replace('#', '(hash)'))
         self.append_raw(f'{prefix}{serialized_comment}{end}')
 
-    def __str__(self) -> str:
-        return ''.join(command * count for command, count in self.instructions)
+    def write_file(self, file: TextIO) -> None:
+        for command, count in self.instructions:
+            file.write(command * count)
+        file.write('\n')
 
 
 __all__ = ['BrainfuckCode']
