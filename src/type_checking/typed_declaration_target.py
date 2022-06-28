@@ -13,7 +13,7 @@ class TypedDeclarationTarget(ABC):
         if isinstance(target, IdentifierAssignmentTarget):
             return TypedIdentifierDeclarationTarget.from_untyped(context, target, data_type)
         if isinstance(target, ArrayElementAssignmentTarget):
-            message = f'Unable to declare an array index (expected identifier or tuple)'
+            message = f'Unable to declare an array index (expected identifier or tuple of identifiers)'
             raise CompilationException(target.location, message)
         if isinstance(target, TupleAssignmentTarget):
             return TypedTupleDeclarationTarget.from_untyped(context, target, data_type)
