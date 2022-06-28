@@ -206,7 +206,7 @@ class SubroutineCompiler(NameManager):
         """Reset the passed variable to 0 and move the pointer to its position."""
         self._reset(variable.index, block_size=variable.size())
 
-    def copy_variable(self, source: Name, destination: int | None = None) -> None:
+    def clone(self, source: Name, destination: int | None = None) -> None:
         """Copy the value of the passed variable to the current location."""
         if destination is None:
             destination = self.index
@@ -554,7 +554,7 @@ class SubroutineCompiler(NameManager):
                   self.variable(left_expression.type()) as left,
                   self.evaluate_in_new_variable(right_expression) as right):
                 for i in range(operation.array_count):
-                    self.copy_variable(left_backup, left.index)
+                    self.clone(left_backup, left.index)
                     self.compile_multiplication_operation(index + i, left.index, right.index + i)
         # Other operations don't have fast path
         else:
@@ -653,7 +653,7 @@ class SubroutineCompiler(NameManager):
                     self._right(element.type().size())
             case TypedIdentifier(location=location, name=name):
                 variable = self.get_name(location, name)
-                self.copy_variable(variable)
+                self.clone(variable)
                 self._comment(f'Copied {name}', CommentLevel.BZ_CODE_EXTENDED)
             case TypedArraySubscriptExpression(array=array, index=array_index):
                 element_size = array.type().base_type.size()
@@ -734,7 +734,7 @@ class SubroutineCompiler(NameManager):
                     self._set(evaluated_argument)
                     self._right()
                 else:
-                    self.copy_variable(evaluated_argument)
+                    self.clone(evaluated_argument)
                     self._right(evaluated_argument.size())
         return subroutine_origin
 
