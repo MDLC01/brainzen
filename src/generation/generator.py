@@ -991,7 +991,10 @@ class SubroutineCompiler(NameManager):
                 with self.scope():
                     for instruction in instructions:
                         self.compile_instruction(instruction)
-            case TypeCheckedVariableDeclaration(target=target, value=expression):
+            case TypeCheckedVariableDeclaration(target=target):
+                variable = self.scoped_variable(target.type)
+                self.declare_names(target, variable.index)
+            case TypeCheckedVariableCreation(target=target, value=expression):
                 variable = self.scoped_variable(target.type)
                 if expression is not None:
                     self.evaluate(expression, variable.index)

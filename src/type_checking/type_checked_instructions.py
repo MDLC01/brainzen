@@ -35,6 +35,8 @@ class TypeCheckedInstruction(ABC):
                 return TypeCheckedDecrementation(context, decrementation)
             case VariableDeclaration() as variable_declaration:
                 return TypeCheckedVariableDeclaration.from_variable_declaration(context, variable_declaration)
+            case VariableCreation() as variable_creation:
+                return TypeCheckedVariableCreation.from_variable_creation(context, variable_creation)
             case Assignment() as assignment:
                 return TypeCheckedAssignment(context, assignment)
             case LoopStatement() as loop_statement:
@@ -737,29 +739,44 @@ class TypeCheckedVariableDeclaration(TypeCheckedInstruction):
     @classmethod
     def from_variable_declaration(cls, context: CodeBlockTypingContext,
                                   variable_declaration: VariableDeclaration) -> 'TypeCheckedVariableDeclaration':
-        if variable_declaration.value is None:
-            value = None
-        else:
-            value = TypedExpression.from_expression(context, variable_declaration.value)
         target = TypedDeclarationTarget.from_untyped(context, variable_declaration.target, variable_declaration.type)
-        return cls(variable_declaration.location, variable_declaration.type, target, value)
+        return cls(variable_declaration.location, target)
 
-    def __init__(self, location: Location, data_type: DataType, target: TypedDeclarationTarget,
-                 value: TypedExpression | None) -> None:
+    def __init__(self, location: Location, target: TypedDeclarationTarget) -> None:
         super().__init__(location)
-        self.type = data_type
         self.target = target
-        self.value = value
-        if self.value is not None and self.value.type() != self.type:
-            raise CompilationException(self.value.location, f'Expected {self.type} but found {self.value.type()}')
+
+    def type(self) -> DataType:
+        return self.target.type
 
     def __str__(self) -> str:
-        if self.value is None:
-            return f'let {self.type} {self.target}'
-        return f'let {self.type} {self.target} = {self.value}'
+        return f'let {self.target}: {self.type()}'
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.target!r}, {self.type!r}, {self.value!r}]'
+        return f'{self.__class__.__name__}[{self.target!r}, {self.type()!r}]'
+
+
+class TypeCheckedVariableCreation(TypeCheckedInstruction):
+    @classmethod
+    def from_variable_creation(cls, context: CodeBlockTypingContext,
+                               variable_declaration: VariableCreation) -> 'TypeCheckedVariableCreation':
+        value = TypedExpression.from_expression(context, variable_declaration.value)
+        target = TypedDeclarationTarget.from_untyped(context, variable_declaration.target, value.type())
+        return cls(variable_declaration.location, target, value)
+
+    def __init__(self, location: Location, target: TypedDeclarationTarget, value: TypedExpression | None) -> None:
+        super().__init__(location)
+        self.target = target
+        self.value = value
+
+    def type(self) -> DataType:
+        return self.value.type()
+
+    def __str__(self) -> str:
+        return f'let {self.target} = {self.value}'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.target!r}, {self.value!r}]'
 
 
 class TypeCheckedAssignment(TypeCheckedInstruction):
@@ -908,6 +925,7 @@ __all__ = ['TypeCheckedInstruction', 'TypeCheckedInstructionBlock', 'TypedExpres
            'TypedUnaryArithmeticExpression', 'TypedBinaryArithmeticExpression', 'TypedArraySubscriptExpression',
            'TypedArraySlicingExpression', 'PrintCall', 'InputCall', 'LogCall', 'TypeCheckedProcedureCall',
            'TypedFunctionCall', 'TypeCheckedIncrementation', 'TypeCheckedDecrementation',
-           'TypeCheckedVariableDeclaration', 'TypeCheckedAssignment', 'TypeCheckedLoopStatement',
-           'TypeCheckedWhileLoopStatement', 'TypeCheckedDoWhileLoopStatement', 'TypeCheckedForLoopStatement',
-           'TypeCheckedConditionalStatement', 'TypeCheckedReturnInstruction', 'TypeCheckedContextSnapshot']
+           'TypeCheckedVariableDeclaration', 'TypeCheckedVariableCreation', 'TypeCheckedAssignment',
+           'TypeCheckedLoopStatement', 'TypeCheckedWhileLoopStatement', 'TypeCheckedDoWhileLoopStatement',
+           'TypeCheckedForLoopStatement', 'TypeCheckedConditionalStatement', 'TypeCheckedReturnInstruction',
+           'TypeCheckedContextSnapshot']

@@ -406,14 +406,16 @@ class ASTGenerator:
             self._expect(OpenParToken)
             arguments = self.parse_sequence(CloseParToken)
             return ProcedureCall(self._location_from(start_location), reference, arguments)
-        # Variable declaration
+        # Variable declaration / creation
         if self._eat(LetKeyword):
-            variable_type = self.parse_type()
             target = self.parse_assignment_target()
-            if self._eat(EqualToken):
+            if self._eat(ColonToken):
+                variable_type = self.parse_type()
+                return VariableDeclaration(self._location_from(start_location), target, variable_type)
+            else:
+                self._expect(EqualToken)
                 value = self.parse_expression()
-                return VariableDeclaration(self._location_from(start_location), target, variable_type, value)
-            return VariableDeclaration(self._location_from(start_location), target, variable_type)
+                return VariableCreation(self._location_from(start_location), target, value)
         # Return instruction
         if self._eat(ReturnKeyword):
             expression = self.parse_expression()

@@ -313,20 +313,29 @@ class Decrementation(Instruction):
 
 
 class VariableDeclaration(Instruction):
-    def __init__(self, location: Location, target: AssignmentTarget, variable_type: DataType,
-                 value: Expression | None = None) -> None:
+    def __init__(self, location: Location, target: AssignmentTarget, variable_type: DataType) -> None:
         super().__init__(location)
         self.target = target
         self.type = variable_type
+
+    def __str__(self) -> str:
+        return f'let {self.target}: {self.type}'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.target!r}, {self.type!r}]'
+
+
+class VariableCreation(Instruction):
+    def __init__(self, location: Location, target: AssignmentTarget, value: Expression) -> None:
+        super().__init__(location)
+        self.target = target
         self.value = value
 
     def __str__(self) -> str:
-        if self.value is None:
-            return f'let {self.type} {self.target}'
-        return f'let {self.type} {self.target} = {self.value}'
+        return f'let {self.target} = {self.value}'
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.target!r}, {self.type!r}, {self.value!r}]'
+        return f'{self.__class__.__name__}[{self.target!r}, {self.value!r}]'
 
 
 class Assignment(Instruction):
@@ -442,5 +451,6 @@ __all__ = ['Instruction', 'InstructionBlock', 'Expression', 'ConstantReference',
            'ArrayIterator', 'IteratorGroup', 'IteratorChain', 'ArrayComprehension', 'Tuple', 'Identifier',
            'ArithmeticExpression', 'UnaryArithmeticExpression', 'BinaryArithmeticExpression',
            'ArraySubscriptExpression', 'ArraySlicingExpression', 'ProcedureCall', 'FunctionCall', 'Incrementation',
-           'Decrementation', 'VariableDeclaration', 'Assignment', 'LoopStatement', 'WhileLoopStatement',
-           'DoWhileLoopStatement', 'ForLoopStatement', 'ConditionalStatement', 'ReturnInstruction', 'ContextSnapshot']
+           'Decrementation', 'VariableDeclaration', 'VariableCreation', 'Assignment', 'LoopStatement',
+           'WhileLoopStatement', 'DoWhileLoopStatement', 'ForLoopStatement', 'ConditionalStatement',
+           'ReturnInstruction', 'ContextSnapshot']
