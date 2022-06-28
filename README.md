@@ -62,9 +62,9 @@ The following procedure prints the passed number in base 10.
 
 ```brainzen
 proc print10(char n) {
-    let char d2 = n / 100;
-    let char d1 = (n / 10) % 10;
-    let char d0 = n % 10;
+    let d2 = n / 100;
+    let d1 = (n / 10) % 10;
+    let d0 = n % 10;
     if (d2) print('0' + d2);
     if (d1 || d2) print('0' + d1);
     print('0' + d0);
@@ -75,7 +75,7 @@ proc print10(char n) {
 
 ```braiznen
 proc main() {
-    let char i = input();
+    let i = input();
     if (i == '0') {
         print('0');
     } else {
@@ -90,10 +90,10 @@ The following function computes the `n`th number of the [Fibonacci sequence](htt
 
 ```brainzen
 func fibonacci(char n) -> char {
-    let char a = 0;
-    let char b = 1;
+    let a = 0;
+    let b = 1;
     loop (n) {
-        let char c = a + b;
+        let c = a + b;
         a = b;
         b = c;
     }
@@ -105,7 +105,7 @@ func fibonacci(char n) -> char {
 
 ```brainzen
 proc fizzbuzz(char n) {
-    let char i = 1;
+    let i = 1;
     loop (n) {
         if (i % 3 == 0 && i % 5 == 0) {
             println("FizzBuzz");
@@ -114,8 +114,7 @@ proc fizzbuzz(char n) {
         } else if (i % 5 == 0) {
             println("Buzz");
         } else {
-            print10(i);
-            println();
+            log(i);
         }
         i++;
     }
