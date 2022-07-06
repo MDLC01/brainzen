@@ -133,7 +133,7 @@ class CodeBlockTypingContext:
     def register_variable(self, location: Location, identifier: str, variable_type: DataType) -> None:
         if identifier in self.variables:
             original = self.variables[identifier]
-            message = f'Redeclaration of identifier {identifier!r} (declared originally at {original.location!r})'
+            message = f'Variable {identifier!r} has already been defined at {original.location!r}'
             CompilationWarning.add(location, message, WarningType.REDECLARATION)
         elif self.is_shadow(identifier):
             original = self.parent[identifier]

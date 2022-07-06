@@ -78,8 +78,8 @@ class TypeCheckedSubroutine(TypeCheckedNamespaceElement, ABC):
         locations = {}
         for argument in self.arguments:
             if argument.identifier in locations:
-                message = f'Argument {argument.identifier!r} is already defined at {locations[argument.identifier]!r}'
-                raise CompilationException(argument.location, message)
+                message = f'Argument {argument.identifier!r} has already been defined at {locations[argument.identifier]!r}'
+                CompilationWarning.add(argument.location, message, WarningType.REDECLARATION)
             locations[argument.identifier] = argument.location
 
     def is_function(self) -> bool:
