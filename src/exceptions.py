@@ -1,4 +1,5 @@
 import sys
+from enum import Enum
 
 
 class Location:
@@ -103,30 +104,74 @@ class CompilationException(Exception):
         return f'{self.location}{self.message}'
 
 
+class WarningType(Enum):
+    OUT_OF_RANGE = 'out_of_range'
+    REDECLARATION = 'redeclaration'
+    NAME_SHADOWING = 'shadowing'
+    NATIVE_CODE = 'native_code'
+    DEBUG_FEATURE = 'debug'
+
+    @classmethod
+    def all(cls) -> set['WarningType']:
+        return {value for value in cls}
+
+    @classmethod
+    def default(cls) -> set['WarningType']:
+        return {cls.OUT_OF_RANGE, cls.REDECLARATION, cls.NAME_SHADOWING, cls.DEBUG_FEATURE}
+
+    @classmethod
+    def debug(cls) -> set['WarningType']:
+        return {cls.OUT_OF_RANGE, cls.REDECLARATION, cls.NAME_SHADOWING, cls.NATIVE_CODE}
+
+    @classmethod
+    def none(cls) -> set['WarningType']:
+        return set()
+
+    @classmethod
+    def get(cls, name: str) -> 'WarningType':
+        for warning_type in cls:
+            if warning_type.value == name:
+                return warning_type
+        raise ValueError(f'Unknown warning type: {name!r}')
+
+    @classmethod
+    def from_string(cls, allowed_warnings: str) -> set['WarningType']:
+        if allowed_warnings in ('*', 'all'):
+            return cls.all()
+        if allowed_warnings == 'debug':
+            return cls.debug()
+        if allowed_warnings in ('none', '-', '_', '.', ''):
+            return cls.none()
+        return {cls.get(name.strip()) for name in allowed_warnings.split(',')}
+
+
 class CompilationWarning(Warning):
     warnings: list['CompilationWarning'] = []
 
-    def __init__(self, location: Location, message: str):
+    def __init__(self, location: Location, message: str, warning_type: WarningType):
         self.location = location
         self.message = message
+        self.type = warning_type
 
     def __str__(self):
         return f'{self.location}{self.message}'
 
     @classmethod
-    def add(cls, location: Location, message: str):
-        cls.warnings.append(cls(location, message))
+    def add(cls, location: Location, message: str, warning_type: WarningType):
+        cls.warnings.append(cls(location, message, warning_type))
 
     @classmethod
-    def print_warnings(cls, source_code: str, *, out=sys.stderr):
+    def print_warnings(cls, source_code: str, allowed_types: set[WarningType], *, out=sys.stderr):
         first = True
         for warning in cls.warnings:
-            if first:
-                first = False
-            else:
-                print(file=out)
-            print(warning, file=out)
-            warning.location.print_position(source_code, out=out)
+            if warning.type in allowed_types:
+                if first:
+                    first = False
+                else:
+                    print(file=out)
+                print(warning, file=out)
+                warning.location.print_position(source_code, out=out)
 
 
-__all__ = ['Location', 'CompilerException', 'ImpossibleException', 'CompilationException', 'CompilationWarning']
+__all__ = ['Location', 'CompilerException', 'ImpossibleException', 'CompilationException', 'WarningType',
+           'CompilationWarning']

@@ -118,8 +118,9 @@ class TypeCheckedNativeSubroutine(TypeCheckedSubroutine):
         super().__init__(location, identifier, is_private, arguments, return_type)
         self.offset = offset
         self.bf_code = bf_code
-        CompilationWarning.add(self.location, 'Using native Brainfuck code is not recommended. Every cell should be'
-                                              ' reset to 0 (except those containing the return value).')
+        message = 'Using native Brainfuck code is not recommended. Every cell should be reset to 0 (except those' \
+                  ' containing the return value).'
+        CompilationWarning.add(self.location, message, WarningType.NATIVE_CODE)
 
     def _modifier_prefix(self) -> str:
         return super()._modifier_prefix() + 'native '

@@ -238,7 +238,8 @@ class LiteralChar(TypedExpression):
     @classmethod
     def from_char(cls, char: Char) -> 'LiteralChar':
         if char.value < 0 or char.value > 255:
-            CompilationWarning.add(char.location, 'Character literal is outside of the possible range')
+            message = 'Character literal is outside of the possible range'
+            CompilationWarning.add(char.location, message, WarningType.OUT_OF_RANGE)
         return cls(char.location, char.value)
 
     def __init__(self, location: Location, value: int) -> None:

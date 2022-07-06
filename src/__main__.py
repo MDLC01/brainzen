@@ -1,5 +1,6 @@
 import sys
 import time
+from argparse import ArgumentParser
 
 from exceptions import *
 from generation import CommentLevel, generate_program
@@ -9,8 +10,8 @@ from tokenization import Tokenizer
 from type_checking.type_checker import TypeCheckedNamespace
 
 
-def compile_source_code(source_code: str, source_file_name: str, output_file_name: str, *, main_procedure: str = 'main',
-                        verbose_level: int = CommentLevel.BZ_CODE) -> float:
+def compile_source_code(source_code: str, source_file_name: str, output_file_name: str, main_procedure: str,
+                        verbose_level: int) -> float:
     start_time = time.time()
     tokens = Tokenizer(source_file_name, source_code).tokenize()
     ast = ASTGenerator(Location.in_file(source_file_name), tokens).generate()
@@ -24,33 +25,35 @@ def compile_source_code(source_code: str, source_file_name: str, output_file_nam
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) < 2:
-        message = f'Usage: {argv[0]} <source file> [destination file [main procedure name [verbose level]]]'
-        print(message, file=sys.stderr)
-        sys.exit(1)
+    parser = ArgumentParser(description='Compile a Brainzen program.')
+    parser.add_argument('source_file_name', help='the Brainzen file to compile')
+    parser.add_argument('-o', '--out', default='out.bf', dest='output_file_name', help='the path to the output file')
+    parser.add_argument('-m', '--main', default='main', dest='main_procedure_identifier',
+                        help='the identifier of the procedure to compile')
+    parser.add_argument('-v', '--verbose', type=int, default=CommentLevel.BZ_CODE, dest='verbose_level',
+                        help='the verbose level for comments in generated Brainfuck file')
+    parser.add_argument('-s', '--silent', dest='silent', default=False, action='store_true',
+                        help='redirect stdout to /dev/null')
+    parser.add_argument('-w', '--warnings', type=WarningType.from_string, default=WarningType.default(),
+                        dest='allowed_warning_types', help='a list of allowed warnings (comma separated)')
 
-    source_file_name = argv[1]
-    output_file_name = argv[2] if len(argv) > 2 else 'out.bf'
+    arguments = parser.parse_args(argv[1:])
 
-    kwargs = {}
-    if len(argv) > 3:
-        kwargs['main_procedure'] = argv[3]
-    if len(argv) > 4:
-        kwargs['verbose_level'] = int(argv[4])
-
-    with open(source_file_name, 'r', encoding='UTF-8') as file:
+    with open(arguments.source_file_name, 'r', encoding='UTF-8') as file:
         code = file.read()
 
     try:
-        compilation_time = compile_source_code(code, source_file_name, output_file_name, **kwargs)
+        compilation_time = compile_source_code(code, arguments.source_file_name, arguments.output_file_name,
+                                               arguments.main_procedure_identifier, arguments.verbose_level)
     except CompilationException as e:
         print(e, file=sys.stderr)
         e.location.print_position(code)
         return 1
 
-    CompilationWarning.print_warnings(code)
+    CompilationWarning.print_warnings(code, arguments.allowed_warning_types)
 
-    print(f'Compiled {source_file_name!r} in {compilation_time:0.2f} s')
+    if not arguments.silent:
+        print(f'Compiled {arguments.source_file_name!r} in {compilation_time:0.2f} s')
 
     return 0
 
