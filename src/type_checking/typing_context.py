@@ -97,6 +97,14 @@ class NamespaceTypingContext:
         self.parent.register_namespace(self.identifier, self)
 
 
+class VariableInfo:
+    __slots__ = 'location', 'type'
+
+    def __init__(self, location: Location, variable_type: DataType) -> None:
+        self.location = location
+        self.type = variable_type
+
+
 class CodeBlockTypingContext:
     __slots__ = 'namespace', 'return_type', 'parent', 'variables'
 
@@ -106,7 +114,7 @@ class CodeBlockTypingContext:
         self.namespace = namespace
         self.return_type = return_type
         self.parent = parent
-        self.variables: dict[str, DataType] = {}
+        self.variables: dict[str, VariableInfo] = {}
 
     def __contains__(self, identifier: str) -> bool:
         if identifier in self.variables:
@@ -115,19 +123,28 @@ class CodeBlockTypingContext:
             return identifier in self.parent
         return False
 
-    def __getitem__(self, identifier: str) -> DataType:
+    def __getitem__(self, identifier: str) -> VariableInfo:
         if identifier in self.variables:
             return self.variables[identifier]
         if self.parent is not None:
             return self.parent[identifier]
         raise CompilerException(f'Unknown identifier: {identifier!r}')
 
-    def register_variable(self, identifier: str, variable_type: DataType) -> None:
-        self.variables[identifier] = variable_type
+    def register_variable(self, location: Location, identifier: str, variable_type: DataType) -> None:
+        if identifier in self.variables:
+            original = self.variables[identifier]
+            message = f'Redeclaration of identifier {identifier!r} (declared originally at {original.location!r})'
+            CompilationWarning.add(location, message, WarningType.REDECLARATION)
+        elif self.is_shadow(identifier):
+            original = self.parent[identifier]
+            message = f'Declaration shadows identifier {identifier!r} from outer scope (declared at' \
+                      f' {original.location!r})'
+            CompilationWarning.add(location, message, WarningType.NAME_SHADOWING)
+        self.variables[identifier] = VariableInfo(location, variable_type)
 
     def get_variable_type(self, location: Location, identifier: str) -> DataType:
         if identifier in self:
-            return self[identifier]
+            return self[identifier].type
         raise CompilationException(location, f'Variable {identifier!r} does not exist')
 
     def is_shadow(self, identifier: str) -> bool:
@@ -149,7 +166,7 @@ class SubroutineTypingContext(CodeBlockTypingContext):
         self.identifier = identifier
         self.signature = signature
         for argument in self.signature.arguments:
-            self.variables[argument.identifier] = argument.type
+            self.variables[argument.identifier] = VariableInfo(argument.location, argument.type)
 
     def __enter__(self) -> 'SubroutineTypingContext':
         return self

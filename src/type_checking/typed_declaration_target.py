@@ -35,7 +35,7 @@ class TypedIdentifierDeclarationTarget(TypedDeclarationTarget):
     @classmethod
     def from_untyped(cls, context: CodeBlockTypingContext, target: IdentifierAssignmentTarget,
                      target_type: DataType) -> 'TypedIdentifierDeclarationTarget':
-        context.register_variable(target.identifier, target_type)
+        context.register_variable(target.location, target.identifier, target_type)
         return cls(target.location, target.identifier, target_type)
 
     def __init__(self, location: Location, identifier: str, target_type: DataType) -> None:
