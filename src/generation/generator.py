@@ -664,6 +664,10 @@ class SubroutineCompiler(NameManager):
                     self._right(element.type().size())
             case TypedArrayComprehension(element_format=element_format, iterators=iterators):
                 self.evaluate_array_comprehension(element_format, iterators)
+            case LiteralRange(start=start, end=end):
+                iterator = range(start, end + 1) if start <= end else reversed(range(end, start + 1))
+                for offset, value in enumerate(iterator):
+                    self._set(value, index=index + offset)
             case LiteralTuple(elements=elements):
                 for element in elements:
                     self.evaluate(element)

@@ -105,6 +105,8 @@ class TypedExpression(TypeCheckedInstruction, ABC):
                 return LiteralArray.from_array(context, array)
             case ArrayComprehension() as array_comprehension:
                 return TypedArrayComprehension.from_untyped(context, array_comprehension)
+            case Range() as range_expression:
+                return LiteralRange.from_untyped(context, range_expression)
             case Tuple() as tuple_expression:
                 return LiteralTuple.from_tuple_expression(context, tuple_expression)
             case Identifier() as identifier:
@@ -217,6 +219,10 @@ def evaluate(context: NamespaceTypingContext, expression: Expression) -> TypedEx
             return LiteralChar.from_char(char)
         case Array(location=location, value=value):
             return LiteralArray(location, [evaluate(context, element) for element in value])
+        case Range(location=location, start=start, end=end):
+            if start > end:
+                return LiteralArray(location, [LiteralChar(location, i) for i in reversed(range(end, start + 1))])
+            return LiteralArray(location, [LiteralChar(location, i) for i in range(start, end + 1)])
         case Tuple(location=location, elements=elements):
             return LiteralTuple(location, [evaluate(context, element) for element in elements])
         case UnaryArithmeticExpression(location=location, operator=operator, operand=operand):
@@ -447,6 +453,26 @@ class TypedArrayComprehension(TypedExpression):
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}[{self.element_format!r}, {self.iterators!r}]'
+
+
+class LiteralRange(TypedExpression):
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext, range_expression: Range) -> 'LiteralRange':
+        return cls(range_expression.location, range_expression.start, range_expression.end)
+
+    def __init__(self, location: Location, start: int, end: int) -> None:
+        super().__init__(location)
+        self.start = start
+        self.end = end
+
+    def type(self) -> DataType:
+        return ArrayType(Types.CHAR, abs(self.end - self.start) + 1)
+
+    def __str__(self) -> str:
+        return f'{self.start}..{self.end}'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.start!r}, {self.end!r}]'
 
 
 class LiteralTuple(TypedExpression):
@@ -922,7 +948,7 @@ class TypeCheckedContextSnapshot(TypeCheckedInstruction):
 
 __all__ = ['TypeCheckedInstruction', 'TypeCheckedInstructionBlock', 'TypedExpression', 'evaluate', 'LiteralChar',
            'LiteralArray', 'TypedIterator', 'TypedArrayIterator', 'TypedIteratorGroup', 'TypedIteratorChain',
-           'TypedArrayComprehension', 'LiteralTuple', 'TypedIdentifier', 'TypedArithmeticExpression',
+           'TypedArrayComprehension', 'LiteralRange', 'LiteralTuple', 'TypedIdentifier', 'TypedArithmeticExpression',
            'TypedUnaryArithmeticExpression', 'TypedBinaryArithmeticExpression', 'TypedArraySubscriptExpression',
            'TypedArraySlicingExpression', 'PrintCall', 'InputCall', 'LogCall', 'TypeCheckedProcedureCall',
            'TypedFunctionCall', 'TypeCheckedIncrementation', 'TypeCheckedDecrementation',

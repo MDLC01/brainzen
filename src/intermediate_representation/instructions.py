@@ -96,6 +96,19 @@ class Array(Expression):
         return f'{self.__class__.__name__}[{self.value!r}]'
 
 
+class Range(Expression):
+    def __init__(self, location: Location, start: int, end: int) -> None:
+        super().__init__(location)
+        self.start = start
+        self.end = end
+
+    def __str__(self) -> str:
+        return f'{self.start}..{self.end}'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.start!r}, {self.end!r}]'
+
+
 class Iterator(ABC):
     __slots__ = 'location', 'target'
 
@@ -447,7 +460,7 @@ class ContextSnapshot(Instruction):
         return f'{self.__class__.__name__}'
 
 
-__all__ = ['Instruction', 'InstructionBlock', 'Expression', 'ConstantReference', 'Char', 'Array', 'Iterator',
+__all__ = ['Instruction', 'InstructionBlock', 'Expression', 'ConstantReference', 'Char', 'Array', 'Range', 'Iterator',
            'ArrayIterator', 'IteratorGroup', 'IteratorChain', 'ArrayComprehension', 'Tuple', 'Identifier',
            'ArithmeticExpression', 'UnaryArithmeticExpression', 'BinaryArithmeticExpression',
            'ArraySubscriptExpression', 'ArraySlicingExpression', 'ProcedureCall', 'FunctionCall', 'Incrementation',

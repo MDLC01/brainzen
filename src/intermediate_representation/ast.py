@@ -298,6 +298,12 @@ class ASTGenerator:
         if self._is_next(IdentifierToken):
             identifier = self._expect(IdentifierToken).name
             return Identifier(self._location_from(start_location), identifier)
+        # Range literal
+        if self._is_next(NumberLiteral) and self._is_next(DoubleDotToken, 1):
+            start = self._expect(NumberLiteral).value
+            self._expect(DoubleDotToken)
+            end = self._expect(NumberLiteral).value
+            return Range(self._location_from(start_location), start, end)
         # Number literal
         if self._is_next(NumberLiteral):
             value = self._expect(NumberLiteral).value
