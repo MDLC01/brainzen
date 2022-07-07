@@ -84,6 +84,11 @@ class BinaryOperation(ABC):
                 if right_type == Types.CHAR:
                     return AdditionOperation()
                 raise InvalidRightOperandType(location, operator, right_type)
+            if isinstance(left_type, ArrayType):
+                if isinstance(right_type, ArrayType):
+                    if left_type.base_type == right_type.base_type:
+                        return ConcatenationOperation(left_type.base_type, left_type.count, right_type.count)
+                raise InvalidRightOperandType(location, operator, right_type)
             raise InvalidLeftOperandType(location, operator, left_type)
         # -
         if isinstance(operator, MinusToken):
@@ -113,14 +118,6 @@ class BinaryOperation(ABC):
             if left_type == Types.CHAR:
                 if right_type == Types.CHAR:
                     return ModuloOperation()
-                raise InvalidRightOperandType(location, operator, right_type)
-            raise InvalidLeftOperandType(location, operator, left_type)
-        # ..
-        if isinstance(operator, DoubleDotToken):
-            if isinstance(left_type, ArrayType):
-                if isinstance(right_type, ArrayType):
-                    if left_type.base_type == right_type.base_type:
-                        return ConcatenationOperation(left_type.base_type, left_type.count, right_type.count)
                 raise InvalidRightOperandType(location, operator, right_type)
             raise InvalidLeftOperandType(location, operator, left_type)
         raise CompilerException(f'Unknown binary operator: {operator}')
@@ -349,7 +346,7 @@ class ConcatenationOperation(BinaryOperation):
         return ArrayType(self.base_type, self.left_array_count + self.right_array_count)
 
     def __str__(self) -> str:
-        return '..'
+        return '+'
 
 
 class ArrayScalingOperation(BinaryOperation):

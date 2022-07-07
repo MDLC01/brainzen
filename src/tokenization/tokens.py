@@ -14,15 +14,14 @@ def is_valid_word(word: str) -> bool:
 
 
 class Priority(IntEnum):
-    MIN = 0
+    MINIMAL = 0
     CONJUNCTION = 1
     DISJUNCTION = 2
     COMPARISON = 3
     ADDITION = 4
     MULTIPLICATION = 5
-    CONCATENATION = 6
     PARENTHESIS = 254
-    MAX = 255
+    MAXIMAL = 255
 
 
 AnyToken = TypeVar('AnyToken', bound='Token')
@@ -258,9 +257,6 @@ class PercentToken(Token):
 
 class DoubleDotToken(Token):
     token = '..'
-
-    def binary_operator_priority(self) -> Priority | None:
-        return Priority.CONCATENATION
 
 
 class ColonToken(Token):
