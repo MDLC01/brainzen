@@ -4,38 +4,30 @@
 func swap(char[16] arr, char k, char l) -> char[16] {
     let xk: char;
     let xl: char;
-    let i = 0;
-    for (e : arr) {
+    for (e : arr, i : 0..15) {
         if (i == k) xk = e;
         if (i == l) xl = e;
-        i++;
     }
-    i = 0;
-    for (e : arr) {
+    for (e : arr, i : 0..15) {
         if (i == k) e = xl;
         if (i == l) e = xk;
-        i++;
     }
     return arr;
 }
 
 func sort(char[16] arr) -> char[16] {
-    let start = 0;
-    for (_ : arr) {
+    for (start : 0..15) {
         let min_index = 0;
         let min_value = 0xff;
-        let i = 0;
-        for (e : arr) {
+        for (e : arr, i : 0..15) {
             if (i >= start) {
                 if (e <= min_value) {
                     min_index = i;
                     min_value = e;
                 }
             }
-            i++;
         }
         arr = swap(arr, start, min_index);
-        start++;
     }
     return arr;
 }
