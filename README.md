@@ -46,7 +46,7 @@ There are also some features that will likely never be added to the language, be
 
 ### Code examples
 
-This section contains examples of basic programs and subroutines written in Brainzen.
+This section contains examples of basic programs and subroutines written in Brainzen. More complex examples are available in this repository, under the [`examples/`](examples) directory.
 
 #### Hello world
 

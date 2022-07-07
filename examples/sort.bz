@@ -1,0 +1,54 @@
+#RESET = "\x1b[0m";
+#RED = "\x1b[91m";
+
+func swap(char[16] arr, char k, char l) -> char[16] {
+    let xk: char;
+    let xl: char;
+    let i = 0;
+    for (e : arr) {
+        if (i == k) xk = e;
+        if (i == l) xl = e;
+        i++;
+    }
+    i = 0;
+    for (e : arr) {
+        if (i == k) e = xl;
+        if (i == l) e = xk;
+        i++;
+    }
+    return arr;
+}
+
+func sort(char[16] arr) -> char[16] {
+    let start = 0;
+    for (_ : arr) {
+        let min_index = 0;
+        let min_value = 0xff;
+        let i = 0;
+        for (e : arr) {
+            if (i >= start) {
+                if (e <= min_value) {
+                    min_index = i;
+                    min_value = e;
+                }
+            }
+            i++;
+        }
+        arr = swap(arr, start, min_index);
+        start++;
+    }
+    return arr;
+}
+
+proc test(char[16] arr) {
+    print("Initial array: ");
+    log(arr);
+    print("Sorted array:  ");
+    log(sort(arr));
+}
+
+proc main() {
+    test([5, 137, 2, 74, 7, 69, 0, 102, 254, 3, 33, 255, 9, 17, 7, 191]);
+    test([16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
+    test([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+}

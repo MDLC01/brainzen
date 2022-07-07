@@ -1,0 +1,112 @@
+#RESET = "\x1b[0m";
+#RED = "\x1b[91m";
+
+proc print_grid(char[9] grid) {
+    let i = 0;
+    for (c : grid) {
+        if (c == ' ') c = '1' + i;
+        i++;
+    }
+
+    println(" ", grid[0], " | ", grid[1], " | ", grid[2]);
+    println("---+---+---");
+    println(" ", grid[3], " | ", grid[4], " | ", grid[5]);
+    println("---+---+---");
+    println(" ", grid[6], " | ", grid[7], " | ", grid[8]);
+}
+
+
+func score(char player) -> char {
+    let p = 0;
+    if (player == 'O') p++;
+    else if (player == 'X') p--;
+    return p;
+}
+
+
+func test_result(char[9] grid) -> char {
+    let scores = [score(c) | c : grid];
+    let v: char;
+
+    // All possible combinations are hardcoded here
+
+    let s = scores[0] + scores[1] + scores[2];
+    if (s == 3) v = 'O';
+    else if (s == -3) v = 'X';
+
+    s = scores[3] + scores[4] + scores[5];
+    if (s == 3) v = 'O';
+    else if (s == -3) v = 'X';
+
+    s = scores[6] + scores[7] + scores[8];
+    if (s == 3) v = 'O';
+    else if (s == -3) v = 'X';
+
+    s = scores[0] + scores[3] + scores[6];
+    if (s == 3) v = 'O';
+    else if (s == -3) v = 'X';
+
+    s = scores[1] + scores[4] + scores[7];
+    if (s == 3) v = 'O';
+    else if (s == -3) v = 'X';
+
+    s = scores[2] + scores[5] + scores[8];
+    if (s == 3) v = 'O';
+    else if (s == -3) v = 'X';
+
+    s = scores[0] + scores[4] + scores[8];
+    if (s == 3) v = 'O';
+    else if (s == -3) v = 'X';
+
+    s = scores[2] + scores[4] + scores[6];
+    if (s == 3) v = 'O';
+    else if (s == -3) v = 'X';
+
+    return v;
+}
+
+
+proc main() {
+    let grid = "         ";
+    let player = 'O';
+
+    let i = 0;
+    let v: char;
+
+    while (i < 9) {
+        i++;
+
+        print_grid(grid);
+        print("It's ", player, "'s turn to play. Pick a cell: ");
+        let c = input();
+
+        let is_invalid = 1;
+        let j = 0;
+        for (cell : grid) {
+            if (c == '1' + j && cell == ' ') {
+                cell = player;
+                if (player == 'O') player = 'X';
+                else player = 'O';
+                is_invalid = 0;
+            }
+            j++;
+        }
+
+        if (is_invalid) {
+            print(#RED, "Please enter a valid value", #RESET);
+            i--;
+        }
+
+        v = test_result(grid);
+        if (v) i = 9;
+
+        println();
+    }
+
+    print_grid(grid);
+    if (v) {
+        println(v, " won!");
+    } else {
+        println("It's a draw!");
+    }
+}

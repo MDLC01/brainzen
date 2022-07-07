@@ -1,0 +1,71 @@
+#RESET = "\x1b[0m";
+#RED = "\x1b[91m";
+
+namespace IO {
+    proc print10(char n) {
+        let d2 = n / 100;
+        let d1 = (n / 10) % 10;
+        let d0 = n % 10;
+        if (d2) print('0' + d2);
+        if (d1 || d2) print('0' + d1);
+        print('0' + d0);
+    }
+
+    func read_digit() -> char {
+        let value = -1;
+        let digit = input();
+        if ('0' <= digit && digit <= '9') {
+            value = digit - '0';
+        }
+        return value;
+    }
+
+    func read_number() -> char {
+        let value = read_digit();
+
+        let digit = read_digit();
+        if (digit != -1) {
+            value = value * 10 + digit;
+
+            digit = read_digit();
+            if (digit != -1) {
+                value = value * 10 + digit;
+            }
+        }
+
+        return value;
+    }
+}
+
+proc main() {
+    print("Input left operand: ");
+    let left = IO::read_number();
+    println();
+
+    print("Choose operation: ");
+    let operation = input();
+    println();
+
+    print("Input right operand: ");
+    let right = IO::read_number();
+    println();
+
+    IO::print10(left);
+    print(" ", operation, " ");
+    IO::print10(right);
+    print(" = ");
+
+    if (operation == '+') {
+        log(left + right);
+    } else if (operation == '-') {
+        log(left - right);
+    } else if (operation == '*') {
+        log(left * right);
+    } else if (operation == '/') {
+        log(left / right);
+    } else if (operation == '%') {
+        log(left % right);
+    } else {
+        println(#RED, "Invalid operation: ", operation, #RESET);
+    }
+}

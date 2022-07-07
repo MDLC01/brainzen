@@ -1,0 +1,38 @@
+namespace IO {
+    proc print10(char n) {
+        let d2 = n / 100;
+        let d1 = (n / 10) % 10;
+        let d0 = n % 10;
+        if (d2) print('0' + d2);
+        if (d1 || d2) print('0' + d1);
+        print('0' + d0);
+    }
+}
+
+proc binary_search(char a, char b) {
+    print("Choose an integer in [");
+    IO::print10(a);
+    print(", ");
+    IO::print10(b);
+    println("[");
+
+    while (a < b - 1) {
+        let pivot = a + (b - a) / 2;
+        print("Is your number ");
+        IO::print10(pivot);
+        print(" or higher? (0/1) ");
+        if (input() - '0') {
+            a = pivot;
+        } else {
+            b = pivot;
+        }
+        println();
+    }
+    print("Your number is ");
+    IO::print10(a);
+    println();
+}
+
+proc main() {
+    binary_search(0, 255);
+}
