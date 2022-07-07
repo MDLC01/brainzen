@@ -154,7 +154,7 @@ class CompilationWarning(Warning):
         self.type = warning_type
 
     def __str__(self):
-        return f'{self.location}{self.message}'
+        return f'{self.location}Warning: {self.message}'
 
     @classmethod
     def add(cls, location: Location, message: str, warning_type: WarningType):
