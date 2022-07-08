@@ -487,7 +487,9 @@ class ASTGenerator:
             return ConditionalStatement(location, test, if_instructions, else_instructions)
         # Instruction
         instruction = self.parse_instruction()
-        self._expect(SemicolonToken)
+        if not self._is_next(SemicolonToken):
+            raise CompilationException(instruction.location.after(), 'Expected semicolon after instruction')
+        self._next()
         return instruction
 
     def parse_instruction_block(self) -> InstructionBlock:

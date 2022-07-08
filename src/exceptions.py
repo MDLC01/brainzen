@@ -61,6 +61,9 @@ class Location:
         end = location.column + location.length
         return Location(self.file, self.line, self.column, end - self.column)
 
+    def after(self) -> 'Location':
+        return Location(self.file, self.line, self.column + self.length)
+
     def print_position(self, source_code: str, *, out=sys.stderr):
         if self.line is None or self.column is None:
             return
