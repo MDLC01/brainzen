@@ -73,6 +73,9 @@ class TypeCheckedSubroutine(TypeCheckedNamespaceElement, ABC):
     def __init__(self, location: Location, identifier: str, is_private: bool, arguments: list[SubroutineArgument],
                  return_type: DataType | None) -> None:
         super().__init__(location, identifier, is_private)
+        if identifier in ('print', 'println', 'input', 'log'):
+            message = f'This subroutine cannot be called from this namespace because {identifier!r} is a reserved name'
+            CompilationWarning.add(location, message, WarningType.RESERVED_NAME)
         self.arguments = arguments
         self.return_type = return_type
         locations = {}
