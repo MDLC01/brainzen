@@ -110,7 +110,7 @@ class WarningType(Enum):
     NAME_SHADOWING = 'shadowing'
     IGNORED_RESULT = 'ignored-result'
     NATIVE_CODE = 'native-code'
-    DEBUG_FEATURE = 'debug'
+    DEBUG_FEATURE = 'debug-feature'
 
     @classmethod
     def all(cls) -> set['WarningType']:
