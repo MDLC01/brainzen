@@ -108,6 +108,7 @@ class WarningType(Enum):
     OUT_OF_RANGE = 'out-of-range'
     REDECLARATION = 'redeclaration'
     NAME_SHADOWING = 'shadowing'
+    IGNORED_RESULT = 'ignored-result'
     NATIVE_CODE = 'native-code'
     DEBUG_FEATURE = 'debug'
 
@@ -121,7 +122,7 @@ class WarningType(Enum):
 
     @classmethod
     def debug(cls) -> set['WarningType']:
-        return {cls.OUT_OF_RANGE, cls.REDECLARATION, cls.NAME_SHADOWING, cls.NATIVE_CODE}
+        return {cls.OUT_OF_RANGE, cls.REDECLARATION, cls.NAME_SHADOWING, cls.IGNORED_RESULT, cls.NATIVE_CODE}
 
     @classmethod
     def none(cls) -> set['WarningType']:

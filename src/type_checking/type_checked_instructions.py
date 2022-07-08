@@ -20,15 +20,15 @@ class TypeCheckedInstruction(ABC):
             case Expression() as expression:
                 return TypedExpression.from_expression(context, expression)
             case ProcedureCall(reference=Reference(namespace=None, identifier='print')) as procedure_call:
-                return PrintCall(context, procedure_call)
+                return PrintCall.from_untyped(context, procedure_call)
             case ProcedureCall(reference=Reference(namespace=None, identifier='println')) as procedure_call:
-                return PrintCall(context, procedure_call, True)
+                return PrintCall.from_untyped(context, procedure_call)
             case ProcedureCall(reference=Reference(namespace=None, identifier='input')) as procedure_call:
-                return InputCall(procedure_call)
+                return InputCall.from_untyped(context, procedure_call)
             case ProcedureCall(reference=Reference(namespace=None, identifier='log')) as procedure_call:
-                return LogCall.from_procedure_call(context, procedure_call)
+                return LogCall.from_untyped(context, procedure_call)
             case ProcedureCall() as procedure_call:
-                return TypeCheckedProcedureCall(context, procedure_call)
+                return TypeCheckedProcedureCall.from_untyped(context, procedure_call)
             case Incrementation() as incrementation:
                 return TypeCheckedIncrementation(context, incrementation)
             case Decrementation() as decrementation:
@@ -124,11 +124,11 @@ class TypedExpression(TypeCheckedInstruction, ABC):
             case FunctionCall(location=location, reference=Reference(namespace=None, identifier='println')):
                 raise CompilationException(location, f"Procedure 'println' does not return anything")
             case FunctionCall(reference=Reference(namespace=None, identifier='input')) as function_call:
-                return InputCall(function_call)
+                return InputCall.from_untyped(context, function_call)
             case FunctionCall(location=location, reference=Reference(namespace=None, identifier='log')):
                 raise CompilationException(location, f"Procedure 'log' does not return anything")
             case FunctionCall() as function_call:
-                return TypedFunctionCall(context, function_call)
+                return TypedFunctionCall.from_untyped(context, function_call)
         raise ImpossibleException(f'Unknown expression type: {expression.__class__.__name__}')
 
     @abstractmethod
@@ -618,97 +618,39 @@ class TypedArraySlicingExpression(TypedExpression):
         return f'{self.__class__.__name__}[{self.array!r}, {self.start}, {self.stop}]'
 
 
-class PrintCall(TypeCheckedInstruction):
-    def __init__(self, context: CodeBlockTypingContext, procedure_call: ProcedureCall, new_line: bool = False) -> None:
-        super().__init__(procedure_call.location)
-        self.new_line = new_line
-        self.procedure = 'println' if new_line else 'print'
-        # Type checking
-        self.arguments: list[TypedExpression] = self._type_check_arguments(context, procedure_call.arguments)
-
-    def _type_check_arguments(self, context: CodeBlockTypingContext,
-                              arguments: list[Expression]) -> list[TypedExpression]:
-        typed_arguments: list[TypedExpression] = []
-        for argument in arguments:
-            typed_argument = TypedExpression.from_expression(context, argument)
-            argument_type = typed_argument.type()
-            if not argument_type.is_string():
-                message = f'Subroutine {self.procedure!r} only accepts string-like arguments, but found {argument_type}'
-                raise CompilationException(argument.location, message)
-            typed_arguments.append(typed_argument)
-        return typed_arguments
-
-    def __str__(self) -> str:
-        arguments = ', '.join(str(argument) for argument in self.arguments)
-        return f'{self.procedure}({arguments})'
-
-    def __repr__(self) -> str:
-        arguments = ', '.join(repr(argument) for argument in self.arguments)
-        return f'{self.__class__.__name__}[println={self.new_line}, {arguments}]'
-
-
-class InputCall(TypedExpression):
-    def __init__(self, procedure_call: ProcedureCall) -> None:
-        super().__init__(procedure_call.location)
-        # Type checking
-        arity = len(procedure_call.arguments)
-        if arity > 0:
-            raise CompilationException(self.location, f"Subroutine 'input' accepts 0 arguments, but found {arity}")
-
-    def type(self) -> DataType:
-        return Types.CHAR
-
-    def __str__(self) -> str:
-        return f'input()'
-
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}'
-
-
-class LogCall(TypeCheckedInstruction):
-    @classmethod
-    def from_procedure_call(cls, context: CodeBlockTypingContext, procedure_call: ProcedureCall) -> 'LogCall':
-        if len(procedure_call.arguments) != 1:
-            message = f"Subroutine 'log' expects a single argument, but found {len(procedure_call.arguments)}"
-            raise CompilationException(procedure_call.location, message)
-        argument = TypedExpression.from_expression(context, procedure_call.arguments[0])
-        return cls(procedure_call.location, argument)
-
-    def __init__(self, location: Location, argument: TypedExpression) -> None:
-        super().__init__(location)
-        self.argument = argument
-
-    def __str__(self) -> str:
-        return f'log({self.argument})'
-
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.argument!r}]'
-
-
 class TypeCheckedProcedureCall(TypeCheckedInstruction):
-    def __init__(self, context: CodeBlockTypingContext, procedure_call: ProcedureCall) -> None:
-        super().__init__(procedure_call.location)
-        self.reference = procedure_call.reference
-        self.arguments = self._type_check_arguments(context, procedure_call.arguments)
-
-    def _type_check_arguments(self, context: CodeBlockTypingContext,
-                              arguments: list[Expression]) -> list[TypedExpression]:
-        expected_types = context.namespace.get_subroutine_signature(self.reference).get_argument_types()
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext, procedure_call: ProcedureCall) -> 'TypeCheckedProcedureCall':
+        location = procedure_call.location
+        reference = procedure_call.reference
+        arguments = procedure_call.arguments
+        # Get subroutine signature
+        signature = context.namespace.get_subroutine_signature(reference)
+        if signature.return_type is not None:
+            message = f'Return value of function {reference} is ignored'
+            CompilationWarning.add(location, message, WarningType.IGNORED_RESULT)
+        expected_types = signature.get_argument_types()
+        # Test arity
         if len(arguments) != len(expected_types):
             argument_count = f'{len(expected_types)} argument'
             if len(expected_types) > 1:
                 argument_count += 's'
-            message = f'Subroutine {self.reference} accepts {argument_count}, but found {len(arguments)}'
-            raise CompilationException(self.location, message)
-        typed_arguments: list[TypedExpression] = []
+            message = f'Procedure {reference} accepts {argument_count}, but found {len(arguments)}'
+            raise CompilationException(location, message)
+        # Test if types match
+        typed_arguments = []
         for i, argument in enumerate(arguments):
-            typed_argument = TypedExpression.from_expression(context, argument)
+            typed_argument = TypedExpression.from_untyped(context, argument)
             if typed_argument.type() != expected_types[i]:
-                message = f'Argument {i} of subroutine {self.reference} is expected to be of type' \
-                          f' {expected_types[i]}, but found {typed_argument.type()}'
+                message = f'Expected {expected_types[i]} but found {typed_argument.type()}'
                 raise CompilationException(typed_argument.location, message)
             typed_arguments.append(typed_argument)
-        return typed_arguments
+        return cls(location, reference, typed_arguments)
+
+    def __init__(self, location: Location, reference: Reference, arguments: list[TypedExpression]) -> None:
+        super().__init__(location)
+        self.reference = reference
+        self.arguments = arguments
 
     def __str__(self) -> str:
         arguments = ', '.join(str(argument) for argument in self.arguments)
@@ -721,13 +663,119 @@ class TypeCheckedProcedureCall(TypeCheckedInstruction):
         return f'{self.__class__.__name__}[{self.reference}]'
 
 
-class TypedFunctionCall(TypeCheckedProcedureCall, TypedExpression):
-    def __init__(self, context: CodeBlockTypingContext, function_call: FunctionCall) -> None:
-        super().__init__(context, function_call)
-        self.return_type: DataType = context.namespace.get_subroutine_signature(self.reference).return_type
+class TypedFunctionCall(TypedExpression):
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext, function_call: FunctionCall) -> 'TypedFunctionCall':
+        location = function_call.location
+        reference = function_call.reference
+        arguments = function_call.arguments
+        # Get subroutine signature
+        signature = context.namespace.get_subroutine_signature(reference)
+        expected_types = signature.get_argument_types()
+        # Test arity
+        if len(arguments) != len(expected_types):
+            argument_count = f'{len(expected_types)} argument'
+            if len(expected_types) > 1:
+                argument_count += 's'
+            message = f'Function {reference} accepts {argument_count}, but found {len(arguments)}'
+            raise CompilationException(location, message)
+        # Test if types match
+        typed_arguments = []
+        for i, argument in enumerate(arguments):
+            typed_argument = TypedExpression.from_untyped(context, argument)
+            if typed_argument.type() != expected_types[i]:
+                message = f'Expected {expected_types[i]} but found {typed_argument.type()}'
+                raise CompilationException(typed_argument.location, message)
+            typed_arguments.append(typed_argument)
+        return cls(location, reference, typed_arguments, signature.return_type)
+
+    def __init__(self, location: Location, reference: Reference, arguments: list[TypedExpression],
+                 return_type: DataType) -> None:
+        super().__init__(location)
+        self.reference = reference
+        self.arguments = arguments
+        self.return_type = return_type
 
     def type(self) -> DataType:
         return self.return_type
+
+    def __str__(self) -> str:
+        arguments = ', '.join(str(argument) for argument in self.arguments)
+        return f'{self.reference}({arguments})'
+
+    def __repr__(self) -> str:
+        if self.arguments:
+            arguments = ', '.join(repr(argument) for argument in self.arguments)
+            return f'{self.__class__.__name__}[{self.reference}, {arguments}]'
+        return f'{self.__class__.__name__}[{self.reference}]'
+
+
+class PrintCall(TypeCheckedProcedureCall):
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext, procedure_call: ProcedureCall) -> 'PrintCall':
+        procedure = procedure_call.reference
+        new_line = procedure.identifier.endswith('ln')
+        arguments = []
+        for argument in procedure_call.arguments:
+            typed_argument = TypedExpression.from_untyped(context, argument)
+            argument_type = typed_argument.type()
+            if not argument_type.is_string():
+                raise CompilationException(argument.location, f'Expected string-like but found {argument_type}')
+            arguments.append(typed_argument)
+        return cls(procedure_call.location, procedure, arguments, new_line)
+
+    def __init__(self, location: Location, procedure: Reference, arguments: list[TypedExpression],
+                 new_line: bool = False) -> None:
+        super().__init__(location, procedure, arguments)
+        self.new_line = new_line
+
+    def __repr__(self) -> str:
+        if self.arguments:
+            arguments = ', '.join(repr(argument) for argument in self.arguments)
+            return f'{self.__class__.__name__}[{self.reference}, {arguments}, new_line={self.new_line}]'
+        return f'{self.__class__.__name__}[{self.reference}, new_line={self.new_line}]'
+
+
+class InputCall(TypedFunctionCall):
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext, function_call: FunctionCall) -> 'InputCall':
+        location = function_call.location
+        reference = function_call.reference
+        # Test arity
+        if len(function_call.arguments) != 0:
+            message = f'Function {reference} accepts no argument, but found {len(function_call.arguments)}'
+            raise CompilationException(location, message)
+        return cls(location, reference)
+
+    def __init__(self, location: Location, reference: Reference) -> None:
+        super().__init__(location, reference, [], Types.CHAR)
+
+    def type(self) -> DataType:
+        return Types.CHAR
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}'
+
+
+class LogCall(TypeCheckedProcedureCall):
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext, procedure_call: ProcedureCall) -> 'LogCall':
+        location = procedure_call.location
+        reference = procedure_call.reference
+        # Test arity
+        if len(procedure_call.arguments) != 1:
+            message = f"Procedure {reference} accepts a single argument, but found {len(procedure_call.arguments)}"
+            raise CompilationException(location, message)
+        # Type check argument
+        argument = TypedExpression.from_untyped(context, procedure_call.arguments[0])
+        return cls(location, reference, argument)
+
+    def __init__(self, location: Location, reference: Reference, argument: TypedExpression) -> None:
+        super().__init__(location, reference, [argument])
+        self.argument = argument
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.argument!r}]'
 
 
 class TypeCheckedIncrementation(TypeCheckedInstruction):
