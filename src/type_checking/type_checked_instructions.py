@@ -642,12 +642,19 @@ class TypedArraySlicingExpression(TypedExpression):
         array_type = array.type()
         if not isinstance(array_type, ArrayType):
             raise CompilationException(location, f'Cannot slice {array_type}')
-        if start > stop:
-            raise CompilationException(location, f'Invalid slice (start index must be smaller than end index)')
+        # Compute positive start (negative indices start at the end)
+        if start < 0:
+            start = array_type.count - start
         if start < 0 or start >= array_type.count:
-            raise CompilationException(location, 'Start index out of bounds')
+            raise CompilationException(location, f'Index out of bounds for {array_type}')
+        # Compute positive stop (negative indices start at the end)
+        if stop < 0:
+            stop = array_type.count - stop
         if stop < 0 or stop > array_type.count:
-            raise CompilationException(location, 'Stop index out of bounds')
+            raise CompilationException(location, f'Index out of bounds for {array_type}')
+        # Assert the slice is valid
+        if start > stop:
+            raise CompilationException(location, 'Invalid slice (start index must be smaller than stop index)')
         base_type = array_type.base_type
         return cls(location, array, start, stop, base_type)
 
