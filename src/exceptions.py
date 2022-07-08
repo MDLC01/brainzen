@@ -105,10 +105,10 @@ class CompilationException(Exception):
 
 
 class WarningType(Enum):
-    OUT_OF_RANGE = 'out_of_range'
+    OUT_OF_RANGE = 'out-of-range'
     REDECLARATION = 'redeclaration'
     NAME_SHADOWING = 'shadowing'
-    NATIVE_CODE = 'native_code'
+    NATIVE_CODE = 'native-code'
     DEBUG_FEATURE = 'debug'
 
     @classmethod
