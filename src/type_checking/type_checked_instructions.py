@@ -12,13 +12,13 @@ from type_checking.typing_context import *
 
 
 class TypeCheckedInstruction(ABC):
-    @staticmethod
-    def from_instruction(context: CodeBlockTypingContext, instruction: Instruction) -> 'TypeCheckedInstruction':
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext, instruction: Instruction) -> 'TypeCheckedInstruction':
         match instruction:
             case InstructionBlock() as instruction_block:
-                return TypeCheckedInstructionBlock(context, instruction_block)
+                return TypeCheckedInstructionBlock.from_untyped(context, instruction_block)
             case Expression() as expression:
-                return TypedExpression.from_expression(context, expression)
+                return TypedExpression.from_untyped(context, expression)
             case ProcedureCall(reference=Reference(namespace=None, identifier='print')) as procedure_call:
                 return PrintCall.from_untyped(context, procedure_call)
             case ProcedureCall(reference=Reference(namespace=None, identifier='println')) as procedure_call:
@@ -30,29 +30,29 @@ class TypeCheckedInstruction(ABC):
             case ProcedureCall() as procedure_call:
                 return TypeCheckedProcedureCall.from_untyped(context, procedure_call)
             case Incrementation() as incrementation:
-                return TypeCheckedIncrementation(context, incrementation)
+                return TypeCheckedIncrementation.from_untyped(context, incrementation)
             case Decrementation() as decrementation:
-                return TypeCheckedDecrementation(context, decrementation)
+                return TypeCheckedDecrementation.from_untyped(context, decrementation)
             case VariableDeclaration() as variable_declaration:
-                return TypeCheckedVariableDeclaration.from_variable_declaration(context, variable_declaration)
+                return TypeCheckedVariableDeclaration.from_untyped(context, variable_declaration)
             case VariableCreation() as variable_creation:
-                return TypeCheckedVariableCreation.from_variable_creation(context, variable_creation)
+                return TypeCheckedVariableCreation.from_untyped(context, variable_creation)
             case Assignment() as assignment:
-                return TypeCheckedAssignment(context, assignment)
+                return TypeCheckedAssignment.from_untyped(context, assignment)
             case LoopStatement() as loop_statement:
-                return TypeCheckedLoopStatement(context, loop_statement)
+                return TypeCheckedLoopStatement.from_untyped(context, loop_statement)
             case WhileLoopStatement() as while_loop_statement:
-                return TypeCheckedWhileLoopStatement(context, while_loop_statement)
+                return TypeCheckedWhileLoopStatement.from_untyped(context, while_loop_statement)
             case DoWhileLoopStatement() as do_while_loop_statement:
-                return TypeCheckedDoWhileLoopStatement(context, do_while_loop_statement)
+                return TypeCheckedDoWhileLoopStatement.from_untyped(context, do_while_loop_statement)
             case ForLoopStatement() as for_loop_statement:
-                return TypeCheckedForLoopStatement.from_for_loop_statement(context, for_loop_statement)
+                return TypeCheckedForLoopStatement.from_untyped(context, for_loop_statement)
             case ConditionalStatement() as conditional_statement:
-                return TypeCheckedConditionalStatement(context, conditional_statement)
+                return TypeCheckedConditionalStatement.from_untyped(context, conditional_statement)
             case ReturnInstruction() as return_instruction:
-                return TypeCheckedReturnInstruction(context, return_instruction)
+                return TypeCheckedReturnInstruction.from_untyped(context, return_instruction)
             case ContextSnapshot() as context_snapshot:
-                return TypeCheckedContextSnapshot(context_snapshot)
+                return TypeCheckedContextSnapshot.from_untyped(context, context_snapshot)
         raise ImpossibleException(f'Unknown instruction type: {instruction.__class__.__name__}')
 
     def __init__(self, location: Location) -> None:
@@ -63,12 +63,17 @@ class TypeCheckedInstruction(ABC):
 
 
 class TypeCheckedInstructionBlock(TypeCheckedInstruction):
-    def __init__(self, context: CodeBlockTypingContext, instruction_block: InstructionBlock, *,
-                 allow_return: bool = False) -> None:
-        super().__init__(instruction_block.location)
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext, instruction_block: InstructionBlock, *,
+                     allow_return: bool = False) -> 'TypeCheckedInstructionBlock':
         subscope = context.subscope(allow_return=allow_return)
-        self.instructions = [TypeCheckedInstruction.from_instruction(subscope, instruction)
-                             for instruction in instruction_block.instructions]
+        instructions = [TypeCheckedInstruction.from_untyped(subscope, instruction)
+                        for instruction in instruction_block.instructions]
+        return cls(instruction_block.location, instructions)
+
+    def __init__(self, location: Location, instructions: list[TypeCheckedInstruction]) -> None:
+        super().__init__(location)
+        self.instructions = instructions
 
     def is_empty(self) -> bool:
         return len(self.instructions) == 0
@@ -94,31 +99,31 @@ class TypeCheckedInstructionBlock(TypeCheckedInstruction):
 class TypedExpression(TypeCheckedInstruction, ABC):
     """An expression whose type is known."""
 
-    @staticmethod
-    def from_expression(context: CodeBlockTypingContext, expression: Expression) -> 'TypedExpression':
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext, expression: Expression) -> 'TypedExpression':
         match expression:
             case ConstantReference(reference=reference):
                 return context.namespace.get_constant_value(reference)
             case Char() as char:
-                return LiteralChar.from_char(char)
+                return LiteralChar.from_untyped(context, char)
             case Array() as array:
-                return LiteralArray.from_array(context, array)
+                return LiteralArray.from_untyped(context, array)
             case ArrayComprehension() as array_comprehension:
                 return TypedArrayComprehension.from_untyped(context, array_comprehension)
             case Range() as range_expression:
                 return LiteralRange.from_untyped(context, range_expression)
             case Tuple() as tuple_expression:
-                return LiteralTuple.from_tuple_expression(context, tuple_expression)
+                return LiteralTuple.from_untyped(context, tuple_expression)
             case Identifier() as identifier:
-                return TypedIdentifier(context, identifier)
+                return TypedIdentifier.from_untyped(context, identifier)
             case UnaryArithmeticExpression() as unary_arithmetic_expression:
-                return TypedUnaryArithmeticExpression(context, unary_arithmetic_expression)
+                return TypedUnaryArithmeticExpression.from_untyped(context, unary_arithmetic_expression)
             case BinaryArithmeticExpression() as binary_arithmetic_expression:
-                return TypedBinaryArithmeticExpression(context, binary_arithmetic_expression)
+                return TypedBinaryArithmeticExpression.from_untyped(context, binary_arithmetic_expression)
             case ArraySubscriptExpression() as array_subscript_expression:
-                return TypedArraySubscriptExpression(context, array_subscript_expression)
+                return TypedArraySubscriptExpression.from_untyped(context, array_subscript_expression)
             case ArraySlicingExpression() as array_slicing_expression:
-                return TypedArraySlicingExpression(context, array_slicing_expression)
+                return TypedArraySlicingExpression.from_untyped(context, array_slicing_expression)
             case FunctionCall(location=location, reference=Reference(namespace=None, identifier='print')):
                 raise CompilationException(location, f"Procedure 'print' does not return anything")
             case FunctionCall(location=location, reference=Reference(namespace=None, identifier='println')):
@@ -248,6 +253,10 @@ class LiteralChar(TypedExpression):
             CompilationWarning.add(char.location, message, WarningType.OUT_OF_RANGE)
         return cls(char.location, char.value)
 
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext, char: Char) -> 'LiteralChar':
+        return cls.from_char(char)
+
     def __init__(self, location: Location, value: int) -> None:
         super().__init__(location)
         self.value = value % 256
@@ -274,8 +283,8 @@ class LiteralArray(TypedExpression):
             return repr(type(self))
 
     @classmethod
-    def from_array(cls, context: CodeBlockTypingContext, array: Array) -> 'LiteralArray':
-        return cls(array.location, [TypedExpression.from_expression(context, expression) for expression in array.value])
+    def from_untyped(cls, context: CodeBlockTypingContext, array: Array) -> 'LiteralArray':
+        return cls(array.location, [TypedExpression.from_untyped(context, expression) for expression in array.value])
 
     def __init__(self, location: Location, value: list[TypedExpression]) -> None:
         super().__init__(location)
@@ -342,7 +351,7 @@ class TypedArrayIterator(TypedIterator):
 
     @classmethod
     def from_untyped(cls, context: CodeBlockTypingContext, array_iterator: ArrayIterator) -> 'TypedArrayIterator':
-        array = TypedExpression.from_expression(context, array_iterator.array)
+        array = TypedExpression.from_untyped(context, array_iterator.array)
         array_type = array.type()
         if not isinstance(array_type, ArrayType):
             raise CompilationException(array.location, f'Expected array but found {array_type}')
@@ -437,7 +446,7 @@ class TypedArrayComprehension(TypedExpression):
                      array_comprehension: ArrayComprehension) -> 'TypedArrayComprehension':
         comprehension_context = context.subscope()
         iterators = TypedIteratorChain.from_untyped(comprehension_context, array_comprehension.iterators)
-        element_format = TypedExpression.from_expression(comprehension_context, array_comprehension.element_format)
+        element_format = TypedExpression.from_untyped(comprehension_context, array_comprehension.element_format)
         return cls(array_comprehension.location, element_format, iterators)
 
     def __init__(self, location: Location, element_format: TypedExpression, iterators: TypedIteratorChain) -> None:
@@ -477,9 +486,9 @@ class LiteralRange(TypedExpression):
 
 class LiteralTuple(TypedExpression):
     @classmethod
-    def from_tuple_expression(cls, context: CodeBlockTypingContext, tuple_expression: Tuple) -> 'LiteralTuple':
+    def from_untyped(cls, context: CodeBlockTypingContext, tuple_expression: Tuple) -> 'LiteralTuple':
         return cls(tuple_expression.location,
-                   [TypedExpression.from_expression(context, expression) for expression in tuple_expression.elements])
+                   [TypedExpression.from_untyped(context, expression) for expression in tuple_expression.elements])
 
     def __init__(self, location: Location, elements: list[TypedExpression]) -> None:
         super().__init__(location)
@@ -500,10 +509,17 @@ class LiteralTuple(TypedExpression):
 
 
 class TypedIdentifier(TypedExpression):
-    def __init__(self, context: CodeBlockTypingContext, identifier: Identifier) -> None:
-        super().__init__(identifier.location)
-        self.name = identifier.name
-        self._type: DataType = context.get_variable_type(self.location, self.name)
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext, identifier: Identifier) -> 'TypedIdentifier':
+        location = identifier.location
+        name = identifier.name
+        variable_type = context.get_variable_type(location, name)
+        return cls(location, name, variable_type)
+
+    def __init__(self, location: Location, name: str, variable_type: DataType) -> None:
+        super().__init__(location)
+        self.name = name
+        self._type = variable_type
 
     def type(self) -> DataType:
         return self._type
@@ -520,11 +536,18 @@ class TypedArithmeticExpression(TypedExpression, ABC):
 
 
 class TypedUnaryArithmeticExpression(TypedArithmeticExpression):
-    def __init__(self, context: CodeBlockTypingContext, expression: UnaryArithmeticExpression) -> None:
-        super().__init__(expression.location)
-        self.operand = TypedExpression.from_expression(context, expression.operand)
-        # Type checking
-        self.operation = UnaryOperation.from_operator(self.location, expression.operator, self.operand.type())
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     expression: UnaryArithmeticExpression) -> 'TypedUnaryArithmeticExpression':
+        location = expression.location
+        operand = TypedExpression.from_untyped(context, expression.operand)
+        operation = UnaryOperation.from_operator(location, expression.operator, operand.type())
+        return cls(location, operand, operation)
+
+    def __init__(self, location: Location, operand: TypedExpression, operation: UnaryOperation) -> None:
+        super().__init__(location)
+        self.operand = operand
+        self.operation = operation
 
     def type(self) -> DataType:
         return self.operation.type()
@@ -537,13 +560,21 @@ class TypedUnaryArithmeticExpression(TypedArithmeticExpression):
 
 
 class TypedBinaryArithmeticExpression(TypedArithmeticExpression):
-    def __init__(self, context: CodeBlockTypingContext, expression: BinaryArithmeticExpression) -> None:
-        super().__init__(expression.location)
-        self.left = TypedExpression.from_expression(context, expression.left)
-        self.right = TypedExpression.from_expression(context, expression.right)
-        # Type checking
-        self.operation = BinaryOperation.from_operator(self.location, expression.operator, self.left.type(),
-                                                       self.right.type())
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     expression: BinaryArithmeticExpression) -> 'TypedBinaryArithmeticExpression':
+        location = expression.location
+        left = TypedExpression.from_untyped(context, expression.left)
+        right = TypedExpression.from_untyped(context, expression.right)
+        operation = BinaryOperation.from_operator(location, expression.operator, left.type(), right.type())
+        return cls(location, left, right, operation)
+
+    def __init__(self, location: Location, left: TypedExpression, right: TypedExpression,
+                 operation: BinaryOperation) -> None:
+        super().__init__(location)
+        self.left = left
+        self.right = right
+        self.operation = operation
 
     def type(self) -> DataType:
         return self.operation.type()
@@ -556,26 +587,35 @@ class TypedBinaryArithmeticExpression(TypedArithmeticExpression):
 
 
 class TypedArraySubscriptExpression(TypedExpression):
-    def __init__(self, context: CodeBlockTypingContext, array_subscript_expression: ArraySubscriptExpression) -> None:
-        super().__init__(array_subscript_expression.location)
-        self.array = TypedExpression.from_expression(context, array_subscript_expression.array)
-        index = evaluate(context.namespace, array_subscript_expression.index)
-        if not isinstance(index, LiteralChar):
-            raise CompilationException(index.location, f'Invalid expression type for array subscript: {index.type()}')
-        self.index = index.value
-        # Type checking
-        array_type = self.array.type()
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     array_subscript_expression: ArraySubscriptExpression) -> 'TypedArraySubscriptExpression':
+        location = array_subscript_expression.location
+        array = TypedExpression.from_untyped(context, array_subscript_expression.array)
+        subscript = evaluate(context.namespace, array_subscript_expression.index)
+        if not isinstance(subscript, LiteralChar):
+            raise CompilationException(subscript.location, f'Expected {Types.CHAR} but found {subscript.type()}')
+        index = subscript.value
+        # Assert the array is in fact an array
+        array_type = array.type()
         if not isinstance(array_type, ArrayType):
-            raise CompilationException(self.location, f'Cannot subscript {array_type}')
-        # Negative indices start wrap around
-        if self.index < 0:
-            self.index = array_type.count - self.index
-        if self.index < 0 or self.index >= array_type.count:
-            raise CompilationException(self.location, 'Array index out of bounds')
-        self._type = array_type.base_type
+            raise CompilationException(location, f'Cannot subscript {array_type}')
+        # Negative indices start at the end
+        if index < 0:
+            index = array_type.count - index
+        if index < 0 or index >= array_type.count:
+            raise CompilationException(location, f'Index out of bounds for {array_type}')
+        base_type = array_type.base_type
+        return cls(location, array, index, base_type)
+
+    def __init__(self, location: Location, array: TypedExpression, index: int, base_type: DataType) -> None:
+        super().__init__(location)
+        self.array = array
+        self.index = index
+        self.base_type = base_type
 
     def type(self) -> DataType:
-        return self._type
+        return self.base_type
 
     def __str__(self) -> str:
         return f'{self.array}[{self.index}]'
@@ -585,31 +625,41 @@ class TypedArraySubscriptExpression(TypedExpression):
 
 
 class TypedArraySlicingExpression(TypedExpression):
-    def __init__(self, context: CodeBlockTypingContext, array_slicing_expression: ArraySlicingExpression) -> None:
-        super().__init__(array_slicing_expression.location)
-        self.array = TypedExpression.from_expression(context, array_slicing_expression.array)
-        start = evaluate(context.namespace, array_slicing_expression.start)
-        if not isinstance(start, LiteralChar):
-            raise CompilationException(start.location, f'Invalid expression type for array index: {start.type()}')
-        self.start = start.value
-        stop = evaluate(context.namespace, array_slicing_expression.stop)
-        if not isinstance(stop, LiteralChar):
-            raise CompilationException(stop.location, f'Invalid expression type for array index: {stop.type()}')
-        self.stop = stop.value
-        # Type checking
-        array_type = self.array.type()
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     array_slicing_expression: ArraySlicingExpression) -> 'TypedArraySlicingExpression':
+        location = array_slicing_expression.location
+        array = TypedExpression.from_untyped(context, array_slicing_expression.array)
+        slice_start = evaluate(context.namespace, array_slicing_expression.start)
+        if not isinstance(slice_start, LiteralChar):
+            raise CompilationException(slice_start.location, f'Expected {Types.CHAR} but found {slice_start.type()}')
+        start = slice_start.value
+        slice_stop = evaluate(context.namespace, array_slicing_expression.stop)
+        if not isinstance(slice_stop, LiteralChar):
+            raise CompilationException(slice_stop.location, f'Expected {Types.CHAR} but found {slice_stop.type()}')
+        stop = slice_stop.value
+        # Assert the array is in fact an array
+        array_type = array.type()
         if not isinstance(array_type, ArrayType):
-            raise CompilationException(self.location, f'Cannot slice {array_type}')
-        if self.start > self.stop:
-            raise CompilationException(self.location, f'Invalid slice (start index must be smaller than end index)')
-        if self.start < 0 or self.start >= array_type.count:
-            raise CompilationException(self.location, 'Start index out of bounds')
-        if self.stop < 0 or self.stop > array_type.count:
-            raise CompilationException(self.location, 'Stop index out of bounds')
-        self._type = array_type.base_type
+            raise CompilationException(location, f'Cannot slice {array_type}')
+        if start > stop:
+            raise CompilationException(location, f'Invalid slice (start index must be smaller than end index)')
+        if start < 0 or start >= array_type.count:
+            raise CompilationException(location, 'Start index out of bounds')
+        if stop < 0 or stop > array_type.count:
+            raise CompilationException(location, 'Stop index out of bounds')
+        base_type = array_type.base_type
+        return cls(location, array, start, stop, base_type)
+
+    def __init__(self, location: Location, array: TypedExpression, start: int, stop: int, base_type: DataType) -> None:
+        super().__init__(location)
+        self.array = array
+        self.start = start
+        self.stop = stop
+        self.base_type = base_type
 
     def type(self) -> DataType:
-        return ArrayType(self._type, self.stop - self.start)
+        return ArrayType(self.base_type, self.stop - self.start)
 
     def __str__(self) -> str:
         return f'{self.array}[{self.start}:{self.stop}]'
@@ -779,13 +829,19 @@ class LogCall(TypeCheckedProcedureCall):
 
 
 class TypeCheckedIncrementation(TypeCheckedInstruction):
-    def __init__(self, context: CodeBlockTypingContext, incrementation: Incrementation) -> None:
-        super().__init__(incrementation.location)
-        self.identifier = incrementation.identifier
-        variable_type = context.get_variable_type(incrementation.location, self.identifier)
-        # Type checking
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     incrementation: Incrementation) -> 'TypeCheckedIncrementation':
+        location = incrementation.location
+        identifier = incrementation.identifier
+        variable_type = context.get_variable_type(incrementation.location, incrementation.identifier)
         if variable_type != Types.CHAR:
-            raise CompilationException(self.location, f'Cannot increment {variable_type}')
+            raise CompilationException(location, f'Cannot increment {variable_type}')
+        return cls(location, identifier)
+
+    def __init__(self, location: Location, identifier: str) -> None:
+        super().__init__(location)
+        self.identifier = identifier
 
     def __str__(self) -> str:
         return f'{self.identifier}++'
@@ -795,13 +851,19 @@ class TypeCheckedIncrementation(TypeCheckedInstruction):
 
 
 class TypeCheckedDecrementation(TypeCheckedInstruction):
-    def __init__(self, context: CodeBlockTypingContext, decrementation: Decrementation) -> None:
-        super().__init__(decrementation.location)
-        self.identifier = decrementation.identifier
-        variable_type = context.get_variable_type(decrementation.location, self.identifier)
-        # Type checking
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     decrementation: Decrementation) -> 'TypeCheckedDecrementation':
+        location = decrementation.location
+        identifier = decrementation.identifier
+        variable_type = context.get_variable_type(decrementation.location, decrementation.identifier)
         if variable_type != Types.CHAR:
-            raise CompilationException(self.location, f'Cannot decrement {variable_type}')
+            raise CompilationException(location, f'Cannot decrement {variable_type}')
+        return cls(location, identifier)
+
+    def __init__(self, location: Location, identifier: str) -> None:
+        super().__init__(location)
+        self.identifier = identifier
 
     def __str__(self) -> str:
         return f'{self.identifier}--'
@@ -812,8 +874,8 @@ class TypeCheckedDecrementation(TypeCheckedInstruction):
 
 class TypeCheckedVariableDeclaration(TypeCheckedInstruction):
     @classmethod
-    def from_variable_declaration(cls, context: CodeBlockTypingContext,
-                                  variable_declaration: VariableDeclaration) -> 'TypeCheckedVariableDeclaration':
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     variable_declaration: VariableDeclaration) -> 'TypeCheckedVariableDeclaration':
         target = TypedDeclarationTarget.from_untyped(context, variable_declaration.target, variable_declaration.type)
         return cls(variable_declaration.location, target)
 
@@ -833,9 +895,9 @@ class TypeCheckedVariableDeclaration(TypeCheckedInstruction):
 
 class TypeCheckedVariableCreation(TypeCheckedInstruction):
     @classmethod
-    def from_variable_creation(cls, context: CodeBlockTypingContext,
-                               variable_declaration: VariableCreation) -> 'TypeCheckedVariableCreation':
-        value = TypedExpression.from_expression(context, variable_declaration.value)
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     variable_declaration: VariableCreation) -> 'TypeCheckedVariableCreation':
+        value = TypedExpression.from_untyped(context, variable_declaration.value)
         target = TypedDeclarationTarget.from_untyped(context, variable_declaration.target, value.type())
         return cls(variable_declaration.location, target, value)
 
@@ -855,13 +917,19 @@ class TypeCheckedVariableCreation(TypeCheckedInstruction):
 
 
 class TypeCheckedAssignment(TypeCheckedInstruction):
-    def __init__(self, context: CodeBlockTypingContext, assignment: Assignment) -> None:
-        super().__init__(assignment.location)
-        self.target = TypedAssignmentTarget.from_untyped(context, assignment.target)
-        self.value = TypedExpression.from_expression(context, assignment.value)
-        # Type checking
-        if self.target.type() != self.value.type():
-            raise CompilationException(self.location, f'Unable to assign {self.value.type()} to {self.target.type()}')
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext, assignment: Assignment) -> 'TypeCheckedAssignment':
+        location = assignment.location
+        target = TypedAssignmentTarget.from_untyped(context, assignment.target)
+        value = TypedExpression.from_untyped(context, assignment.value)
+        if target.type() != value.type():
+            raise CompilationException(location, f'Unable to assign {value.type()} to {target.type()}')
+        return cls(location, target, value)
+
+    def __init__(self, location: Location, target: TypedAssignmentTarget, value: TypedExpression) -> None:
+        super().__init__(location)
+        self.target = target
+        self.value = value
 
     def __str__(self) -> str:
         return f'{self.target} = {self.value}'
@@ -871,13 +939,18 @@ class TypeCheckedAssignment(TypeCheckedInstruction):
 
 
 class TypeCheckedLoopStatement(TypeCheckedInstruction):
-    def __init__(self, context: CodeBlockTypingContext, loop_statement: LoopStatement) -> None:
-        super().__init__(loop_statement.location)
-        self.count: TypedExpression = TypedExpression.from_expression(context, loop_statement.count)
-        self.body: TypeCheckedInstructionBlock = TypeCheckedInstructionBlock(context, loop_statement.body)
-        # Type checking
-        if not self.count.type().is_integer():
-            raise CompilationException(self.count.location, f'Expected char but found {self.count.type()}')
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext, loop_statement: LoopStatement) -> 'TypeCheckedLoopStatement':
+        count = TypedExpression.from_untyped(context, loop_statement.count)
+        body = TypeCheckedInstructionBlock.from_untyped(context, loop_statement.body)
+        if not count.type().is_integer():
+            raise CompilationException(count.location, f'Expected {Types.CHAR} but found {count.type()}')
+        return cls(loop_statement.location, count, body)
+
+    def __init__(self, location: Location, count: TypedExpression, body: TypeCheckedInstructionBlock) -> None:
+        super().__init__(location)
+        self.count = count
+        self.body = body
 
     def __str__(self) -> str:
         return f'loop ({self.count}) line {self.location.line}'
@@ -887,13 +960,19 @@ class TypeCheckedLoopStatement(TypeCheckedInstruction):
 
 
 class TypeCheckedWhileLoopStatement(TypeCheckedInstruction):
-    def __init__(self, context: CodeBlockTypingContext, while_loop_statement: WhileLoopStatement) -> None:
-        super().__init__(while_loop_statement.location)
-        self.test: TypedExpression = TypedExpression.from_expression(context, while_loop_statement.test)
-        self.body: TypeCheckedInstructionBlock = TypeCheckedInstructionBlock(context, while_loop_statement.body)
-        # Type checking
-        if self.test.type() != Types.CHAR:
-            raise CompilationException(self.test.location, f'Expected char but found {self.test.type()}')
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     while_loop_statement: WhileLoopStatement) -> 'TypeCheckedWhileLoopStatement':
+        test = TypedExpression.from_untyped(context, while_loop_statement.test)
+        if test.type() != Types.CHAR:
+            raise CompilationException(test.location, f'Expected {Types.CHAR} but found {test.type()}')
+        body = TypeCheckedInstructionBlock.from_untyped(context, while_loop_statement.body)
+        return cls(while_loop_statement.location, test, body)
+
+    def __init__(self, location: Location, test: TypedExpression, body: TypeCheckedInstructionBlock) -> None:
+        super().__init__(location)
+        self.test = test
+        self.body = body
 
     def __str__(self) -> str:
         return f'while ({self.test}) line {self.location.line}'
@@ -903,13 +982,19 @@ class TypeCheckedWhileLoopStatement(TypeCheckedInstruction):
 
 
 class TypeCheckedDoWhileLoopStatement(TypeCheckedInstruction):
-    def __init__(self, context: CodeBlockTypingContext, do_while_loop_statement: DoWhileLoopStatement) -> None:
-        super().__init__(do_while_loop_statement.location)
-        self.body: TypeCheckedInstructionBlock = TypeCheckedInstructionBlock(context, do_while_loop_statement.body)
-        self.test: TypedExpression = TypedExpression.from_expression(context, do_while_loop_statement.test)
-        # Type checking
-        if self.test.type() != Types.CHAR:
-            raise CompilationException(self.test.location, f'Expected char but found {self.test.type()}')
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     do_while_loop_statement: DoWhileLoopStatement) -> 'TypeCheckedDoWhileLoopStatement':
+        body = TypeCheckedInstructionBlock.from_untyped(context, do_while_loop_statement.body)
+        test = TypedExpression.from_untyped(context, do_while_loop_statement.test)
+        if test.type() != Types.CHAR:
+            raise CompilationException(test.location, f'Expected {Types.CHAR} but found {test.type()}')
+        return cls(do_while_loop_statement.location, body, test)
+
+    def __init__(self, location: Location, body: TypeCheckedInstructionBlock, test: TypedExpression) -> None:
+        super().__init__(location)
+        self.body = body
+        self.test = test
 
     def __str__(self) -> str:
         return f'do while ({self.test}) line {self.location.line}'
@@ -920,11 +1005,11 @@ class TypeCheckedDoWhileLoopStatement(TypeCheckedInstruction):
 
 class TypeCheckedForLoopStatement(TypeCheckedInstruction):
     @classmethod
-    def from_for_loop_statement(cls, context: CodeBlockTypingContext,
-                                for_loop_statement: ForLoopStatement) -> 'TypeCheckedForLoopStatement':
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     for_loop_statement: ForLoopStatement) -> 'TypeCheckedForLoopStatement':
         loop_context = context.subscope()
         iterators = TypedIteratorGroup.from_untyped(loop_context, for_loop_statement.iterators)
-        body = TypeCheckedInstructionBlock(loop_context, for_loop_statement.body)
+        body = TypeCheckedInstructionBlock.from_untyped(loop_context, for_loop_statement.body)
         return cls(for_loop_statement.location, iterators, body)
 
     def __init__(self, location: Location, iterators: TypedIteratorGroup, body: TypeCheckedInstructionBlock) -> None:
@@ -940,17 +1025,25 @@ class TypeCheckedForLoopStatement(TypeCheckedInstruction):
 
 
 class TypeCheckedConditionalStatement(TypeCheckedInstruction):
-    def __init__(self, context: CodeBlockTypingContext, statement: ConditionalStatement) -> None:
-        super().__init__(statement.location)
-        self.test = TypedExpression.from_expression(context, statement.test)
-        self.if_body = TypeCheckedInstructionBlock(context, statement.if_body)
-        if statement.has_else():
-            self.else_body = TypeCheckedInstructionBlock(context, statement.else_body)
-        else:
-            self.else_body = None
-        # Type checking
-        if self.test.type() != Types.CHAR:
-            raise CompilationException(self.test.location, f'Expected char but found {self.test.type()}')
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     conditional_statement: ConditionalStatement) -> 'TypeCheckedConditionalStatement':
+        location = conditional_statement.location
+        test = TypedExpression.from_untyped(context, conditional_statement.test)
+        if test.type() != Types.CHAR:
+            raise CompilationException(test.location, f'Expected {Types.CHAR} but found {test.type()}')
+        if_body = TypeCheckedInstructionBlock.from_untyped(context, conditional_statement.if_body)
+        if conditional_statement.has_else():
+            else_body = TypeCheckedInstructionBlock.from_untyped(context, conditional_statement.else_body)
+            return cls(location, test, if_body, else_body)
+        return cls(location, test, if_body)
+
+    def __init__(self, location: Location, test: TypedExpression, if_body: TypeCheckedInstructionBlock,
+                 else_body: TypeCheckedInstructionBlock | None = None) -> None:
+        super().__init__(location)
+        self.test = test
+        self.if_body = if_body
+        self.else_body = else_body
 
     def has_else(self) -> bool:
         return self.else_body is not None
@@ -963,15 +1056,20 @@ class TypeCheckedConditionalStatement(TypeCheckedInstruction):
 
 
 class TypeCheckedReturnInstruction(TypeCheckedInstruction):
-    def __init__(self, context: CodeBlockTypingContext, instruction: ReturnInstruction) -> None:
-        super().__init__(instruction.location)
-        self.value: TypedExpression = TypedExpression.from_expression(context, instruction.value)
-        # Type checking
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     return_instruction: ReturnInstruction) -> 'TypeCheckedReturnInstruction':
+        location = return_instruction.location
+        value = TypedExpression.from_untyped(context, return_instruction.value)
         if context.return_type is None:
-            raise CompilationException(self.location, 'Unexpected return statement')
-        if self.value.type() != context.return_type:
-            message = f'Expected {context.return_type} but found {self.value.type()}'
-            raise CompilationException(self.location, message)
+            raise CompilationException(location, 'Unexpected return statement')
+        if value.type() != context.return_type:
+            raise CompilationException(value.location, f'Expected {context.return_type} but found {value.type()}')
+        return cls(location, value)
+
+    def __init__(self, location: Location, value: TypedExpression) -> None:
+        super().__init__(location)
+        self.value = value
 
     def __str__(self) -> str:
         return f'return {self.value}'
@@ -981,9 +1079,18 @@ class TypeCheckedReturnInstruction(TypeCheckedInstruction):
 
 
 class TypeCheckedContextSnapshot(TypeCheckedInstruction):
-    def __init__(self, context_snapshot: ContextSnapshot) -> None:
-        super().__init__(context_snapshot.location)
-        self.identifier = context_snapshot.identifier
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext,
+                     context_snapshot: ContextSnapshot) -> 'TypeCheckedContextSnapshot':
+        location = context_snapshot.location
+        identifier = context_snapshot.identifier
+        if identifier not in context:
+            raise CompilationException(location, f'Unknown identifier: {identifier!r}')
+        return cls(location, identifier)
+
+    def __init__(self, location: Location, identifier: str) -> None:
+        super().__init__(location)
+        self.identifier = identifier
 
     def __str__(self) -> str:
         if self.identifier is not None:

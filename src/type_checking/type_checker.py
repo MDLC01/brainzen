@@ -13,15 +13,15 @@ class TypeCheckedNamespaceElement(ABC):
     __slots__ = 'location', 'identifier', 'is_private'
 
     @classmethod
-    def from_element(cls, context: NamespaceTypingContext, element: NamespaceElement) -> 'TypeCheckedNamespaceElement':
+    def from_untyped(cls, context: NamespaceTypingContext, element: NamespaceElement) -> 'TypeCheckedNamespaceElement':
         if isinstance(element, Constant):
-            return TypeCheckedConstant.from_constant(context, element)
+            return TypeCheckedConstant.from_untyped(context, element)
         if isinstance(element, NativeSubroutine):
-            return TypeCheckedNativeSubroutine.from_native_subroutine(context, element)
+            return TypeCheckedNativeSubroutine.from_untyped(context, element)
         if isinstance(element, Procedure):
-            return TypeCheckedProcedure.from_procedure(context, element)
+            return TypeCheckedProcedure.from_untyped(context, element)
         if isinstance(element, Namespace):
-            return TypeCheckedNamespace.from_namespace(context, element)
+            return TypeCheckedNamespace.from_untyped(context, element)
         raise ImpossibleException(f'Unknown namespace element type: {element.__class__}')
 
     def __init__(self, location: Location, identifier: str, is_private: bool) -> None:
@@ -48,7 +48,7 @@ class TypeCheckedConstant(TypeCheckedNamespaceElement):
     __slots__ = 'expression'
 
     @classmethod
-    def from_constant(cls, context: NamespaceTypingContext, constant: Constant) -> 'TypeCheckedConstant':
+    def from_untyped(cls, context: NamespaceTypingContext, constant: Constant) -> 'TypeCheckedConstant':
         value = evaluate(context, constant.expression)
         context.register_constant(constant.identifier, value)
         return cls(constant.location, constant.identifier, constant.is_private, value)
@@ -105,8 +105,8 @@ class TypeCheckedNativeSubroutine(TypeCheckedSubroutine):
     __slots__ = 'offset', 'bf_code'
 
     @classmethod
-    def from_native_subroutine(cls, context: NamespaceTypingContext,
-                               subroutine: NativeSubroutine) -> 'TypeCheckedNativeSubroutine':
+    def from_untyped(cls, context: NamespaceTypingContext,
+                     subroutine: NativeSubroutine) -> 'TypeCheckedNativeSubroutine':
         signature = SubroutineSignature(subroutine.location, subroutine.is_private, subroutine.arguments,
                                         subroutine.return_type)
         context.register_subroutine(subroutine.identifier, signature)
@@ -133,11 +133,11 @@ class TypeCheckedProcedure(TypeCheckedSubroutine):
     __slots__ = 'body'
 
     @classmethod
-    def from_procedure(cls, context: NamespaceTypingContext, procedure: Procedure) -> 'TypeCheckedProcedure':
+    def from_untyped(cls, context: NamespaceTypingContext, procedure: Procedure) -> 'TypeCheckedProcedure':
         signature = SubroutineSignature(procedure.location, procedure.is_private, procedure.arguments,
                                         procedure.return_type)
         with context.subroutine(procedure.identifier, signature) as subroutine_context:
-            body = TypeCheckedInstructionBlock(subroutine_context, procedure.body, allow_return=True)
+            body = TypeCheckedInstructionBlock.from_untyped(subroutine_context, procedure.body, allow_return=True)
         return cls(procedure.location, procedure.identifier, procedure.is_private, procedure.arguments,
                    procedure.return_type, body)
 
@@ -158,14 +158,14 @@ class TypeCheckedNamespace(TypeCheckedNamespaceElement):
 
     @classmethod
     def from_file(cls, file: File) -> 'TypeCheckedNamespace':
-        return cls.from_namespace(NamespaceTypingContext(file.identifier), file)
+        return cls.from_untyped(NamespaceTypingContext(file.identifier), file)
 
     @classmethod
-    def from_namespace(cls, context: NamespaceTypingContext, namespace: Namespace) -> 'TypeCheckedNamespace':
+    def from_untyped(cls, context: NamespaceTypingContext, namespace: Namespace) -> 'TypeCheckedNamespace':
         elements = []
         with context.namespace(namespace.identifier) as namespace_context:
             for element in namespace.elements:
-                type_checked_element = TypeCheckedNamespaceElement.from_element(namespace_context, element)
+                type_checked_element = TypeCheckedNamespaceElement.from_untyped(namespace_context, element)
                 elements.append(type_checked_element)
         return cls(namespace.location, namespace.identifier, namespace.is_private, elements)
 
