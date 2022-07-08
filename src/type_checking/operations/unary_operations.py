@@ -21,28 +21,32 @@ class UnaryOperation(ABC):
         # !
         if isinstance(operator, BangToken):
             if operand_type == Types.CHAR:
-                return NegationOperation()
+                return NegationOperation(operator)
             raise InvalidOperandType(location, operator, operand_type)
         # !!
         if isinstance(operator, DoubleBangToken):
             if operand_type == Types.CHAR:
-                return BoolNormalizationOperation()
+                return BoolNormalizationOperation(operator)
             raise InvalidOperandType(location, operator, operand_type)
         # -
         if isinstance(operator, MinusToken):
             if operand_type == Types.CHAR:
-                return OppositionOperation()
+                return OppositionOperation(operator)
             if isinstance(operand_type, ArrayType):
-                return ArrayOppositionOperation(operand_type.count)
+                return ArrayOppositionOperation(operator, operand_type.count)
             raise InvalidOperandType(location, operator, operand_type)
         # **
         if isinstance(operator, DoubleStarToken):
             if isinstance(operand_type, ArrayType):
                 inner_type = operand_type.base_type
                 if isinstance(inner_type, ArrayType):
-                    return ArrayFlatteningOperation(inner_type.base_type, operand_type.count, inner_type.count)
+                    return ArrayFlatteningOperation(operator, inner_type.base_type, operand_type.count,
+                                                    inner_type.count)
             raise InvalidOperandType(location, operator, operand_type)
         raise CompilerException(f'Unknown unary operator: {operator}')
+
+    def __init__(self, operator: Token) -> None:
+        self.operator = operator
 
     @abstractmethod
     def operand_type(self) -> DataType:
@@ -52,9 +56,8 @@ class UnaryOperation(ABC):
     def type(self) -> DataType:
         ...
 
-    @abstractmethod
     def __str__(self) -> str:
-        ...
+        return self.operator.__str__()
 
 
 class NegationOperation(UnaryOperation):
@@ -64,9 +67,6 @@ class NegationOperation(UnaryOperation):
     def type(self) -> DataType:
         return Types.CHAR
 
-    def __str__(self) -> str:
-        return '!'
-
 
 class BoolNormalizationOperation(UnaryOperation):
     def operand_type(self) -> DataType:
@@ -74,9 +74,6 @@ class BoolNormalizationOperation(UnaryOperation):
 
     def type(self) -> DataType:
         return Types.CHAR
-
-    def __str__(self) -> str:
-        return '!!'
 
 
 class OppositionOperation(UnaryOperation):
@@ -86,12 +83,10 @@ class OppositionOperation(UnaryOperation):
     def type(self) -> DataType:
         return Types.CHAR
 
-    def __str__(self) -> str:
-        return '-'
-
 
 class ArrayOppositionOperation(UnaryOperation):
-    def __init__(self, array_count: int) -> None:
+    def __init__(self, operator: Token, array_count: int) -> None:
+        super().__init__(operator)
         self.array_count = array_count
 
     def operand_type(self) -> DataType:
@@ -100,12 +95,10 @@ class ArrayOppositionOperation(UnaryOperation):
     def type(self) -> DataType:
         return ArrayType(Types.CHAR, self.array_count)
 
-    def __str__(self) -> str:
-        return '-'
-
 
 class ArrayFlatteningOperation(UnaryOperation):
-    def __init__(self, base_type: DataType, outer_count: int, inner_count: int) -> None:
+    def __init__(self, operator: Token, base_type: DataType, outer_count: int, inner_count: int) -> None:
+        super().__init__(operator)
         self.base_type = base_type
         self.outer_count = outer_count
         self.inner_count = inner_count
@@ -116,9 +109,6 @@ class ArrayFlatteningOperation(UnaryOperation):
 
     def type(self) -> DataType:
         return ArrayType(self.base_type, self.outer_count * self.inner_count)
-
-    def __str__(self) -> str:
-        return '**'
 
 
 __all__ = ['UnaryOperation', 'NegationOperation', 'BoolNormalizationOperation', 'OppositionOperation',

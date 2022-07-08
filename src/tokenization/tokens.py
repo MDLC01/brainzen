@@ -81,6 +81,13 @@ class Token(ABC):
     def __init__(self, location: Location) -> None:
         self.location = location
 
+    def __str__(self) -> str:
+        if self.token is not None:
+            return self.token
+        if self.keyword is not None:
+            return self.keyword
+        return self.__repr__()
+
     def __repr__(self) -> str:
         return self.__class__.__name__
 
