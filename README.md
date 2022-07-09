@@ -42,7 +42,7 @@ There are also some features that will likely never be added to the language, be
 - Referencing subroutines before their respective declaration (including recursion);
 - Early exits (including exceptions and exception handling);
 - Dynamic arrays (including arrays of arbitrary size);
-- Any form of interaction with the operating system (due to the limitations related to the nature of Brainfuck).
+- Any form of interaction with the operating system (due to limitations related to the nature of Brainfuck).
 
 ### Code examples
 
@@ -123,7 +123,7 @@ proc fizzbuzz(char n) {
 
 ## Contributing
 
-This is a personal project I want to lead myself. As such, I will likely not be accepting pull requests. But feel free to clone the project and fork it if you wish.
+This is a personal project I want to lead myself. As such, I will likely not be accepting pull requests. But feel free to clone the project and fork it as you wish.
 
 ### Project structure
 
