@@ -4,7 +4,6 @@ from typing import Generator
 from data_types import *
 from exceptions import *
 from intermediate_representation import *
-from reference import *
 from type_checking.type_checked_instructions import *
 from type_checking.typing_context import *
 
@@ -50,7 +49,7 @@ class TypeCheckedConstant(TypeCheckedNamespaceElement):
     @classmethod
     def from_untyped(cls, context: NamespaceTypingContext, constant: Constant) -> 'TypeCheckedConstant':
         value = evaluate(context, constant.expression)
-        context.register_constant(constant.identifier, value)
+        context.register_constant(constant.identifier, constant.is_private, value)
         return cls(constant.location, constant.identifier, constant.is_private, value)
 
     def __init__(self, location: Location, identifier: str, is_private: bool, expression: TypedExpression) -> None:
@@ -110,9 +109,8 @@ class TypeCheckedNativeSubroutine(TypeCheckedSubroutine):
     @classmethod
     def from_untyped(cls, context: NamespaceTypingContext,
                      subroutine: NativeSubroutine) -> 'TypeCheckedNativeSubroutine':
-        signature = SubroutineSignature(subroutine.location, subroutine.is_private, subroutine.arguments,
-                                        subroutine.return_type)
-        context.register_subroutine(subroutine.identifier, signature)
+        signature = SubroutineSignature(subroutine.location, subroutine.arguments, subroutine.return_type)
+        context.register_subroutine(subroutine.identifier, subroutine.is_private, signature)
         return cls(subroutine.location, subroutine.identifier, subroutine.is_private, subroutine.arguments,
                    subroutine.return_type, subroutine.offset, subroutine.bf_code)
 
@@ -137,9 +135,8 @@ class TypeCheckedProcedure(TypeCheckedSubroutine):
 
     @classmethod
     def from_untyped(cls, context: NamespaceTypingContext, procedure: Procedure) -> 'TypeCheckedProcedure':
-        signature = SubroutineSignature(procedure.location, procedure.is_private, procedure.arguments,
-                                        procedure.return_type)
-        with context.subroutine(procedure.identifier, signature) as subroutine_context:
+        signature = SubroutineSignature(procedure.location, procedure.arguments, procedure.return_type)
+        with context.subroutine(procedure.identifier, procedure.is_private, signature) as subroutine_context:
             body = TypeCheckedInstructionBlock.from_untyped(subroutine_context, procedure.body, allow_return=True)
         return cls(procedure.location, procedure.identifier, procedure.is_private, procedure.arguments,
                    procedure.return_type, body)
@@ -158,83 +155,26 @@ class TypeCheckedProcedure(TypeCheckedSubroutine):
 
 class TypeCheckedNamespace(TypeCheckedNamespaceElement):
     """A type checked namespace is a namespace that has been type checked (the type of every expression is known)."""
+    __slots__ = 'elements'
 
     @classmethod
     def from_file(cls, file: File) -> 'TypeCheckedNamespace':
-        return cls.from_untyped(NamespaceTypingContext(file.identifier), file)
+        typing_context = NamespaceTypingContext(file.identifier, False)
+        return cls.from_untyped(typing_context, file)
 
     @classmethod
     def from_untyped(cls, context: NamespaceTypingContext, namespace: Namespace) -> 'TypeCheckedNamespace':
         elements = []
-        with context.namespace(namespace.identifier) as namespace_context:
+        with context.namespace(namespace.identifier, namespace.is_private) as namespace_context:
             for element in namespace.elements:
                 type_checked_element = TypeCheckedNamespaceElement.from_untyped(namespace_context, element)
                 elements.append(type_checked_element)
         return cls(namespace.location, namespace.identifier, namespace.is_private, elements)
 
-    # def __init__(self, namespace: Namespace, parent: Optional['TypeCheckedNamespace'] = None) -> None:
-    #     super().__init__(namespace.location, namespace.identifier, namespace.is_private)
-    #     self.parent = parent
-    #     self.constants: dict[str, TypedExpression] = {}
-    #     self.namespaces: dict[str, 'TypeCheckedNamespace'] = {}
-    #     self.subroutine_signatures: dict[str, SubroutineSignature] = {}
-    #     self.elements: list[TypeCheckedNamespaceElement] = []
-    #     # Type checking
-    #     for element in namespace:
-    #         self.register_element(element)
-
     def __init__(self, location: Location, identifier: str, is_private: bool,
                  elements: list[TypeCheckedNamespaceElement]) -> None:
         super().__init__(location, identifier, is_private)
-        self.parent = ...
         self.elements = elements
-        self.constants: dict[str, TypeCheckedConstant] = {}
-        self.subroutines: dict[str, 'TypeCheckedSubroutine'] = {}
-        self.namespaces: dict[str, 'TypeCheckedNamespace'] = {}
-        for element in self.elements:
-            identifier = element.identifier
-            if isinstance(element, TypeCheckedConstant):
-                self.constants[identifier] = element
-            elif isinstance(element, TypeCheckedNamespace):
-                self.namespaces[identifier] = element
-            elif isinstance(element, TypeCheckedSubroutine):
-                self.subroutines[identifier] = element
-            else:
-                raise ImpossibleException(f'Unknown namespace element type: {element.__class__.__name__}')
-
-    def get_constant_value(self, reference: Reference) -> TypedExpression:
-        namespace = self.get_namespace(reference.namespace)
-        if reference.identifier in namespace.constants:
-            return namespace.constants[reference.identifier].expression
-        if self.parent is not None:
-            return self.parent.get_constant_value(reference)
-        raise CompilationException(reference.location, f'Unknown constant: #{reference}')
-
-    def get_namespace(self, reference: Reference | None) -> 'TypeCheckedNamespace':
-        if reference is None:
-            return self
-        parent = self.get_namespace(reference.namespace)
-        if reference.identifier in parent.namespaces:
-            element = parent.namespaces[reference.identifier]
-            if element.is_private and reference.namespace is not None:
-                message = f'Namespace {reference.identifier!r} is private (declared at {element.location!r})'
-                raise CompilationException(reference.location, message)
-            return element
-        if self.parent is not None:
-            return self.parent.get_namespace(reference)
-        raise CompilationException(reference.location, f'Unknown namespace: {reference.identifier!r}')
-
-    def get_subroutine(self, reference: Reference) -> TypeCheckedSubroutine:
-        namespace = self.get_namespace(reference.namespace)
-        if reference.identifier in namespace.subroutines:
-            subroutine = namespace.subroutines[reference.identifier]
-            if subroutine.is_private and reference.namespace is not None:
-                message = f'Subroutine {reference.identifier!r} is private (declared at {subroutine.location!r})'
-                raise CompilationException(reference.location, message)
-            return subroutine
-        if self.parent is not None:
-            return self.parent.get_subroutine_signature(reference)
-        raise CompilationException(reference.location, f'Unknown subroutine: {reference.identifier!r}')
 
     def __iter__(self) -> Generator[TypeCheckedNamespaceElement, None, None]:
         for element in self.elements:

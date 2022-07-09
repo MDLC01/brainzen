@@ -1,4 +1,4 @@
-from typing import Optional, TYPE_CHECKING
+from typing import Generic, Optional, TYPE_CHECKING, TypeVar
 
 from data_types import DataType
 from exceptions import *
@@ -11,12 +11,11 @@ if TYPE_CHECKING:
 
 
 class SubroutineSignature:
-    __slots__ = 'location', 'is_private', 'arguments', 'arguments_by_name', 'return_type'
+    __slots__ = 'location', 'arguments', 'arguments_by_name', 'return_type'
 
-    def __init__(self, location: Location, is_private: bool, arguments: list[SubroutineArgument],
+    def __init__(self, location: Location, arguments: list[SubroutineArgument],
                  return_type: DataType | None = None) -> None:
         self.location = location
-        self.is_private = is_private
         self.arguments = arguments
         self.arguments_by_name = {argument.identifier: argument.type for argument in self.arguments}
         self.return_type = return_type
@@ -34,67 +33,110 @@ class SubroutineSignature:
         return f'({arguments}) -> void'
 
 
-class NamespaceTypingContext:
-    __slots__ = 'identifier', 'parent', 'namespaces', 'constants', 'subroutines'
+_T = TypeVar('_T')
 
-    def __init__(self, identifier: str, parent: Optional['NamespaceTypingContext'] = None) -> None:
+
+class NamespaceElementInfo(Generic[_T]):
+    __slots__ = 'identifier', 'is_private', 'element'
+
+    def __init__(self, identifier: str, is_private: bool, element: _T) -> None:
         self.identifier = identifier
-        self.parent = parent
-        self.namespaces: dict[str, 'NamespaceTypingContext'] = {}
-        self.constants: dict[str, TypedExpression] = {}
-        self.subroutines: dict[str, SubroutineSignature] = {}
+        self.is_private = is_private
+        self.element = element
 
-    def get_namespace(self, reference: Reference | None) -> 'NamespaceTypingContext':
-        if reference is None:
-            return self
+
+class NamespaceTypingContext:
+    __slots__ = 'identifier', 'is_private', 'parent', 'namespaces', 'constants', 'subroutines'
+
+    def __init__(self, identifier: str, is_private: bool, parent: Optional['NamespaceTypingContext'] = None) -> None:
+        self.identifier = identifier
+        self.is_private = is_private
+        self.parent = parent
+        self.namespaces = dict[str, NamespaceElementInfo[NamespaceTypingContext]]()
+        self.constants = dict[str, NamespaceElementInfo['TypedExpression']]()
+        self.subroutines = dict[str, NamespaceElementInfo[SubroutineSignature]]()
+
+    def get_namespace(self, reference: Reference) -> 'NamespaceTypingContext':
+        # Unqualified reference (reference from within the namespace)
+        if reference.namespace is None:
+            if reference.identifier in self.namespaces:
+                return self.namespaces[reference.identifier].element
+            if self.parent is not None:
+                return self.parent.get_namespace(reference)
+            else:
+                raise CompilationException(reference.location, f'Unknown namespace: {reference.identifier}')
+        # Fully qualified reference (reference from outside the namespace)
         parent = self.get_namespace(reference.namespace)
-        if reference.identifier in parent.namespaces:
-            return parent.namespaces[reference.identifier]
-        if self.parent is not None:
-            return self.parent.get_namespace(reference)
-        raise CompilationException(reference.location, f'Unknown namespace: {reference}')
+        if reference.identifier not in parent.namespaces:
+            raise CompilationException(reference.location, f'Unknown namespace: {reference.identifier}')
+        namespace = parent.namespaces[reference.identifier]
+        if namespace.is_private:
+            raise CompilationException(reference.location, f'Unable to access private namespace {reference.identifier}')
+        return namespace.element
 
     def get_constant_value(self, reference: Reference) -> 'TypedExpression':
-        namespace = self.get_namespace(reference.namespace)
-        if reference.identifier in namespace.constants:
-            return namespace.constants[reference.identifier]
-        if self.parent is not None:
-            return self.parent.get_constant_value(reference)
-        raise CompilationException(reference.location, f'Unknown constant: #{reference}')
+        # Unqualified reference (reference from within the namespace)
+        if reference.namespace is None:
+            if reference.identifier in self.constants:
+                return self.constants[reference.identifier].element
+            if self.parent is not None:
+                return self.parent.get_constant_value(reference)
+            else:
+                raise CompilationException(reference.location, f'Unknown constant: {reference.identifier}')
+        # Fully qualified reference (reference from outside the namespace)
+        parent = self.get_namespace(reference.namespace)
+        if reference.identifier not in parent.constants:
+            raise CompilationException(reference.location, f'Unknown constant: {reference.identifier}')
+        constant = parent.constants[reference.identifier]
+        if constant.is_private:
+            raise CompilationException(reference.location, f'Unable to access private constant {reference.identifier}')
+        return constant.element
 
     def get_subroutine_signature(self, reference: Reference) -> SubroutineSignature:
-        namespace = self.get_namespace(reference.namespace)
-        if reference.identifier in namespace.subroutines:
-            return namespace.subroutines[reference.identifier]
-        if self.parent is not None:
-            return self.parent.get_subroutine_signature(reference)
-        raise CompilationException(reference.location, f'Unknown subroutine: {reference}')
+        # Unqualified reference (reference from within the namespace)
+        if reference.namespace is None:
+            if reference.identifier in self.subroutines:
+                return self.subroutines[reference.identifier].element
+            if self.parent is not None:
+                return self.parent.get_subroutine_signature(reference)
+            else:
+                raise CompilationException(reference.location, f'Unknown subroutine: {reference.identifier}')
+        # Fully qualified reference (reference from outside the namespace)
+        parent = self.get_namespace(reference.namespace)
+        if reference.identifier not in parent.subroutines:
+            raise CompilationException(reference.location, f'Unknown subroutine: {reference.identifier}')
+        constant = parent.subroutines[reference.identifier]
+        if constant.is_private:
+            message = f'Unable to access private subroutine {reference.identifier}'
+            raise CompilationException(reference.location, message)
+        return constant.element
 
-    def register_constant(self, identifier: str, expression: 'TypedExpression') -> None:
+    def register_constant(self, identifier: str, is_private: bool, expression: 'TypedExpression') -> None:
         """Register a constant value."""
-        self.constants[identifier] = expression
+        self.constants[identifier] = NamespaceElementInfo(identifier, is_private, expression)
 
-    def namespace(self, identifier: str) -> 'NamespaceTypingContext':
+    def namespace(self, identifier: str, is_private: bool) -> 'NamespaceTypingContext':
         """Create a context for a child namespace."""
-        return NamespaceTypingContext(identifier, self)
+        return NamespaceTypingContext(identifier, is_private, self)
 
-    def register_namespace(self, identifier: str, namespace: 'NamespaceTypingContext') -> None:
+    def register_namespace(self, identifier: str, is_private: bool, namespace: 'NamespaceTypingContext') -> None:
         """Register a child namespace."""
-        self.namespaces[identifier] = namespace
+        self.namespaces[identifier] = NamespaceElementInfo(identifier, is_private, namespace)
 
-    def subroutine(self, identifier: str, signature: SubroutineSignature) -> 'SubroutineTypingContext':
+    def subroutine(self, identifier: str, is_private: bool,
+                   signature: SubroutineSignature) -> 'SubroutineTypingContext':
         """Create a context for a subroutine."""
-        return SubroutineTypingContext(self, identifier, signature)
+        return SubroutineTypingContext(self, identifier, is_private, signature)
 
-    def register_subroutine(self, identifier: str, signature: SubroutineSignature) -> None:
+    def register_subroutine(self, identifier: str, is_private: bool, signature: SubroutineSignature) -> None:
         """Register a subroutine."""
-        self.subroutines[identifier] = signature
+        self.subroutines[identifier] = NamespaceElementInfo(identifier, is_private, signature)
 
     def __enter__(self) -> 'NamespaceTypingContext':
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.parent.register_namespace(self.identifier, self)
+        self.parent.register_namespace(self.identifier, self.is_private, self)
 
 
 class VariableInfo:
@@ -159,11 +201,13 @@ class CodeBlockTypingContext:
 
 
 class SubroutineTypingContext(CodeBlockTypingContext):
-    __slots__ = 'identifier', 'signature'
+    __slots__ = 'identifier', 'is_private', 'signature'
 
-    def __init__(self, namespace: NamespaceTypingContext, identifier: str, signature: SubroutineSignature) -> None:
+    def __init__(self, namespace: NamespaceTypingContext, identifier: str, is_private: bool,
+                 signature: SubroutineSignature) -> None:
         super().__init__(namespace, return_type=signature.return_type)
         self.identifier = identifier
+        self.is_private = is_private
         self.signature = signature
         for argument in self.signature.arguments:
             self.variables[argument.identifier] = VariableInfo(argument.location, argument.type)
@@ -172,7 +216,7 @@ class SubroutineTypingContext(CodeBlockTypingContext):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.namespace.register_subroutine(self.identifier, self.signature)
+        self.namespace.register_subroutine(self.identifier, self.is_private, self.signature)
 
 
 __all__ = ['SubroutineArgument', 'SubroutineSignature', 'NamespaceTypingContext', 'CodeBlockTypingContext']
