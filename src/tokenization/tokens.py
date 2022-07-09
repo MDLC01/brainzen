@@ -69,6 +69,9 @@ class Token(ABC):
         else:
             cls.keyword: str | None = None
 
+    def __init__(self, location: Location) -> None:
+        self.location = location
+
     def is_unary_operator(self) -> bool:
         return False
 
@@ -77,9 +80,6 @@ class Token(ABC):
 
     def is_binary_operator(self) -> bool:
         return self.binary_operator_priority() is not None
-
-    def __init__(self, location: Location) -> None:
-        self.location = location
 
     def __str__(self) -> str:
         if self.token is not None:
