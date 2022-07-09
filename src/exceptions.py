@@ -127,6 +127,10 @@ class WarningType(Enum):
         return {value for value in cls}
 
     @classmethod
+    def likely_errors(cls) -> set['WarningType']:
+        return {cls.OUT_OF_RANGE, cls.RESERVED_NAME}
+
+    @classmethod
     def default(cls) -> set['WarningType']:
         return {cls.OUT_OF_RANGE, cls.REDECLARATION, cls.NAME_SHADOWING, cls.RESERVED_NAME, cls.DEBUG_FEATURE}
 
@@ -147,14 +151,25 @@ class WarningType(Enum):
         raise ValueError(f'Unknown warning type: {name!r}')
 
     @classmethod
-    def from_string(cls, allowed_warnings: str) -> set['WarningType']:
-        if allowed_warnings in ('*', 'all'):
-            return cls.all()
-        if allowed_warnings == 'debug':
+    def get_selection_or_singleton(cls, name: str) -> set['WarningType']:
+        if name == 'likely-errors':
+            return cls.likely_errors()
+        if name == 'default':
+            return cls.default()
+        if name == 'debug':
             return cls.debug()
-        if allowed_warnings in ('none', '-', '_', '.', ''):
+        return {cls.get(name)}
+
+    @classmethod
+    def selection_from_string(cls, allowed_warnings: str) -> set['WarningType']:
+        if allowed_warnings == '*':
+            return cls.all()
+        if allowed_warnings in ('none', '-', ''):
             return cls.none()
-        return {cls.get(name.strip()) for name in allowed_warnings.split(',')}
+        selection = set()
+        for name in allowed_warnings.split(','):
+            selection = selection.union(cls.get_selection_or_singleton(name.strip()))
+        return selection
 
 
 class CompilationWarning(Warning):

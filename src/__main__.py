@@ -34,7 +34,7 @@ def main(argv: list[str]) -> int:
                         help='the verbose level for comments in generated Brainfuck file')
     parser.add_argument('-s', '--silent', dest='silent', default=False, action='store_true',
                         help='redirect stdout to /dev/null')
-    parser.add_argument('-w', '--warn', type=WarningType.from_string, default=WarningType.default(),
+    parser.add_argument('-w', '--warn', type=WarningType.selection_from_string, default=WarningType.default(),
                         dest='allowed_warning_types', help='a list of allowed warnings (comma separated)')
 
     arguments = parser.parse_args(argv[1:])
