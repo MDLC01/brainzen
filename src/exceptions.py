@@ -64,7 +64,7 @@ class Location:
     def after(self) -> 'Location':
         return Location(self.file, self.line, self.column + self.length)
 
-    def print_position(self, source_code: str, *, out=sys.stderr):
+    def print_position(self, source_code: str, *, out=sys.stderr) -> None:
         if self.line is None or self.column is None:
             return
         lines = source_code.splitlines()
@@ -81,20 +81,20 @@ class Location:
 class CompilerException(Exception):
     """An exception that is raised by the compiler when something went wrong in the compilation process."""
 
-    def __init__(self, message: str, should_be_prevented: bool = False):
+    def __init__(self, message: str, should_be_prevented: bool = False) -> None:
         super().__init__()
         self.message = message
         if should_be_prevented:
             self.message += '. This exception should have been prevented.'
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.message
 
 
 class ImpossibleException(CompilerException):
     """An exception that is not meant to be raised."""
 
-    def __init__(self, message: str):
+    def __init__(self, message: str) -> None:
         super().__init__(message)
 
 
@@ -103,13 +103,13 @@ class CompilationException(Exception):
 
     __slots__ = 'location', 'message', 'hint'
 
-    def __init__(self, location: Location, message: str, hint: str | None = None):
+    def __init__(self, location: Location, message: str, hint: str | None = None) -> None:
         super().__init__()
         self.location = location
         self.message = message
         self.hint = hint
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'{self.location}{self.message}'
 
 
@@ -177,21 +177,21 @@ class CompilationWarning(Warning):
 
     warnings: list['CompilationWarning'] = []
 
-    def __init__(self, location: Location, warning_type: WarningType, message: str, hint: str | None = None):
+    def __init__(self, location: Location, warning_type: WarningType, message: str, hint: str | None = None) -> None:
         self.location = location
         self.type = warning_type
         self.message = message
         self.hint = hint
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'{self.location}Warning: {self.message}'
 
     @classmethod
-    def add(cls, location: Location, warning_type: WarningType, message: str, hint: str | None = None):
+    def add(cls, location: Location, warning_type: WarningType, message: str, hint: str | None = None) -> None:
         cls.warnings.append(cls(location, warning_type, message, hint))
 
     @classmethod
-    def print_warnings(cls, source_code: str, allowed_types: set[WarningType], *, out=sys.stderr):
+    def print_warnings(cls, source_code: str, allowed_types: set[WarningType], *, out=sys.stderr) -> None:
         first = True
         for warning in cls.warnings:
             if warning.type in allowed_types:
