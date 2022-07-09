@@ -217,7 +217,7 @@ class ASTGenerator:
     def _expect_end(self, token_type: Type[_T]) -> _T:
         """Similar to _expect, except the error is raised after the location of the previous token"""
         if not self._is_next(token_type):
-            raise CompilationException(self._previous_location().after(), f'Expected {token_type.__doc__}')
+            raise CompilationException(self._previous_location().after(), f'Missing {token_type.__doc__}')
         return self._next()
 
     def _eat(self, token_type: Type[AnyToken]) -> bool:
