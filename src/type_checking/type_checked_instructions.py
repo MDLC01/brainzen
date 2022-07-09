@@ -249,8 +249,9 @@ class LiteralChar(TypedExpression):
     @classmethod
     def from_char(cls, char: Char) -> 'LiteralChar':
         if char.value < 0 or char.value > 255:
-            message = 'Character literal is outside of the possible range'
-            CompilationWarning.add(char.location, message, WarningType.OUT_OF_RANGE)
+            CompilationWarning.add(char.location, WarningType.OUT_OF_RANGE,
+                                   'Character literal is outside of the possible range',
+                                   'Characters must be integers between 0 and 255')
         return cls(char.location, char.value)
 
     @classmethod
@@ -684,8 +685,8 @@ class TypeCheckedProcedureCall(TypeCheckedInstruction):
         # Get subroutine signature
         signature = context.namespace.get_subroutine_signature(reference)
         if signature.return_type is not None:
-            message = f'Return value of function {reference!r} is ignored'
-            CompilationWarning.add(location, message, WarningType.IGNORED_RESULT)
+            CompilationWarning.add(location, WarningType.IGNORED_RESULT,
+                                   f'Return value of function {reference!r} is ignored')
         expected_types = signature.get_argument_types()
         # Test arity
         if len(arguments) != len(expected_types):

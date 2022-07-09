@@ -1037,8 +1037,8 @@ class SubroutineCompiler(NameManager):
                 self.evaluate(expression, self.return_index)
             case TypeCheckedContextSnapshot(location=location, identifier=identifier):
                 self.create_context_snapshot(location, identifier)
-                message = '`?` is a debug feature and should not be used in production code'
-                CompilationWarning.add(location, message, WarningType.DEBUG_FEATURE)
+                CompilationWarning.add(location, WarningType.DEBUG_FEATURE,
+                                       '`?` is a debug feature and should not be used in production code')
                 comment_line = False
             case _:
                 raise ImpossibleException(f'Unknown instruction type: {instruction.__class__.__name__}')

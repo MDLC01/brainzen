@@ -45,9 +45,11 @@ def main(argv: list[str]) -> int:
     try:
         compilation_time = compile_source_code(code, arguments.source_file_name, arguments.output_file_name,
                                                arguments.main_procedure_identifier, arguments.verbose_level)
-    except CompilationException as e:
-        print(e, file=sys.stderr)
-        e.location.print_position(code)
+    except CompilationException as exception:
+        print(exception, file=sys.stderr)
+        exception.location.print_position(code)
+        if exception.hint is not None:
+            print(exception.hint, file=sys.stderr)
         return 1
 
     CompilationWarning.print_warnings(code, arguments.allowed_warning_types)

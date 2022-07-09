@@ -101,10 +101,13 @@ class ImpossibleException(CompilerException):
 class CompilationException(Exception):
     """An exception that is thrown when an error happens while compiling a Brainzen program."""
 
-    def __init__(self, location: Location, message: str):
+    __slots__ = 'location', 'message', 'hint'
+
+    def __init__(self, location: Location, message: str, hint: str | None = None):
         super().__init__()
         self.location = location
         self.message = message
+        self.hint = hint
 
     def __str__(self):
         return f'{self.location}{self.message}'
@@ -155,19 +158,22 @@ class WarningType(Enum):
 
 
 class CompilationWarning(Warning):
+    __slots__ = 'location', 'type', 'message', 'hint'
+
     warnings: list['CompilationWarning'] = []
 
-    def __init__(self, location: Location, message: str, warning_type: WarningType):
+    def __init__(self, location: Location, warning_type: WarningType, message: str, hint: str | None = None):
         self.location = location
-        self.message = message
         self.type = warning_type
+        self.message = message
+        self.hint = hint
 
     def __str__(self):
         return f'{self.location}Warning: {self.message}'
 
     @classmethod
-    def add(cls, location: Location, message: str, warning_type: WarningType):
-        cls.warnings.append(cls(location, message, warning_type))
+    def add(cls, location: Location, warning_type: WarningType, message: str, hint: str | None = None):
+        cls.warnings.append(cls(location, warning_type, message, hint))
 
     @classmethod
     def print_warnings(cls, source_code: str, allowed_types: set[WarningType], *, out=sys.stderr):
@@ -180,6 +186,8 @@ class CompilationWarning(Warning):
                     print(file=out)
                 print(warning, file=out)
                 warning.location.print_position(source_code, out=out)
+                if warning.hint is not None:
+                    print(f'Hint: {warning.hint}', file=out)
 
 
 __all__ = ['Location', 'CompilerException', 'ImpossibleException', 'CompilationException', 'WarningType',

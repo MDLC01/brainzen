@@ -175,13 +175,13 @@ class CodeBlockTypingContext:
     def register_variable(self, location: Location, identifier: str, variable_type: DataType) -> None:
         if identifier in self.variables:
             original = self.variables[identifier]
-            message = f'Variable {identifier!r} has already been defined at {original.location!r}'
-            CompilationWarning.add(location, message, WarningType.REDECLARATION)
+            CompilationWarning.add(location, WarningType.REDECLARATION,
+                                   f'Variable {identifier!r} has already been defined at {original.location!r}')
         elif self.is_shadow(identifier):
             original = self.parent[identifier]
-            message = f'Declaration shadows identifier {identifier!r} from outer scope (declared at' \
-                      f' {original.location!r})'
-            CompilationWarning.add(location, message, WarningType.NAME_SHADOWING)
+            CompilationWarning.add(location, WarningType.NAME_SHADOWING,
+                                   f'Declaration shadows identifier {identifier!r} from outer scope',
+                                   f'Declared originally at {original.location!r}')
         self.variables[identifier] = VariableInfo(location, variable_type)
 
     def get_variable_type(self, location: Location, identifier: str) -> DataType:

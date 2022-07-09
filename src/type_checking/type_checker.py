@@ -74,14 +74,17 @@ class TypeCheckedSubroutine(TypeCheckedNamespaceElement, ABC):
         super().__init__(location, identifier, is_private)
         if identifier in ('print', 'println', 'input', 'log'):
             message = f'This subroutine cannot be called from this namespace because {identifier!r} is a reserved name'
-            CompilationWarning.add(location, message, WarningType.RESERVED_NAME)
+            suggested_name = f'{identifier}_'
+            hint = f'Try renaming the subroutine to {suggested_name!r}'
+            CompilationWarning.add(location, WarningType.RESERVED_NAME, message, hint)
         self.arguments = arguments
         self.return_type = return_type
         locations = {}
         for argument in self.arguments:
             if argument.identifier in locations:
-                message = f'Argument {argument.identifier!r} has already been defined at {locations[argument.identifier]!r}'
-                CompilationWarning.add(argument.location, message, WarningType.REDECLARATION)
+                CompilationWarning.add(argument.location, WarningType.REDECLARATION,
+                                       f'Argument {argument.identifier!r} has already been defined at'
+                                       f' {locations[argument.identifier]!r}')
             locations[argument.identifier] = argument.location
 
     def is_function(self) -> bool:
@@ -119,9 +122,9 @@ class TypeCheckedNativeSubroutine(TypeCheckedSubroutine):
         super().__init__(location, identifier, is_private, arguments, return_type)
         self.offset = offset
         self.bf_code = bf_code
-        message = 'Using native Brainfuck code is not recommended. Every cell should be reset to 0 (except those' \
-                  ' containing the return value).'
-        CompilationWarning.add(self.location, message, WarningType.NATIVE_CODE)
+        CompilationWarning.add(self.location, WarningType.NATIVE_CODE,
+                               'Using native Brainfuck code is not recommended. Every cell should be reset to 0 (except'
+                               ' those containing the return value).')
 
     def _modifier_prefix(self) -> str:
         return super()._modifier_prefix() + 'native '
