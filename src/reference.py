@@ -22,5 +22,8 @@ class Reference:
             return f'{self.namespace}::{self.identifier}'
         return self.identifier
 
+    def __repr__(self) -> str:
+        return f"'{self}'"
+
 
 __all__ = ['Reference']

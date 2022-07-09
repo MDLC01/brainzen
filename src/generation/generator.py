@@ -35,13 +35,13 @@ class Context:
         parent = self.get_namespace(reference.namespace)
         if reference.identifier in parent.namespaces:
             return parent.namespaces[reference.identifier]
-        raise CompilerException(f'Unable to find namespace {reference}')
+        raise CompilerException(f'Unable to find namespace {reference!r}')
 
     def get_subroutine(self, reference: Reference) -> 'SubroutineCompiler':
         namespace = self.get_namespace(reference.namespace)
         if reference.identifier in namespace.subroutines:
             return namespace.subroutines[reference.identifier]
-        raise CompilerException(f'Unable to find subroutine {reference}')
+        raise CompilerException(f'Unable to find subroutine {reference!r}')
 
     def with_namespace(self, identifier: str, namespace: 'Context') -> 'Context':
         namespaces = self.namespaces.copy()
@@ -766,11 +766,11 @@ class SubroutineCompiler(NameManager):
         call_index = self.index
         subroutine = self.context.get_subroutine(reference)
         if expect_return and not subroutine.returns():
-            raise CompilerException(f'Using procedure {reference} as a function should have been caught earlier')
+            raise CompilerException(f'Using procedure {reference!r} as a function should have been caught earlier')
         # Test if the number of arguments is right
         arity = subroutine.arity()
         if arity != len(arguments):
-            message = f'Subroutine {reference} expects {arity} arguments, found {len(arguments)}'
+            message = f'Subroutine {reference!r} expects {arity} arguments, found {len(arguments)}'
             raise CompilationException(location, message)
         # First, evaluates the arguments
         self._comment(f'Preparing call to subroutine {reference} (evaluating arguments)', prefix='\n')

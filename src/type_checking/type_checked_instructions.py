@@ -684,7 +684,7 @@ class TypeCheckedProcedureCall(TypeCheckedInstruction):
         # Get subroutine signature
         signature = context.namespace.get_subroutine_signature(reference)
         if signature.return_type is not None:
-            message = f'Return value of function {reference} is ignored'
+            message = f'Return value of function {reference!r} is ignored'
             CompilationWarning.add(location, message, WarningType.IGNORED_RESULT)
         expected_types = signature.get_argument_types()
         # Test arity
@@ -692,7 +692,7 @@ class TypeCheckedProcedureCall(TypeCheckedInstruction):
             argument_count = f'{len(expected_types)} argument'
             if len(expected_types) > 1:
                 argument_count += 's'
-            message = f'Procedure {reference} accepts {argument_count}, but found {len(arguments)}'
+            message = f'Procedure {reference!r} accepts {argument_count}, but found {len(arguments)}'
             raise CompilationException(location, message)
         # Test if types match
         typed_arguments = []
@@ -734,7 +734,7 @@ class TypedFunctionCall(TypedExpression):
             argument_count = f'{len(expected_types)} argument'
             if len(expected_types) > 1:
                 argument_count += 's'
-            message = f'Function {reference} accepts {argument_count}, but found {len(arguments)}'
+            message = f'Function {reference!r} accepts {argument_count}, but found {len(arguments)}'
             raise CompilationException(location, message)
         # Test if types match
         typed_arguments = []
@@ -800,7 +800,7 @@ class InputCall(TypedFunctionCall):
         reference = function_call.reference
         # Test arity
         if len(function_call.arguments) != 0:
-            message = f'Function {reference} accepts no argument, but found {len(function_call.arguments)}'
+            message = f'Function {reference!r} accepts no argument, but found {len(function_call.arguments)}'
             raise CompilationException(location, message)
         return cls(location, reference)
 
@@ -821,7 +821,7 @@ class LogCall(TypeCheckedProcedureCall):
         reference = procedure_call.reference
         # Test arity
         if len(procedure_call.arguments) != 1:
-            message = f"Procedure {reference} accepts a single argument, but found {len(procedure_call.arguments)}"
+            message = f'Procedure {reference!r} accepts a single argument, but found {len(procedure_call.arguments)}'
             raise CompilationException(location, message)
         # Type check argument
         argument = TypedExpression.from_untyped(context, procedure_call.arguments[0])
