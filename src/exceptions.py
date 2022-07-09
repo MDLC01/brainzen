@@ -67,7 +67,10 @@ class Location:
     def print_position(self, source_code: str, *, out=sys.stderr):
         if self.line is None or self.column is None:
             return
-        line = source_code.splitlines()[self.line - 1]
+        lines = source_code.splitlines()
+        if self.line < 0 or self.line - 1 >= len(lines):
+            return
+        line = lines[self.line - 1]
         stripped_line = line.lstrip()
         offset = len(line) - len(stripped_line)
         line_number = str(self.line)
