@@ -139,6 +139,13 @@ class NamespaceTypingContext:
         self.parent.register_namespace(self.identifier, self.is_private, self)
 
 
+class FileTypingContext(NamespaceTypingContext):
+    __slots__ = ()
+
+    def __init__(self, identifier: str) -> None:
+        super().__init__(identifier, False)
+
+
 class VariableInfo:
     __slots__ = 'location', 'type'
 
@@ -219,4 +226,5 @@ class SubroutineTypingContext(CodeBlockTypingContext):
         self.namespace.register_subroutine(self.identifier, self.is_private, self.signature)
 
 
-__all__ = ['SubroutineArgument', 'SubroutineSignature', 'NamespaceTypingContext', 'CodeBlockTypingContext']
+__all__ = ['SubroutineArgument', 'SubroutineSignature', 'NamespaceTypingContext', 'FileTypingContext',
+           'CodeBlockTypingContext']

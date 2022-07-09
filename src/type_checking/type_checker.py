@@ -162,7 +162,7 @@ class TypeCheckedNamespace(TypeCheckedNamespaceElement):
 
     @classmethod
     def from_file(cls, file: File) -> 'TypeCheckedNamespace':
-        typing_context = NamespaceTypingContext(file.identifier, False)
+        typing_context = FileTypingContext(file.identifier)
         return cls.from_untyped(typing_context, file)
 
     @classmethod
