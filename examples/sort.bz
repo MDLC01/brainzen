@@ -1,5 +1,5 @@
-#RESET = "\x1b[0m";
-#RED = "\x1b[91m";
+#RESET = "\x1b[39m";
+#RED = "\x1b[31m";
 
 func swap(char[16] arr, char k, char l) -> char[16] {
     let xk: char;

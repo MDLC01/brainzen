@@ -1,5 +1,5 @@
-#RESET = "\x1b[0m";
-#RED = "\x1b[91m";
+#RESET = "\x1b[39m";
+#RED = "\x1b[31m";
 
 namespace IO {
     proc print10(char n) {
