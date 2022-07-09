@@ -539,12 +539,14 @@ class ASTGenerator:
 
     def parse_constant_definition(self, is_private: bool) -> Constant:
         start_location = self._expect(HashToken).location
-        identifier = self._expect(IdentifierToken).name
+        identifier = self._expect(IdentifierToken)
+        CompilationWarning.suggest_screaming_snake_case(identifier.location, identifier.name,
+                                                        'Constant names should use SCREAMING_SNAKE_CASE')
         self._expect(EqualToken)
         expression = self.parse_expression()
         self._expect_end(SemicolonToken)
         location = self._location_from(start_location)
-        return Constant(location, identifier, is_private, expression)
+        return Constant(location, identifier.name, is_private, expression)
 
     def parse_subroutine_argument_declaration(self) -> list[SubroutineArgument]:
         self._expect(OpenParToken)
@@ -591,10 +593,12 @@ class ASTGenerator:
     def parse_namespace_definition(self, is_private: bool) -> Namespace:
         start_location = self._location()
         self._expect(NamespaceKeyword)
-        identifier = self._expect(IdentifierToken).name
+        identifier = self._expect(IdentifierToken)
+        CompilationWarning.suggest_pascal_case(identifier.location, identifier.name,
+                                               'Namespace names should use PascalCase')
         location = self._location_from(start_location)
         self._expect(OpenBraceToken)
-        namespace = Namespace(location, identifier, is_private)
+        namespace = Namespace(location, identifier.name, is_private)
         while not self._eat(CloseBraceToken):
             self.parse_and_register_namespace_element(namespace)
         return namespace

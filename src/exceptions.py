@@ -120,6 +120,7 @@ class WarningType(Enum):
     RESERVED_NAME = 'reserved-name'
     IGNORED_RESULT = 'ignored-result'
     NATIVE_CODE = 'native-code'
+    NAMING_CONVENTIONS = 'naming'
     DEBUG_FEATURE = 'debug-feature'
 
     @classmethod
@@ -189,6 +190,36 @@ class CompilationWarning(Warning):
     @classmethod
     def add(cls, location: Location, warning_type: WarningType, message: str, hint: str | None = None) -> None:
         cls.warnings.append(cls(location, warning_type, message, hint))
+
+    @classmethod
+    def suggest_pascal_case(cls, location: Location, identifier: str, message: str | None = None) -> None:
+        if identifier[0].isupper() and '_' not in identifier:
+            return
+        if message is None:
+            message = 'Name should use PascalCase'
+        suggested_name = ''
+        for i, c in enumerate(identifier):
+            if c == '_':
+                pass
+            elif i == 0 or identifier[i - 1] == '_':
+                suggested_name += c.upper()
+            else:
+                suggested_name += c
+        cls.add(location, WarningType.NAMING_CONVENTIONS, message, f'Try renaming to {suggested_name!r}')
+
+    @classmethod
+    def suggest_screaming_snake_case(cls, location: Location, identifier: str, message: str | None = None) -> None:
+        if identifier.isupper():
+            return
+        if message is None:
+            message = 'Name should use SCREAMING_SNAKE_CASE'
+        suggested_name = ''
+        for i, c in enumerate(identifier):
+            if i != 0 and identifier[i - 1] != '_' and c.isupper():
+                suggested_name += f'_{c}'
+            else:
+                suggested_name += c.upper()
+        cls.add(location, WarningType.NAMING_CONVENTIONS, message, f'Try renaming to {suggested_name!r}')
 
     @classmethod
     def print_warnings(cls, source_code: str, allowed_types: set[WarningType], *, out=sys.stderr) -> None:
