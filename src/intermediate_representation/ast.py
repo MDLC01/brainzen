@@ -214,6 +214,12 @@ class ASTGenerator:
             raise CompilationException(self._location(), message)
         return self._next()
 
+    def _expect_end(self, token_type: Type[_T]) -> _T:
+        """Similar to _expect, except the error is raised after the location of the previous token"""
+        if not self._is_next(token_type):
+            raise CompilationException(self._previous_location().after(), f'Expected {token_type.__doc__}')
+        return self._next()
+
     def _eat(self, token_type: Type[AnyToken]) -> bool:
         """Advance the cursor if the next token is of the passed type"""
         if self._is_next(token_type):
@@ -487,9 +493,7 @@ class ASTGenerator:
             return ConditionalStatement(location, test, if_instructions, else_instructions)
         # Instruction
         instruction = self.parse_instruction()
-        if not self._is_next(SemicolonToken):
-            raise CompilationException(instruction.location.after(), 'Expected semicolon after instruction')
-        self._next()
+        self._expect_end(SemicolonToken)
         return instruction
 
     def parse_instruction_block(self) -> InstructionBlock:
@@ -538,7 +542,7 @@ class ASTGenerator:
         identifier = self._expect(IdentifierToken).name
         self._expect(EqualToken)
         expression = self.parse_expression()
-        self._expect(SemicolonToken)
+        self._expect_end(SemicolonToken)
         location = self._location_from(start_location)
         return Constant(location, identifier, is_private, expression)
 
