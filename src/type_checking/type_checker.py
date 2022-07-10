@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Generator
+from typing import Generator, Optional
 
 from type_checking.data_types import *
 from exceptions import *
@@ -12,9 +12,13 @@ class TypeCheckedNamespaceElement(ABC):
     __slots__ = 'location', 'identifier', 'is_private'
 
     @classmethod
-    def from_untyped(cls, context: NamespaceTypingContext, element: NamespaceElement) -> 'TypeCheckedNamespaceElement':
+    def from_untyped(cls, context: NamespaceTypingContext,
+                     element: NamespaceElement) -> Optional['TypeCheckedNamespaceElement']:
         if isinstance(element, Constant):
             return TypeCheckedConstant.from_untyped(context, element)
+        if isinstance(element, TypeAlias):
+            context.register_type(element.identifier, element.is_private, context.build_type(element.type))
+            return None
         if isinstance(element, NativeSubroutine):
             return TypeCheckedNativeSubroutine.from_untyped(context, element)
         if isinstance(element, Procedure):
@@ -174,7 +178,8 @@ class TypeCheckedNamespace(TypeCheckedNamespaceElement):
         with context.namespace(namespace.identifier, namespace.is_private) as namespace_context:
             for element in namespace.elements:
                 type_checked_element = TypeCheckedNamespaceElement.from_untyped(namespace_context, element)
-                elements.append(type_checked_element)
+                if type_checked_element is not None:
+                    elements.append(type_checked_element)
         return cls(namespace.location, namespace.identifier, namespace.is_private, elements)
 
     def __init__(self, location: Location, identifier: str, is_private: bool,

@@ -294,6 +294,10 @@ class PrivateKeyword(Token):
     keyword = 'private'
 
 
+class TypeKeyword(Token):
+    keyword = 'type'
+
+
 class NamespaceKeyword(Token):
     keyword = 'namespace'
 
@@ -439,7 +443,7 @@ __all__ = ['is_allowed_in_word', 'is_valid_word', 'Priority', 'AnyToken', 'Token
            'BangEqualToken', 'LessThanToken', 'LessThanEqualToken', 'GreaterThanToken', 'GreaterThanEqualToken',
            'DoubleAmpersandToken', 'PipeToken', 'DoublePipeToken', 'PlusToken', 'MinusToken', 'StarToken',
            'DoubleStarToken', 'SlashToken', 'PercentToken', 'DoubleDotToken', 'ColonToken', 'DoubleColonToken',
-           'ArrowToken', 'HashToken', 'QuestionMarkToken', 'PrivateKeyword', 'NamespaceKeyword', 'NativeKeyword',
-           'TildeToken', 'ProcKeyword', 'FuncKeyword', 'LetKeyword', 'LoopKeyword', 'ForKeyword', 'WhileKeyword',
-           'DoKeyword', 'IfKeyword', 'ElseKeyword', 'ReturnKeyword', 'EOFToken', 'NumberLiteral', 'NumericLiteral',
-           'CharacterLiteral', 'StringLiteral', 'IdentifierToken', 'NativeCodeBlock']
+           'ArrowToken', 'HashToken', 'QuestionMarkToken', 'PrivateKeyword', 'TypeKeyword', 'NamespaceKeyword',
+           'NativeKeyword', 'TildeToken', 'ProcKeyword', 'FuncKeyword', 'LetKeyword', 'LoopKeyword', 'ForKeyword',
+           'WhileKeyword', 'DoKeyword', 'IfKeyword', 'ElseKeyword', 'ReturnKeyword', 'EOFToken', 'NumberLiteral',
+           'NumericLiteral', 'CharacterLiteral', 'StringLiteral', 'IdentifierToken', 'NativeCodeBlock']

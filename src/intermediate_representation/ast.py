@@ -46,6 +46,20 @@ class Constant(NamespaceElement):
         return f'{self.__class__.__name__}[{self.identifier}, {self.expression!r}]'
 
 
+class TypeAlias(NamespaceElement):
+    __slots__ = 'type'
+
+    def __init__(self, location: Location, identifier: str, is_private: bool, type_expression: TypeExpression) -> None:
+        super().__init__(location, identifier, is_private)
+        self.type = type_expression
+
+    def __str__(self) -> str:
+        return f'type {self.identifier} = {self.type}'
+
+    def __repr__(self, indent: str = '') -> str:
+        return f'{self.__class__.__name__}[{self.identifier}, {self.type!r}]'
+
+
 class SubroutineArgument:
     __slots__ = 'location', 'identifier', 'type'
 
@@ -126,10 +140,11 @@ class AlreadyDefinedException(CompilationException):
 class Namespace(NamespaceElement):
     def __init__(self, location: Location, identifier: str, is_private: bool) -> None:
         super().__init__(location, identifier, is_private)
-        self.elements: list[NamespaceElement] = []
-        self.constants: dict[str, Constant] = {}
-        self.namespaces: dict[str, Namespace] = {}
-        self.subroutines: dict[str, Subroutine] = {}
+        self.elements = list[NamespaceElement]()
+        self.constants = dict[str, Constant]()
+        self.type_aliases = dict[str, TypeAlias]()
+        self.namespaces = dict[str, Namespace]()
+        self.subroutines = dict[str, Subroutine]()
 
     def register_constant(self, constant: Constant) -> None:
         identifier = constant.identifier
@@ -137,6 +152,13 @@ class Namespace(NamespaceElement):
             raise AlreadyDefinedException('Constant', self.constants[identifier], constant.location)
         self.constants[identifier] = constant
         self.elements.append(constant)
+
+    def register_type_alias(self, type_alias: TypeAlias) -> None:
+        identifier = type_alias.identifier
+        if identifier in self.type_aliases:
+            raise AlreadyDefinedException('Type alias', self.type_aliases[identifier], type_alias.location)
+        self.type_aliases[identifier] = type_alias
+        self.elements.append(type_alias)
 
     def register_namespace(self, namespace: 'Namespace') -> None:
         identifier = namespace.identifier
@@ -240,10 +262,10 @@ class ASTGenerator:
                 break
         return elements
 
-    def parse_base_type(self) -> TypeExpression:
+    def parse_type(self) -> TypeExpression:
         # Parenthesised type description
         if self._eat(OpenParToken):
-            operand = self.parse_type()
+            operand = self.parse_type_expression()
             self._expect_delimiter(CloseParToken)
             return operand
         # Reference
@@ -252,7 +274,7 @@ class ASTGenerator:
 
     def parse_type_operand(self) -> TypeExpression:
         start_location = self._location()
-        operand = self.parse_base_type()
+        operand = self.parse_type()
         # Subscripts
         while self._eat(OpenBracketToken):
             count = self.parse_expression()
@@ -260,7 +282,7 @@ class ASTGenerator:
             operand = TypeArray(self._location_from(start_location), operand, count)
         return operand
 
-    def parse_type(self) -> TypeExpression:
+    def parse_type_expression(self) -> TypeExpression:
         start_location = self._location()
         types = [self.parse_type_operand()]
         while self._eat(StarToken):
@@ -449,7 +471,7 @@ class ASTGenerator:
         if self._eat(LetKeyword):
             target = self.parse_assignment_target()
             if self._eat(ColonToken):
-                variable_type = self.parse_type()
+                variable_type = self.parse_type_expression()
                 return VariableDeclaration(self._location_from(start_location), target, variable_type)
             else:
                 self._expect(EqualToken)
@@ -548,6 +570,14 @@ class ASTGenerator:
         location = self._location_from(start_location)
         return Constant(location, identifier.name, is_private, expression)
 
+    def parse_type_alias_definition(self, is_private: bool) -> TypeAlias:
+        start_location = self._expect(TypeKeyword).location
+        identifier = self._expect(IdentifierToken).name
+        self._expect(EqualToken)
+        type_expression = self.parse_type_expression()
+        self._expect_delimiter(SemicolonToken)
+        return TypeAlias(self._location_from(start_location), identifier, is_private, type_expression)
+
     def parse_subroutine_argument_declaration(self) -> list[SubroutineArgument]:
         self._expect(OpenParToken)
         arguments = []
@@ -555,7 +585,7 @@ class ASTGenerator:
             return arguments
         while True:
             start_location = self._location()
-            argument_type = self.parse_type()
+            argument_type = self.parse_type_expression()
             identifier = self._expect(IdentifierToken)
             arguments.append(SubroutineArgument(self._location_from(start_location), identifier.name, argument_type))
             if not self._eat(CommaToken):
@@ -577,7 +607,7 @@ class ASTGenerator:
         return_type = None
         if is_function:
             self._expect(ArrowToken)
-            return_type = self.parse_type()
+            return_type = self.parse_type_expression()
         # Native code
         if is_native:
             self._expect(TildeToken)
@@ -609,6 +639,10 @@ class ASTGenerator:
         if self._is_next(HashToken):
             constant = self.parse_constant_definition(is_private)
             namespace.register_constant(constant)
+        # Type alias definition
+        elif self._is_next(TypeKeyword):
+            type_alias = self.parse_type_alias_definition(is_private)
+            namespace.register_type_alias(type_alias)
         # Namespace definition
         elif self._is_next(NamespaceKeyword):
             child_namespace = self.parse_namespace_definition(is_private)
@@ -624,5 +658,6 @@ class ASTGenerator:
         return self.file
 
 
-__all__ = ['NamespaceElement', 'Constant', 'SubroutineArgument', 'Subroutine', 'NativeSubroutine', 'Procedure',
+__all__ = ['NamespaceElement', 'Constant', 'TypeAlias', 'SubroutineArgument', 'Subroutine', 'NativeSubroutine',
+           'Procedure',
            'Namespace', 'File', 'ASTGenerator']
