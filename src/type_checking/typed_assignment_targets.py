@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from data_types import ArrayType, DataType, ProductType
+from type_checking.data_types import ArrayType, DataType, ProductType
 from exceptions import *
 from intermediate_representation.assignment_targets import *
 from type_checking.typing_context import CodeBlockTypingContext

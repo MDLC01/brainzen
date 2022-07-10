@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Generator
 
-from data_types import *
+from type_checking.data_types import *
 from exceptions import *
 from intermediate_representation.instructions import *
 from reference import Reference
@@ -885,7 +885,8 @@ class TypeCheckedVariableDeclaration(TypeCheckedInstruction):
     @classmethod
     def from_untyped(cls, context: CodeBlockTypingContext,
                      variable_declaration: VariableDeclaration) -> 'TypeCheckedVariableDeclaration':
-        target = TypedDeclarationTarget.from_untyped(context, variable_declaration.target, variable_declaration.type)
+        variable_type = context.namespace.build_type(variable_declaration.type)
+        target = TypedDeclarationTarget.from_untyped(context, variable_declaration.target, variable_type)
         return cls(variable_declaration.location, target)
 
     def __init__(self, location: Location, target: TypedDeclarationTarget) -> None:

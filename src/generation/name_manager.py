@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 
-from data_types import DataType, Types
+from type_checking.data_types import *
 from exceptions import CompilerException
-from intermediate_representation import SubroutineArgument
+from type_checking import TypedSubroutineArgument
 
 
 _counter = 0
@@ -137,7 +137,7 @@ class Scope:
 
 
 class NameManager(ABC):
-    def __init__(self, arguments: list[SubroutineArgument], return_type: DataType | None = None) -> None:
+    def __init__(self, arguments: list[TypedSubroutineArgument], return_type: DataType | None = None) -> None:
         argument_variables = []
         argument_buffer_size = 0
         for argument in arguments:

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Generator
 
-from data_types import *
+from type_checking.data_types import *
 from exceptions import *
 from intermediate_representation import *
 from type_checking.type_checked_instructions import *
@@ -69,7 +69,7 @@ class TypeCheckedConstant(TypeCheckedNamespaceElement):
 class TypeCheckedSubroutine(TypeCheckedNamespaceElement, ABC):
     __slots__ = 'arguments', 'return_type'
 
-    def __init__(self, location: Location, identifier: str, is_private: bool, arguments: list[SubroutineArgument],
+    def __init__(self, location: Location, identifier: str, is_private: bool, arguments: list[TypedSubroutineArgument],
                  return_type: DataType | None) -> None:
         super().__init__(location, identifier, is_private)
         if identifier in ('print', 'println', 'input', 'log'):
@@ -112,12 +112,14 @@ class TypeCheckedNativeSubroutine(TypeCheckedSubroutine):
     @classmethod
     def from_untyped(cls, context: NamespaceTypingContext,
                      subroutine: NativeSubroutine) -> 'TypeCheckedNativeSubroutine':
-        signature = SubroutineSignature(subroutine.location, subroutine.arguments, subroutine.return_type)
+        arguments = [TypedSubroutineArgument.from_untyped(context, argument) for argument in subroutine.arguments]
+        return_type = context.build_type(subroutine.return_type) if subroutine.return_type is not None else None
+        signature = SubroutineSignature(subroutine.location, arguments, return_type)
         context.register_subroutine(subroutine.identifier, subroutine.is_private, signature)
-        return cls(subroutine.location, subroutine.identifier, subroutine.is_private, subroutine.arguments,
-                   subroutine.return_type, subroutine.offset, subroutine.bf_code)
+        return cls(subroutine.location, subroutine.identifier, subroutine.is_private, arguments, return_type,
+                   subroutine.offset, subroutine.bf_code)
 
-    def __init__(self, location: Location, identifier: str, is_private: bool, arguments: list[SubroutineArgument],
+    def __init__(self, location: Location, identifier: str, is_private: bool, arguments: list[TypedSubroutineArgument],
                  return_type: DataType | None, offset: int, bf_code: str) -> None:
         super().__init__(location, identifier, is_private, arguments, return_type)
         self.offset = offset
@@ -138,13 +140,14 @@ class TypeCheckedProcedure(TypeCheckedSubroutine):
 
     @classmethod
     def from_untyped(cls, context: NamespaceTypingContext, procedure: Procedure) -> 'TypeCheckedProcedure':
-        signature = SubroutineSignature(procedure.location, procedure.arguments, procedure.return_type)
+        arguments = [TypedSubroutineArgument.from_untyped(context, argument) for argument in procedure.arguments]
+        return_type = context.build_type(procedure.return_type) if procedure.return_type is not None else None
+        signature = SubroutineSignature(procedure.location, arguments, return_type)
         with context.subroutine(procedure.identifier, procedure.is_private, signature) as subroutine_context:
             body = TypeCheckedInstructionBlock.from_untyped(subroutine_context, procedure.body, allow_return=True)
-        return cls(procedure.location, procedure.identifier, procedure.is_private, procedure.arguments,
-                   procedure.return_type, body)
+        return cls(procedure.location, procedure.identifier, procedure.is_private, arguments, return_type, body)
 
-    def __init__(self, location: Location, identifier: str, is_private: bool, arguments: list[SubroutineArgument],
+    def __init__(self, location: Location, identifier: str, is_private: bool, arguments: list[TypedSubroutineArgument],
                  return_type: DataType | None, body: TypeCheckedInstructionBlock) -> None:
         super().__init__(location, identifier, is_private, arguments, return_type)
         self.body = body

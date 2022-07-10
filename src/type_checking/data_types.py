@@ -6,6 +6,8 @@ from exceptions import *
 class DataType(ABC):
     """A type for variables, functions and subroutine arguments."""
 
+    __slots__ = ()
+
     def is_string(self) -> bool:
         if isinstance(self, ArrayType):
             return self.base_type.is_string()
@@ -82,7 +84,7 @@ class PrimitiveType(DataType):
 
 
 class ProductType(DataType):
-    __slots__ = 'types'
+    __slots__ = 'operands'
 
     @classmethod
     def from_operands(cls, operands: list[DataType]) -> 'DataType':

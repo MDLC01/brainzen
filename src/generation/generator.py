@@ -1,6 +1,5 @@
 from enum import IntEnum
 
-from data_types import *
 from exceptions import *
 from generation.brainfuck_code import *
 from generation.name_manager import *

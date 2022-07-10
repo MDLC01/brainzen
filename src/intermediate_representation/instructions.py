@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Generator
 
-from data_types import DataType
 from exceptions import CompilerException, Location
 from intermediate_representation.assignment_targets import AssignmentTarget
+from intermediate_representation.type_expressions import TypeExpression
 from reference import *
 from tokenization import Token
 
@@ -326,7 +326,7 @@ class Decrementation(Instruction):
 
 
 class VariableDeclaration(Instruction):
-    def __init__(self, location: Location, target: AssignmentTarget, variable_type: DataType) -> None:
+    def __init__(self, location: Location, target: AssignmentTarget, variable_type: TypeExpression) -> None:
         super().__init__(location)
         self.target = target
         self.type = variable_type

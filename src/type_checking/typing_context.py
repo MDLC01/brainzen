@@ -1,19 +1,37 @@
 from typing import Generic, Optional, TYPE_CHECKING, TypeVar
 
-from data_types import DataType
 from exceptions import *
-from intermediate_representation import SubroutineArgument
+from intermediate_representation import *
 from reference import Reference
+from type_checking.data_types import *
 
 
 if TYPE_CHECKING:
     from type_checked_instructions import TypedExpression
 
 
+class TypedSubroutineArgument:
+    __slots__ = 'location', 'identifier', 'type'
+
+    @classmethod
+    def from_untyped(cls, context: 'NamespaceTypingContext',
+                     subroutine_argument: SubroutineArgument) -> 'TypedSubroutineArgument':
+        argument_type = context.build_type(subroutine_argument.type)
+        return cls(subroutine_argument.location, subroutine_argument.identifier, argument_type)
+
+    def __init__(self, location: Location, identifier: str, argument_type: DataType) -> None:
+        self.location = location
+        self.identifier = identifier
+        self.type = argument_type
+
+    def __repr__(self) -> str:
+        return f'{self.type} {self.identifier}'
+
+
 class SubroutineSignature:
     __slots__ = 'location', 'arguments', 'arguments_by_name', 'return_type'
 
-    def __init__(self, location: Location, arguments: list[SubroutineArgument],
+    def __init__(self, location: Location, arguments: list[TypedSubroutineArgument],
                  return_type: DataType | None = None) -> None:
         self.location = location
         self.arguments = arguments
@@ -46,13 +64,14 @@ class NamespaceElementInfo(Generic[_T]):
 
 
 class NamespaceTypingContext:
-    __slots__ = 'identifier', 'is_private', 'parent', 'namespaces', 'constants', 'subroutines'
+    __slots__ = 'identifier', 'is_private', 'parent', 'namespaces', 'types', 'constants', 'subroutines'
 
     def __init__(self, identifier: str, is_private: bool, parent: Optional['NamespaceTypingContext'] = None) -> None:
         self.identifier = identifier
         self.is_private = is_private
         self.parent = parent
         self.namespaces = dict[str, NamespaceElementInfo[NamespaceTypingContext]]()
+        self.types = dict[str, NamespaceElementInfo[DataType]]()
         self.constants = dict[str, NamespaceElementInfo['TypedExpression']]()
         self.subroutines = dict[str, NamespaceElementInfo[SubroutineSignature]]()
 
@@ -73,6 +92,40 @@ class NamespaceTypingContext:
         if namespace.is_private:
             raise CompilationException(reference.location, f'Unable to access private namespace {reference.identifier}')
         return namespace.element
+
+    def get_type(self, reference: Reference) -> DataType:
+        # Unqualified reference (reference from within the namespace)
+        if reference.namespace is None:
+            if reference.identifier in self.types:
+                return self.types[reference.identifier].element
+            if self.parent is not None:
+                return self.parent.get_type(reference)
+            else:
+                raise CompilationException(reference.location, f'Unknown type: {reference.identifier}')
+        # Fully qualified reference (reference from outside the namespace)
+        parent = self.get_namespace(reference.namespace)
+        if reference.identifier not in parent.types:
+            raise CompilationException(reference.location, f'Unknown type: {reference.identifier}')
+        data_type = parent.types[reference.identifier]
+        if data_type.is_private:
+            raise CompilationException(reference.location, f'Unable to access private type {reference.identifier}')
+        return data_type.element
+
+    def build_type(self, type_expression: TypeExpression) -> DataType:
+        match type_expression:
+            case TypeReference(reference=reference):
+                return self.get_type(reference)
+            case TypeArray(base_type=base_type, count=count_expression):
+                from type_checking.type_checked_instructions import evaluate, LiteralChar
+
+                # This means an array cannot be longer than 255 elements, which is sad
+                count = evaluate(self, count_expression)
+                if not isinstance(count, LiteralChar):
+                    raise CompilationException(count.location, f'Expected {Types.CHAR} but found {count.type()}')
+                return ArrayType(self.build_type(base_type), count.value)
+            case TypeProduct(operands=operands):
+                return ProductType([self.build_type(operand) for operand in operands])
+        raise ImpossibleException(f'Unknown type expression type: {type_expression.__class__.__name__}')
 
     def get_constant_value(self, reference: Reference) -> 'TypedExpression':
         # Unqualified reference (reference from within the namespace)
@@ -111,6 +164,10 @@ class NamespaceTypingContext:
             raise CompilationException(reference.location, message)
         return constant.element
 
+    def register_type(self, identifier: str, is_private: bool, data_type: DataType) -> None:
+        """Register a type."""
+        self.types[identifier] = NamespaceElementInfo(identifier, is_private, data_type)
+
     def register_constant(self, identifier: str, is_private: bool, expression: 'TypedExpression') -> None:
         """Register a constant value."""
         self.constants[identifier] = NamespaceElementInfo(identifier, is_private, expression)
@@ -144,6 +201,7 @@ class FileTypingContext(NamespaceTypingContext):
 
     def __init__(self, identifier: str) -> None:
         super().__init__(identifier, False)
+        self.register_type('char', False, Types.CHAR)
 
 
 class VariableInfo:
@@ -226,5 +284,5 @@ class SubroutineTypingContext(CodeBlockTypingContext):
         self.namespace.register_subroutine(self.identifier, self.is_private, self.signature)
 
 
-__all__ = ['SubroutineArgument', 'SubroutineSignature', 'NamespaceTypingContext', 'FileTypingContext',
+__all__ = ['TypedSubroutineArgument', 'SubroutineSignature', 'NamespaceTypingContext', 'FileTypingContext',
            'CodeBlockTypingContext']

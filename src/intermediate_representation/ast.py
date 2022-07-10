@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Type, TypeVar
 
-from data_types import *
 from exceptions import *
 from intermediate_representation.assignment_targets import *
 from intermediate_representation.instructions import *
+from intermediate_representation.type_expressions import *
 from reference import *
 from tokenization.tokens import *
 
@@ -49,10 +49,10 @@ class Constant(NamespaceElement):
 class SubroutineArgument:
     __slots__ = 'location', 'identifier', 'type'
 
-    def __init__(self, location: Location, identifier: str, variable_type: DataType) -> None:
+    def __init__(self, location: Location, identifier: str, argument_type: TypeExpression) -> None:
         self.location = location
         self.identifier = identifier
-        self.type = variable_type
+        self.type = argument_type
 
     def __repr__(self) -> str:
         return f'{self.type} {self.identifier}'
@@ -62,7 +62,7 @@ class Subroutine(NamespaceElement, ABC):
     __slots__ = 'arguments', 'return_type'
 
     def __init__(self, location: Location, identifier: str, is_private: bool, arguments: list[SubroutineArgument],
-                 return_type: DataType | None) -> None:
+                 return_type: TypeExpression | None) -> None:
         super().__init__(location, identifier, is_private)
         self.arguments = arguments
         self.return_type = return_type
@@ -90,7 +90,7 @@ class NativeSubroutine(Subroutine):
     __slots__ = 'offset', 'bf_code'
 
     def __init__(self, location: Location, identifier: str, is_private: bool, arguments: list[SubroutineArgument],
-                 return_type: DataType | None, offset: int, bf_code: str) -> None:
+                 return_type: TypeExpression | None, offset: int, bf_code: str) -> None:
         super().__init__(location, identifier, is_private, arguments, return_type)
         self.offset = offset
         self.bf_code = bf_code
@@ -106,7 +106,7 @@ class Procedure(Subroutine):
     __slots__ = 'body'
 
     def __init__(self, location: Location, identifier: str, is_private: bool, arguments: list[SubroutineArgument],
-                 return_type: DataType | None, body: InstructionBlock) -> None:
+                 return_type: TypeExpression | None, body: InstructionBlock) -> None:
         super().__init__(location, identifier, is_private, arguments, return_type)
         self.body = body
 
@@ -214,7 +214,7 @@ class ASTGenerator:
             raise CompilationException(self._location(), message)
         return self._next()
 
-    def _expect_end(self, token_type: Type[_T]) -> _T:
+    def _expect_delimiter(self, token_type: Type[_T]) -> _T:
         """Similar to _expect, except the error is raised after the location of the previous token"""
         if not self._is_next(token_type):
             raise CompilationException(self._previous_location().after(), f'Missing {token_type.__doc__}')
@@ -239,6 +239,33 @@ class ASTGenerator:
                 self._expect(closing_token_type)
                 break
         return elements
+
+    def parse_base_type(self) -> TypeExpression:
+        # Parenthesised type description
+        if self._eat(OpenParToken):
+            operand = self.parse_type()
+            self._expect_delimiter(CloseParToken)
+            return operand
+        # Reference
+        reference = self.parse_reference()
+        return TypeReference(reference)
+
+    def parse_type_operand(self) -> TypeExpression:
+        start_location = self._location()
+        operand = self.parse_base_type()
+        # Subscripts
+        while self._eat(OpenBracketToken):
+            count = self.parse_expression()
+            self._expect_delimiter(CloseBracketToken)
+            operand = TypeArray(self._location_from(start_location), operand, count)
+        return operand
+
+    def parse_type(self) -> TypeExpression:
+        start_location = self._location()
+        types = [self.parse_type_operand()]
+        while self._eat(StarToken):
+            types.append(self.parse_type_operand())
+        return TypeProduct.from_operands(self._location_from(start_location), types)
 
     def parse_iterator(self) -> Iterator:
         start_location = self._location()
@@ -493,7 +520,7 @@ class ASTGenerator:
             return ConditionalStatement(location, test, if_instructions, else_instructions)
         # Instruction
         instruction = self.parse_instruction()
-        self._expect_end(SemicolonToken)
+        self._expect_delimiter(SemicolonToken)
         return instruction
 
     def parse_instruction_block(self) -> InstructionBlock:
@@ -510,33 +537,6 @@ class ASTGenerator:
         instruction = self.parse_instruction_or_statement()
         return InstructionBlock(instruction.location, instruction)
 
-    def parse_base_type(self) -> DataType:
-        # Parenthesised type description
-        if self._eat(OpenParToken):
-            operand = self.parse_type()
-            self._expect(CloseParToken)
-            return operand
-        # Identifier
-        start_location = self._location()
-        identifier = self._expect(IdentifierToken).name
-        return PrimitiveType.of(self._location_from(start_location), identifier)
-
-    def parse_type_operand(self) -> DataType:
-        operand = self.parse_base_type()
-        # Subscripts
-        while self._is_next(OpenBracketToken):
-            self._expect(OpenBracketToken)
-            size = self._expect(NumericLiteral).value
-            self._expect(CloseBracketToken)
-            operand = ArrayType(operand, size)
-        return operand
-
-    def parse_type(self) -> DataType:
-        types = [self.parse_type_operand()]
-        while self._eat(StarToken):
-            types.append(self.parse_type_operand())
-        return ProductType.from_operands(types)
-
     def parse_constant_definition(self, is_private: bool) -> Constant:
         start_location = self._expect(HashToken).location
         identifier = self._expect(IdentifierToken)
@@ -544,7 +544,7 @@ class ASTGenerator:
                                                         'Constant names should use SCREAMING_SNAKE_CASE')
         self._expect(EqualToken)
         expression = self.parse_expression()
-        self._expect_end(SemicolonToken)
+        self._expect_delimiter(SemicolonToken)
         location = self._location_from(start_location)
         return Constant(location, identifier.name, is_private, expression)
 

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from data_types import *
+from type_checking.data_types import *
 from exceptions import *
 from tokenization.tokens import *
 
