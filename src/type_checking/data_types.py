@@ -46,30 +46,9 @@ class DataType(ABC):
 class PrimitiveType(DataType):
     __slots__ = 'identifier', '_size'
 
-    _types: dict[str, 'PrimitiveType'] = {}
-
-    @classmethod
-    def is_valid_base_type(cls, identifier: str) -> bool:
-        return identifier in cls._types
-
-    @classmethod
-    def of(cls, location: Location, identifier: str) -> 'PrimitiveType':
-        if cls.is_valid_base_type(identifier):
-            return cls._types[identifier]
-        raise CompilationException(location, f'Unknown type: {identifier!r}')
-
-    @classmethod
-    def get(cls, identifier: str) -> 'PrimitiveType':
-        if identifier in cls._types:
-            return cls._types[identifier]
-        raise CompilerException(f'Unknown type {identifier!r}', True)
-
     def __init__(self, identifier: str, size: int) -> None:
         self.identifier = identifier
         self._size = size
-        if identifier in self._types:
-            raise CompilerException(f'Type {identifier!r} is already defined')
-        self._types[identifier] = self
 
     def size(self) -> int:
         return self._size
@@ -117,10 +96,6 @@ class ProductType(DataType):
 
 class ArrayType(DataType):
     __slots__ = 'base_type', 'count'
-
-    @classmethod
-    def string(cls, length: int):
-        return cls(Types.CHAR, length)
 
     def __init__(self, base_type: DataType, size: int) -> None:
         self.base_type = base_type
