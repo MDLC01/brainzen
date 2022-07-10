@@ -19,7 +19,7 @@ Here is a non-exhaustive list of major available features:
 - Subroutines;
 - Loops;
 - Conditional statements;
-- Types (characters, static arrays and [product types](https://en.wikipedia.org/wiki/Product_type));
+- A strict type system with characters, static arrays, [product types](https://en.wikipedia.org/wiki/Product_type) and type aliases;
 - Namespaces.
 
 ### Considered features
