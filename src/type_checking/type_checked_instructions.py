@@ -249,8 +249,9 @@ class LiteralChar(TypedExpression):
     @classmethod
     def from_char(cls, char: Char) -> 'LiteralChar':
         if char.value < 0 or char.value > 255:
+            wrapped_value = char.value % 256
             CompilationWarning.add(char.location, WarningType.OUT_OF_RANGE,
-                                   'Character literal is outside of the possible range',
+                                   f'Literal is outside of the possible range, it will be wrapped to {wrapped_value}',
                                    'Characters must be integers between 0 and 255')
         return cls(char.location, char.value)
 
