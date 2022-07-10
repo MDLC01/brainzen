@@ -1,7 +1,9 @@
 #RESET = "\x1b[39m";
 #RED = "\x1b[31m";
 
-proc print_grid(char[9] grid) {
+type Board = char[9];
+
+proc print_grid(Board grid) {
     for (c : grid, i : '1'..'9') {
         if (c == ' ') c = i;
     }
@@ -22,7 +24,7 @@ func score(char player) -> char {
 }
 
 
-func test_result(char[9] grid) -> char {
+func test_result(Board grid) -> char {
     let scores = [score(c) | c : grid];
     let v: char;
 

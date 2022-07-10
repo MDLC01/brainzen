@@ -1,7 +1,9 @@
 #RESET = "\x1b[39m";
 #RED = "\x1b[31m";
 
-func swap(char[16] arr, char k, char l) -> char[16] {
+type Array = char[16];
+
+func swap(Array arr, char k, char l) -> Array {
     let xk: char;
     let xl: char;
     for (e : arr, i : 0..15) {
@@ -15,7 +17,7 @@ func swap(char[16] arr, char k, char l) -> char[16] {
     return arr;
 }
 
-func sort(char[16] arr) -> char[16] {
+func sort(Array arr) -> Array {
     for (start : 0..15) {
         let min_index = 0;
         let min_value = 0xff;
@@ -32,7 +34,7 @@ func sort(char[16] arr) -> char[16] {
     return arr;
 }
 
-proc test(char[16] arr) {
+proc test(Array arr) {
     print("Initial array: ");
     log(arr);
     print("Sorted array:  ");
