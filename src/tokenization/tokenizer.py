@@ -3,7 +3,7 @@ from tokenization.tokens import *
 
 
 class Tokenizer:
-    def __init__(self, file_name: str, code: str):
+    def __init__(self, file_name: str, code: str) -> None:
         self.file_name = file_name
         self.code = code
         self.index = 0
@@ -37,17 +37,17 @@ class Tokenizer:
             return True
         return False
 
-    def _skip_line(self):
+    def _skip_line(self) -> None:
         """Skip the current line"""
         while self._has_next() and self._peek() != '\n':
             self._next()
 
-    def _skip_whitespace(self):
+    def _skip_whitespace(self) -> None:
         """Skip until the next non-whitespace character"""
         while self._has_next() and self._peek().isspace():
             self._next()
 
-    def _advance(self):
+    def _advance(self) -> None:
         """Skip whitespaces and comments"""
         inline_comment_depth = 0
         inline_comment_start = self.location
