@@ -83,14 +83,14 @@ class NamespaceTypingContext:
             if self.parent is not None:
                 return self.parent.get_namespace(reference)
             else:
-                raise CompilationException(reference.location, f'Unknown namespace: {reference.identifier}')
+                raise CompilationException(reference.location, f'Unknown namespace: {reference!r}')
         # Fully qualified reference (reference from outside the namespace)
         parent = self.get_namespace(reference.namespace)
         if reference.identifier not in parent.namespaces:
-            raise CompilationException(reference.location, f'Unknown namespace: {reference.identifier}')
+            raise CompilationException(reference.location, f'Unknown namespace: {reference!r}')
         namespace = parent.namespaces[reference.identifier]
         if namespace.is_private:
-            raise CompilationException(reference.location, f'Unable to access private namespace {reference.identifier}')
+            raise CompilationException(reference.location, f'Unable to access private namespace {reference!r}')
         return namespace.element
 
     def get_type(self, reference: Reference) -> DataType:
@@ -101,14 +101,14 @@ class NamespaceTypingContext:
             if self.parent is not None:
                 return self.parent.get_type(reference)
             else:
-                raise CompilationException(reference.location, f'Unknown type: {reference.identifier}')
+                raise CompilationException(reference.location, f'Unknown type: {reference!r}')
         # Fully qualified reference (reference from outside the namespace)
         parent = self.get_namespace(reference.namespace)
         if reference.identifier not in parent.types:
-            raise CompilationException(reference.location, f'Unknown type: {reference.identifier}')
+            raise CompilationException(reference.location, f'Unknown type: {reference!r}')
         data_type = parent.types[reference.identifier]
         if data_type.is_private:
-            raise CompilationException(reference.location, f'Unable to access private type {reference.identifier}')
+            raise CompilationException(reference.location, f'Unable to access private type {reference!r}')
         return data_type.element
 
     def build_type(self, type_expression: TypeExpression) -> DataType:
@@ -135,14 +135,14 @@ class NamespaceTypingContext:
             if self.parent is not None:
                 return self.parent.get_constant_value(reference)
             else:
-                raise CompilationException(reference.location, f'Unknown constant: {reference.identifier}')
+                raise CompilationException(reference.location, f'Unknown constant: {reference!r}')
         # Fully qualified reference (reference from outside the namespace)
         parent = self.get_namespace(reference.namespace)
         if reference.identifier not in parent.constants:
-            raise CompilationException(reference.location, f'Unknown constant: {reference.identifier}')
+            raise CompilationException(reference.location, f'Unknown constant: {reference!r}')
         constant = parent.constants[reference.identifier]
         if constant.is_private:
-            raise CompilationException(reference.location, f'Unable to access private constant {reference.identifier}')
+            raise CompilationException(reference.location, f'Unable to access private constant {reference!r}')
         return constant.element
 
     def get_subroutine_signature(self, reference: Reference) -> SubroutineSignature:
@@ -153,15 +153,14 @@ class NamespaceTypingContext:
             if self.parent is not None:
                 return self.parent.get_subroutine_signature(reference)
             else:
-                raise CompilationException(reference.location, f'Unknown subroutine: {reference.identifier}')
+                raise CompilationException(reference.location, f'Unknown subroutine: {reference!r}')
         # Fully qualified reference (reference from outside the namespace)
         parent = self.get_namespace(reference.namespace)
         if reference.identifier not in parent.subroutines:
-            raise CompilationException(reference.location, f'Unknown subroutine: {reference.identifier}')
+            raise CompilationException(reference.location, f'Unknown subroutine: {reference!r}')
         constant = parent.subroutines[reference.identifier]
         if constant.is_private:
-            message = f'Unable to access private subroutine {reference.identifier}'
-            raise CompilationException(reference.location, message)
+            raise CompilationException(reference.location, f'Unable to access private subroutine {reference!r}')
         return constant.element
 
     def register_type(self, identifier: str, is_private: bool, data_type: DataType) -> None:
