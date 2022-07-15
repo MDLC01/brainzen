@@ -249,6 +249,16 @@ class ASTGenerator:
             return True
         return False
 
+    def parse_reference(self) -> Reference:
+        """Parse a reference to a namespace element."""
+        start_location = self._location()
+        identifier = self._expect(IdentifierToken).name
+        reference = Reference(self._location_from(start_location), identifier)
+        while self._eat(DoubleColonToken):
+            identifier = self._expect(IdentifierToken).name
+            reference = Reference(self._location_from(start_location), identifier, reference)
+        return reference
+
     def parse_sequence(self, closing_token_type: Type[AnyToken]) -> list[Expression]:
         """
         Parse a sequence of expressions (actually, binary operations), separated by commas, until a token of type
@@ -262,7 +272,7 @@ class ASTGenerator:
                 break
         return elements
 
-    def parse_type(self) -> TypeExpression:
+    def parse_type_unit(self) -> TypeExpression:
         # Parenthesised type description
         if self._eat(OpenParToken):
             operand = self.parse_type_expression()
@@ -274,7 +284,7 @@ class ASTGenerator:
 
     def parse_type_operand(self) -> TypeExpression:
         start_location = self._location()
-        operand = self.parse_type()
+        operand = self.parse_type_unit()
         # Subscripts
         while self._eat(OpenBracketToken):
             count = self.parse_expression()
@@ -332,7 +342,7 @@ class ASTGenerator:
         self._expect(CloseBracketToken)
         return Array(self._location_from(start_location), [element])
 
-    def parse_value(self) -> Expression:
+    def parse_expression_unit(self) -> Expression:
         start_location = self._location()
         # Parenthesised expression
         if self._eat(OpenParToken):
@@ -374,7 +384,7 @@ class ASTGenerator:
 
     def parse_operand(self) -> Expression:
         start_location = self._location()
-        operand = self.parse_value()
+        operand = self.parse_expression_unit()
         # Subscripts / slices
         while self._is_next(OpenBracketToken):
             self._expect(OpenBracketToken)
@@ -437,16 +447,6 @@ class ASTGenerator:
             if not self._eat(CommaToken):
                 break
         return TupleAssignmentTarget.of(self._location_from(start_location), targets)
-
-    def parse_reference(self) -> Reference:
-        """Parse a reference to a namespace element."""
-        start_location = self._location()
-        identifier = self._expect(IdentifierToken).name
-        reference = Reference(self._location_from(start_location), identifier)
-        while self._eat(DoubleColonToken):
-            identifier = self._expect(IdentifierToken).name
-            reference = Reference(self._location_from(start_location), identifier, reference)
-        return reference
 
     def parse_instruction(self) -> Instruction:
         """Parse an instruction (does not expect a semicolon at the end)."""
