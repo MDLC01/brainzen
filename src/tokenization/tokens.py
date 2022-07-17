@@ -112,6 +112,16 @@ class CloseBracketToken(Token):
     token = ']'
 
 
+class OpenDoubledBracketToken(Token):
+    """opening bracket"""
+    token = '[|'
+
+
+class CloseDoubledBracketToken(Token):
+    """closing bracket"""
+    token = '|]'
+
+
 class OpenParToken(Token):
     """opening parenthesis"""
     token = '('
@@ -260,10 +270,6 @@ class PercentToken(Token):
 
     def binary_operator_priority(self) -> Priority | None:
         return Priority.MULTIPLICATION
-
-
-class DoubleDotToken(Token):
-    token = '..'
 
 
 class ColonToken(Token):
@@ -438,12 +444,13 @@ class NativeCodeBlock(Token):
 
 
 __all__ = ['is_allowed_in_word', 'is_valid_word', 'Priority', 'AnyToken', 'Token', 'OpenBraceToken', 'CloseBraceToken',
-           'OpenBracketToken', 'CloseBracketToken', 'OpenParToken', 'CloseParToken', 'SemicolonToken', 'CommaToken',
-           'EqualToken', 'DoublePlusToken', 'DoubleMinusToken', 'BangToken', 'DoubleBangToken', 'DoubleEqualToken',
-           'BangEqualToken', 'LessThanToken', 'LessThanEqualToken', 'GreaterThanToken', 'GreaterThanEqualToken',
-           'DoubleAmpersandToken', 'PipeToken', 'DoublePipeToken', 'PlusToken', 'MinusToken', 'StarToken',
-           'DoubleStarToken', 'SlashToken', 'PercentToken', 'DoubleDotToken', 'ColonToken', 'DoubleColonToken',
-           'ArrowToken', 'HashToken', 'QuestionMarkToken', 'PrivateKeyword', 'TypeKeyword', 'NamespaceKeyword',
-           'NativeKeyword', 'TildeToken', 'ProcKeyword', 'FuncKeyword', 'LetKeyword', 'LoopKeyword', 'ForKeyword',
-           'WhileKeyword', 'DoKeyword', 'IfKeyword', 'ElseKeyword', 'ReturnKeyword', 'EOFToken', 'NumberLiteral',
-           'NumericLiteral', 'CharacterLiteral', 'StringLiteral', 'IdentifierToken', 'NativeCodeBlock']
+           'OpenDoubledBracketToken', 'CloseDoubledBracketToken', 'OpenBracketToken', 'CloseBracketToken',
+           'OpenParToken', 'CloseParToken', 'SemicolonToken', 'CommaToken', 'EqualToken', 'DoublePlusToken',
+           'DoubleMinusToken', 'BangToken', 'DoubleBangToken', 'DoubleEqualToken', 'BangEqualToken', 'LessThanToken',
+           'LessThanEqualToken', 'GreaterThanToken', 'GreaterThanEqualToken', 'DoubleAmpersandToken', 'PipeToken',
+           'DoublePipeToken', 'PlusToken', 'MinusToken', 'StarToken', 'DoubleStarToken', 'SlashToken', 'PercentToken',
+           'ColonToken', 'DoubleColonToken', 'ArrowToken', 'HashToken', 'QuestionMarkToken', 'PrivateKeyword',
+           'TypeKeyword', 'NamespaceKeyword', 'NativeKeyword', 'TildeToken', 'ProcKeyword', 'FuncKeyword', 'LetKeyword',
+           'LoopKeyword', 'ForKeyword', 'WhileKeyword', 'DoKeyword', 'IfKeyword', 'ElseKeyword', 'ReturnKeyword',
+           'EOFToken', 'NumberLiteral', 'NumericLiteral', 'CharacterLiteral', 'StringLiteral', 'IdentifierToken',
+           'NativeCodeBlock']

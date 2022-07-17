@@ -97,16 +97,22 @@ class Array(Expression):
 
 
 class Range(Expression):
-    def __init__(self, location: Location, start: int, end: int) -> None:
+    def __init__(self, location: Location, left_bound: Expression, right_bound: Expression, left_excluded: bool,
+                 right_excluded: bool) -> None:
         super().__init__(location)
-        self.start = start
-        self.end = end
+        self.left_bound = left_bound
+        self.right_bound = right_bound
+        self.left_excluded = left_excluded
+        self.right_excluded = right_excluded
 
     def __str__(self) -> str:
-        return f'{self.start}..{self.end}'
+        left_par = '|]' if self.left_excluded else '[|'
+        right_par = '[|' if self.right_excluded else '|]'
+        return f'{left_par}{self.left_bound}, {self.right_bound}{right_par}'
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.start!r}, {self.end!r}]'
+        return f'{self.__class__.__name__}[{self.left_bound!r}, {self.right_bound!r},' \
+               f' {self.left_excluded!r}, {self.right_excluded!r}]'
 
 
 class Iterator(ABC):

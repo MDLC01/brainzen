@@ -111,7 +111,7 @@ class TypedExpression(TypeCheckedInstruction, ABC):
             case ArrayComprehension() as array_comprehension:
                 return TypedArrayComprehension.from_untyped(context, array_comprehension)
             case Range() as range_expression:
-                return LiteralRange.from_untyped(context, range_expression)
+                return evaluate(context.namespace, range_expression)
             case Tuple() as tuple_expression:
                 return LiteralTuple.from_untyped(context, tuple_expression)
             case Identifier() as identifier:
@@ -216,6 +216,19 @@ def compute_binary_operation(operation: BinaryOperation, left: Value, right: Val
     raise CompilerException(f'Unknown binary operation: {operation!r}')
 
 
+def create_python_range(context: NamespaceTypingContext, range_literal: Range) -> range:
+    left_bound = evaluate(context, range_literal.left_bound)
+    right_bound = evaluate(context, range_literal.right_bound)
+    if not isinstance(left_bound, LiteralChar):
+        raise CompilationException(left_bound.location, f'Expected {Types.CHAR} evaluable at compile time')
+    if not isinstance(right_bound, LiteralChar):
+        raise CompilationException(right_bound.location, f'Expected {Types.CHAR} evaluable at compile time')
+    step = -1 if left_bound.value > right_bound.value else 1
+    start = left_bound.value + step if range_literal.left_excluded else left_bound.value
+    end = right_bound.value - step if range_literal.right_excluded else right_bound.value
+    return range(start, end + step, step)
+
+
 def evaluate(context: NamespaceTypingContext, expression: Expression) -> TypedExpression:
     match expression:
         case ConstantReference(reference=reference):
@@ -224,10 +237,9 @@ def evaluate(context: NamespaceTypingContext, expression: Expression) -> TypedEx
             return LiteralChar.from_char(char)
         case Array(location=location, value=value):
             return LiteralArray(location, [evaluate(context, element) for element in value])
-        case Range(location=location, start=start, end=end):
-            if start > end:
-                return LiteralArray(location, [LiteralChar(location, i) for i in reversed(range(end, start + 1))])
-            return LiteralArray(location, [LiteralChar(location, i) for i in range(start, end + 1)])
+        case Range(location=location) as range_literal:
+            return LiteralArray(location,
+                                [LiteralChar(location, i) for i in create_python_range(context, range_literal)])
         case Tuple(location=location, elements=elements):
             return LiteralTuple(location, [evaluate(context, element) for element in elements])
         case UnaryArithmeticExpression(location=location, operator=operator, operand=operand):
@@ -319,17 +331,18 @@ class LiteralArray(TypedExpression):
 
 
 class TypedIterator(ABC):
-    __slots__ = 'location', 'target'
+    __slots__ = 'location'
 
     @classmethod
     def from_untyped(cls, context: CodeBlockTypingContext, iterator: Iterator) -> 'TypedIterator':
         if isinstance(iterator, ArrayIterator):
+            if isinstance(iterator.array, Range):
+                return TypedRangeIterator.from_untyped(context, iterator)
             return TypedArrayIterator.from_untyped(context, iterator)
         raise ImpossibleException(f'Unknown iterator type: {iterator.__class__.__name__}')
 
-    def __init__(self, location: Location, target: TypedDeclarationTarget) -> None:
+    def __init__(self, location: Location) -> None:
         self.location = location
-        self.target = target
 
     @abstractmethod
     def count(self) -> int:
@@ -348,8 +361,41 @@ class TypedIterator(ABC):
         ...
 
 
+class TypedRangeIterator(TypedIterator):
+    __slots__ = 'variable', 'range'
+
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext, iterator: ArrayIterator) -> 'TypedRangeIterator':
+        range_literal = iterator.array
+        if not isinstance(range_literal, Range):
+            raise CompilerException(f'Expected range literal but got {range_literal.__class__.__name__}')
+        location = iterator.location
+        target = TypedDeclarationTarget.from_untyped(context, iterator.target, Types.CHAR)
+        python_range = create_python_range(context.namespace, range_literal)
+        return cls(location, target, python_range)
+
+    def __init__(self, location: Location, target: TypedDeclarationTarget, python_range: range) -> None:
+        super().__init__(location)
+        if not isinstance(target, TypedIdentifierDeclarationTarget):
+            raise CompilerException(f'char cannot be assigned to {target.__class__.__name__}')
+        self.variable = target.identifier
+        self.range = python_range
+
+    def count(self) -> int:
+        return len(self.range)
+
+    def type(self) -> DataType:
+        return Types.CHAR
+
+    def __str__(self) -> str:
+        return f'{self.variable} : [|{self.range.start}, {self.range.stop + self.range.step}|]'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.variable!r}, {self.range!r}]'
+
+
 class TypedArrayIterator(TypedIterator):
-    __slots__ = 'array', 'array_type'
+    __slots__ = 'target', 'array', 'array_type'
 
     @classmethod
     def from_untyped(cls, context: CodeBlockTypingContext, array_iterator: ArrayIterator) -> 'TypedArrayIterator':
@@ -361,7 +407,8 @@ class TypedArrayIterator(TypedIterator):
         return cls(array_iterator.location, target, array)
 
     def __init__(self, location: Location, target: TypedDeclarationTarget, array: TypedExpression) -> None:
-        super().__init__(location, target)
+        super().__init__(location)
+        self.target = target
         self.array = array
         array_type = self.array.type()
         if not isinstance(array_type, ArrayType):
@@ -464,26 +511,6 @@ class TypedArrayComprehension(TypedExpression):
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}[{self.element_format!r}, {self.iterators!r}]'
-
-
-class LiteralRange(TypedExpression):
-    @classmethod
-    def from_untyped(cls, context: CodeBlockTypingContext, range_expression: Range) -> 'LiteralRange':
-        return cls(range_expression.location, range_expression.start, range_expression.end)
-
-    def __init__(self, location: Location, start: int, end: int) -> None:
-        super().__init__(location)
-        self.start = start
-        self.end = end
-
-    def type(self) -> DataType:
-        return ArrayType(Types.CHAR, abs(self.end - self.start) + 1)
-
-    def __str__(self) -> str:
-        return f'{self.start}..{self.end}'
-
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}[{self.start!r}, {self.end!r}]'
 
 
 class LiteralTuple(TypedExpression):
@@ -1112,11 +1139,11 @@ class TypeCheckedContextSnapshot(TypeCheckedInstruction):
 
 
 __all__ = ['TypeCheckedInstruction', 'TypeCheckedInstructionBlock', 'TypedExpression', 'evaluate', 'LiteralChar',
-           'LiteralArray', 'TypedIterator', 'TypedArrayIterator', 'TypedIteratorGroup', 'TypedIteratorChain',
-           'TypedArrayComprehension', 'LiteralRange', 'LiteralTuple', 'TypedIdentifier', 'TypedArithmeticExpression',
-           'TypedUnaryArithmeticExpression', 'TypedBinaryArithmeticExpression', 'TypedArraySubscriptExpression',
-           'TypedArraySlicingExpression', 'PrintCall', 'InputCall', 'LogCall', 'TypeCheckedProcedureCall',
-           'TypedFunctionCall', 'TypeCheckedIncrementation', 'TypeCheckedDecrementation',
+           'LiteralArray', 'TypedIterator', 'TypedRangeIterator', 'TypedArrayIterator', 'TypedIteratorGroup',
+           'TypedIteratorChain', 'TypedArrayComprehension', 'LiteralTuple', 'TypedIdentifier',
+           'TypedArithmeticExpression', 'TypedUnaryArithmeticExpression', 'TypedBinaryArithmeticExpression',
+           'TypedArraySubscriptExpression', 'TypedArraySlicingExpression', 'PrintCall', 'InputCall', 'LogCall',
+           'TypeCheckedProcedureCall', 'TypedFunctionCall', 'TypeCheckedIncrementation', 'TypeCheckedDecrementation',
            'TypeCheckedVariableDeclaration', 'TypeCheckedVariableCreation', 'TypeCheckedAssignment',
            'TypeCheckedLoopStatement', 'TypeCheckedWhileLoopStatement', 'TypeCheckedDoWhileLoopStatement',
            'TypeCheckedForLoopStatement', 'TypeCheckedConditionalStatement', 'TypeCheckedReturnInstruction',

@@ -342,6 +342,19 @@ class ASTGenerator:
         self._expect(CloseBracketToken)
         return Array(self._location_from(start_location), [element])
 
+    def parse_range_literal(self) -> Expression:
+        start_location = self._location()
+        left_excluded = self._eat(CloseDoubledBracketToken)
+        if not left_excluded:
+            self._expect(OpenDoubledBracketToken)
+        left_bound = self.parse_binary_operation()
+        self._expect_delimiter(CommaToken)
+        right_bound = self.parse_binary_operation()
+        right_excluded = self._eat(OpenDoubledBracketToken)
+        if not right_excluded:
+            self._expect(CloseDoubledBracketToken)
+        return Range(self._location_from(start_location), left_bound, right_bound, left_excluded, right_excluded)
+
     def parse_expression_unit(self) -> Expression:
         start_location = self._location()
         # Parenthesised expression
@@ -364,11 +377,8 @@ class ASTGenerator:
             identifier = self._expect(IdentifierToken).name
             return Identifier(self._location_from(start_location), identifier)
         # Range literal
-        if self._is_next(NumberLiteral) and self._is_next(DoubleDotToken, 1):
-            start = self._expect(NumberLiteral).value
-            self._expect(DoubleDotToken)
-            end = self._expect(NumberLiteral).value
-            return Range(self._location_from(start_location), start, end)
+        if self._is_next(OpenDoubledBracketToken) or self._is_next(CloseDoubledBracketToken):
+            return self.parse_range_literal()
         # Number literal
         if self._is_next(NumberLiteral):
             value = self._expect(NumberLiteral).value

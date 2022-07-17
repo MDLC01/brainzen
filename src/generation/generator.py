@@ -148,12 +148,17 @@ class SubroutineCompiler(NameManager):
             self._loop_end()
         self._goto(index)
 
+    def _add(self, amount: int, *, index: int | None = None) -> None:
+        if index is None:
+            index = self.index
+        if amount < 0:
+            self._decrement(index, count=-amount)
+        else:
+            self._increment(index, count=amount)
+
     def _set(self, value: int, *, index: int | None = None) -> None:
         self._reset(index)
-        if value < 0:
-            self._decrement(index, count=-value)
-        else:
-            self._increment(index, count=value)
+        self._add(value, index=index)
 
     def _goto(self, index: int | None) -> int:
         """Move the pointer to the passed index (relative to the starting index of the subroutine)."""
@@ -624,19 +629,29 @@ class SubroutineCompiler(NameManager):
         index = self._goto(index)
         count = iterators.count()
         with self.scope():
-            variables = []
+            range_variables = []
+            array_variables = []
             group = iterators.groups[0]
             # Prepare iterators
             for iterator in group.iterators:
-                if not isinstance(iterator, TypedArrayIterator):
-                    raise ImpossibleException(f'Unknown iterator type: {iterator.__class__.__name__}')
-                # There is no need to copy the entire array if it already exists
-                if isinstance(iterator.array, TypedIdentifier):
-                    array = self.get_name(iterator.array.location, iterator.array.name)
+                # Range iterator
+                if isinstance(iterator, TypedRangeIterator):
+                    variable = self.scoped_variable(iterator.type(), iterator.variable)
+                    self._set(iterator.range.start, index=variable.index)
+                    range_variables.append((variable, iterator.range.step))
+                # Array iterator
+                elif isinstance(iterator, TypedArrayIterator):
+                    # There is no need to copy the entire array if it already exists
+                    if isinstance(iterator.array, TypedIdentifier):
+                        array = self.get_name(iterator.array.location, iterator.array.name)
+                    else:
+                        array = self.scoped_variable(iterator.array.type())
+                        self.evaluate(iterator.array, array.index)
+                    variables = self.declare_names(iterator.target, array.index)
+                    array_variables.append((iterator.target.type.size(), variables))
+                # Unknown
                 else:
-                    array = self.scoped_variable(iterator.array.type())
-                    self.evaluate(iterator.array, array.index)
-                variables.append((iterator.target.type.size(), self.declare_names(iterator.target, array.index)))
+                    raise ImpossibleException(f'Unknown iterator type: {iterator.__class__.__name__}')
             # Run loop
             for i in range(count):
                 if len(iterators.groups) == 1:
@@ -647,7 +662,9 @@ class SubroutineCompiler(NameManager):
                     offset = element_format.type().size() * chain.count()
                     self.evaluate_array_comprehension(element_format, chain, index + i * offset)
                 # Update loop variable indices
-                for target_size, bindings in variables:
+                for variable, step in range_variables:
+                    self._add(step, index=variable.index)
+                for target_size, bindings in array_variables:
                     for binding in bindings:
                         binding.update_index(binding.index + target_size)
 
@@ -663,10 +680,6 @@ class SubroutineCompiler(NameManager):
                     self._right(element.type().size())
             case TypedArrayComprehension(element_format=element_format, iterators=iterators):
                 self.evaluate_array_comprehension(element_format, iterators)
-            case LiteralRange(start=start, end=end):
-                iterator = range(start, end + 1) if start <= end else reversed(range(end, start + 1))
-                for offset, value in enumerate(iterator):
-                    self._set(value, index=index + offset)
             case LiteralTuple(elements=elements):
                 for element in elements:
                     self.evaluate(element)
@@ -922,23 +935,35 @@ class SubroutineCompiler(NameManager):
     def for_loop(self, iterators: TypedIteratorGroup, body: TypeCheckedInstructionBlock) -> None:
         with self.scope():
             # Evaluate arrays and declare loop variables
-            variables = []
+            range_variables = []
+            array_variables = []
             for iterator in iterators.iterators:
-                if not isinstance(iterator, TypedArrayIterator):
-                    raise ImpossibleException(f'Unknown iterator type: {iterator.__class__.__name__}')
-                # Mutating the loop variable should mutate the corresponding element in the array.
-                if isinstance(iterator.array, TypedIdentifier):
-                    array = self.get_name(iterator.array.location, iterator.array.name)
+                # Range iterators
+                if isinstance(iterator, TypedRangeIterator):
+                    variable = self.scoped_variable(iterator.type(), iterator.variable)
+                    self._set(iterator.range.start, index=variable.index)
+                    range_variables.append((variable, iterator.range.step))
+                # Array iterators
+                elif isinstance(iterator, TypedArrayIterator):
+                    # Mutating the loop variable should mutate the corresponding element in the array.
+                    if isinstance(iterator.array, TypedIdentifier):
+                        array = self.get_name(iterator.array.location, iterator.array.name)
+                    else:
+                        array = self.scoped_variable(iterator.array.type())
+                        self.evaluate(iterator.array, array.index)
+                    variables = self.declare_names(iterator.target, array.index)
+                    array_variables.append((iterator.target.type.size(), variables))
+                # Unknown
                 else:
-                    array = self.scoped_variable(iterator.array.type())
-                    self.evaluate(iterator.array, array.index)
-                variables.append((iterator.target.type.size(), self.declare_names(iterator.target, array.index)))
+                    raise ImpossibleException(f'Unknown iterator type: {iterator.__class__.__name__}')
             # Run loop
             count = iterators.count()
             for i in range(count):
                 self.compile_instruction(body)
                 # Update loop variable indices
-                for target_size, bindings in variables:
+                for variable, step in range_variables:
+                    self._add(step, index=variable.index)
+                for target_size, bindings in array_variables:
                     for binding in bindings:
                         binding.update_index(binding.index + target_size)
 
