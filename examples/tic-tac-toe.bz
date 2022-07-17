@@ -4,7 +4,7 @@
 type Board = char[9];
 
 proc print_grid(Board grid) {
-    for (c : grid, i : '1'..'9') {
+    for (c : grid, i : [|'1', '9'|]) {
         if (c == ' ') c = i;
     }
 
@@ -81,7 +81,7 @@ proc main() {
         let c = input();
 
         let is_invalid = 1;
-        for (cell : grid, j : '1'..'9') {
+        for (cell : grid, j : [|'1', '9'|]) {
             if (c == j && cell == ' ') {
                 cell = player;
                 if (player == 'O') player = 'X';

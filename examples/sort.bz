@@ -1,16 +1,17 @@
 #RESET = "\x1b[39m";
 #RED = "\x1b[31m";
 
-type Array = char[16];
+#SIZE = 16;
+type Array = char[#SIZE];
 
 func swap(Array arr, char k, char l) -> Array {
     let xk: char;
     let xl: char;
-    for (e : arr, i : 0..15) {
+    for (e : arr, i : [|0, #SIZE[|) {
         if (i == k) xk = e;
         if (i == l) xl = e;
     }
-    for (e : arr, i : 0..15) {
+    for (e : arr, i : [|0, #SIZE[|) {
         if (i == k) e = xl;
         if (i == l) e = xk;
     }
@@ -18,10 +19,10 @@ func swap(Array arr, char k, char l) -> Array {
 }
 
 func sort(Array arr) -> Array {
-    for (start : 0..15) {
+    for (start : [|0, #SIZE[|) {
         let min_index = 0;
         let min_value = 0xff;
-        for (e : arr, i : 0..15) {
+        for (e : arr, i : [|0, #SIZE[|) {
             if (i >= start) {
                 if (e <= min_value) {
                     min_index = i;
