@@ -58,7 +58,7 @@ class TypeArray(TypeExpression):
 
 
 class TypeProduct(TypeExpression):
-    __slots__ = 'elements'
+    __slots__ = 'operands'
 
     @classmethod
     def from_operands(cls, location: Location, operands: list[TypeExpression]) -> TypeExpression:
