@@ -224,8 +224,8 @@ proc print_path(Path path, Cell source, Cell goal, Grid grid) {
 }
 
 /**
- * Syntax: `xxxxx|xxxxx|xxxxx|xxxxx|xxxxx|ab|cd`, where:
- *  - `|` represents an arbitrary character OR a carriage return followed by an arbitrary character;
+ * Syntax: `xxxxx|xxxxx|xxxxx|xxxxx|xxxxx`, where:
+ *  - `|` represents a carriage return followed by an arbitrary character OR any character but a carriage return;
  *  - `x` represents a cell (`#` for a wall, S for the source, G for the goal, anything else for air);
  */
 proc main() {
