@@ -4,7 +4,7 @@ This is an advanced example of what can be achieved with Brainzen. [a-star.bz](a
 
 ## How to use
 
-The compiled Brainfuck program (which you can compile yourself from the source using the [Brainzen compiler](../..), or [download from this repo as a zipped Brainfuck source file](a-star.zip) for a version which expects a 9×9 grid) reads a grid from standard input and outputs a path to standard output.
+The compiled Brainfuck program (which you can compile yourself from the source using the [Brainzen compiler](https://github.com/MDLC01/brainzen), or [download from this repo as a zipped Brainfuck source file](a-star.zip) for a version which expects a 9×9 grid) reads a grid from standard input and outputs a path to standard output.
 
 In case no path exist for the specified grid, the behavior of the program is undefined, but likely an infinite loop.
 
