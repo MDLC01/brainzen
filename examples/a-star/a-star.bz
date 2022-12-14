@@ -1,0 +1,236 @@
+#INFINITY = 255;
+
+#WIDTH = 9;
+#HEIGHT = 9;
+
+type Grid = char[#WIDTH][#HEIGHT];
+type Cell = char * char;
+type Path = Cell[#WIDTH][#HEIGHT];
+
+proc skip_newline() {
+    if (input() == '\r') {
+        input();
+    }
+}
+
+func read_grid() -> Grid * Cell * Cell {
+    let grid: Grid;
+    let source: Cell;
+    let goal: Cell;
+    for (row : grid, i : [|0, #HEIGHT[|) {
+        for (cell : row, j : [|0, #WIDTH[|) {
+            let v = input();
+            if (v == '#') {
+                cell = 1;
+            } else if (v == 'S') {
+                source = (i, j);
+            }
+            else if (v == 'G') {
+                goal = (i, j);
+            }
+        }
+        skip_newline();
+    }
+    return grid, source, goal;
+}
+
+func h(Cell source, Cell goal) -> char {
+    let x1, y1 = source;
+    let x2, y2 = goal;
+    let dx, dy = x2 - x1, y2 - y1;
+    return dx * dx + dy * dy;
+}
+
+func extract_min(Grid priority_queue) -> Grid * Cell {
+    let min_priority = 0;
+    let min_cell: Cell;
+    let i = 0;
+    for (row : priority_queue) {
+        let j = 0;
+        for (priority : row) {
+            if (priority <= min_priority) {
+                min_priority = priority;
+                min_cell = (i, j);
+            }
+            j++;
+        }
+        i++;
+    }
+    let i = 0;
+    for (row : priority_queue) {
+        let j = 0;
+        for (priority : row) {
+            if ((i, j) == min_cell) {
+                priority = #INFINITY;
+            }
+            j++;
+        }
+        i++;
+    }
+    return priority_queue, min_cell;
+}
+
+#NIL = (-1, -1);
+
+func a_star(Grid grid, Cell source, Cell goal) -> Path {
+    // Unpack source and goal coordinates
+    let source_i, source_j = source;
+    let goal_i, goal_j = goal;
+    // Initialize distance matrix
+    let distances: Grid;
+    let i = 0;
+    for (row : distances) {
+        let j = 0;
+        for (cell : row) {
+            if ((i, j) == source) {
+                cell = 0;
+            } else {
+                cell = #INFINITY;
+            }
+            j++;
+        }
+        i++;
+    }
+    // Initialize parents matrix
+    let parents = [[#NIL | _ : [|0, #WIDTH[|] | _ : [|0, #HEIGHT[|];
+    // Initialize priority queue
+    let priorities: Grid;
+    let i = 0;
+    for (row : priorities) {
+        let j = 0;
+        for (priority : row) {
+            if ((i, j) == source) {
+                priority = h(source, goal);
+            } else {
+                priority = #INFINITY;
+            }
+            j++;
+        }
+        i++;
+    }
+    // Main loop
+    let open_count = 1;
+    while (open_count) {
+        // Extract cell with minimum priority
+        let min_priority = #INFINITY;
+        let cell: Cell;
+        let i = 0;
+        for (row : priorities) {
+            let j = 0;
+            for (priority : row) {
+                if (priority < min_priority) {
+                    min_priority = priority;
+                    cell = (i, j);
+                }
+                j++;
+            }
+            i++;
+        }
+        let i = 0;
+        for (row : priorities) {
+            let j = 0;
+            for (priority : row) {
+                if ((i, j) == cell) {
+                    priority = #INFINITY;
+                }
+                j++;
+            }
+            i++;
+        }
+        open_count--;
+        // Treat cell
+        if (cell == goal) {
+            // Exit loop
+            open_count = 0;
+        } else {
+            // Get distances[cell] + 1
+            let d: char;
+            let i = 0;
+            for (row : distances) {
+                let j = 0;
+                for (distance : row) {
+                    if ((i, j) == cell) {
+                        d = distance + 1;
+                    }
+                    j++;
+                }
+                i++;
+            }
+            // For every cell
+            let i = 0;
+            for (distance_row : distances, parent_row : parents, priority_row : priorities, row : grid) {
+                let j = 0;
+                for (current_distance : distance_row, current_parent : parent_row, current_priority : priority_row, successor : row) {
+                    // If the cell is not a wall
+                    if (!successor) {
+                        // If `successor` is indeed a successor of cell
+                        if ((i + 1, j) == cell
+                         || (i - 1, j) == cell
+                         || (i, j + 1) == cell
+                         || (i, j - 1) == cell) {
+                            // If a better path is found
+                            if (d < current_distance) {
+                                current_parent = cell;
+                                current_distance = d;
+                                if (current_priority == #INFINITY) {
+                                    open_count++;
+                                }
+                                let p = d + h((i, j), goal);
+                                if (p < current_priority) {
+                                    current_priority = p;
+                                }
+                            }
+                        }
+                    }
+                    j++;
+                }
+                i++;
+            }
+        }
+    }
+    return parents;
+}
+
+proc print_path(Path path, Cell source, Cell goal, Grid grid) {
+    // Header
+    print("  |");
+    for (i : [|'1', '1' + #WIDTH[|) {
+        print(" ", i, " ");
+    }
+    println();
+    print("--+");
+    for (i : [|0, #WIDTH[|) {
+        print("---");
+    }
+    println();
+    // Grid
+    for (path_row : path, grid_row : grid, i : [|0, #HEIGHT[|) {
+        print('A' + i, " |");
+        for ((parent_i, parent_j) : path_row, is_wall : grid_row, j : [|0, #WIDTH[|) {
+            if ((i, j) == source) {
+                print(" ()");
+            } else if (is_wall) {
+               print(" ##");
+            } else if ((parent_i, parent_j) == #NIL) {
+                print(" ??");
+            } else {
+                print(" ", 'A' + parent_i, '1' + parent_j);
+            }
+        }
+        println();
+    }
+    let goal_i, goal_j = goal;
+    println("Goal: ", 'A' + goal_i, '1' + goal_j);
+}
+
+/**
+ * Syntax: `xxxxx|xxxxx|xxxxx|xxxxx|xxxxx|ab|cd`, where:
+ *  - `|` represents an arbitrary character OR a carriage return followed by an arbitrary character;
+ *  - `x` represents a cell (`#` for a wall, S for the source, G for the goal, anything else for air);
+ */
+proc main() {
+    let grid, source, goal = read_grid();
+    let path = a_star(grid, source, goal);
+    println("Done! Results bellow:");
+    print_path(path, source, goal, grid);
+}
