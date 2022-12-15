@@ -17,8 +17,8 @@ func read_grid() -> Grid * Cell * Cell {
     let grid: Grid;
     let source: Cell;
     let goal: Cell;
-    for (row : grid, i : [|0, #HEIGHT[|) {
-        for (cell : row, j : [|0, #WIDTH[|) {
+    for (row : grid, i counts) {
+        for (cell : row, j counts) {
             let v = input();
             if (v == '#') {
                 cell = 1;
@@ -44,28 +44,20 @@ func h(Cell source, Cell goal) -> char {
 func extract_min(Grid priority_queue) -> Grid * Cell {
     let min_priority = 0;
     let min_cell: Cell;
-    let i = 0;
-    for (row : priority_queue) {
-        let j = 0;
-        for (priority : row) {
+    for (row : priority_queue, i counts) {
+        for (priority : row, j counts) {
             if (priority <= min_priority) {
                 min_priority = priority;
                 min_cell = (i, j);
             }
-            j++;
         }
-        i++;
     }
-    let i = 0;
-    for (row : priority_queue) {
-        let j = 0;
-        for (priority : row) {
+    for (row : priority_queue, i counts) {
+        for (priority : row, j counts) {
             if ((i, j) == min_cell) {
                 priority = #INFINITY;
             }
-            j++;
         }
-        i++;
     }
     return priority_queue, min_cell;
 }
@@ -78,35 +70,27 @@ func a_star(Grid grid, Cell source, Cell goal) -> Path {
     let goal_i, goal_j = goal;
     // Initialize distance matrix
     let distances: Grid;
-    let i = 0;
-    for (row : distances) {
-        let j = 0;
-        for (cell : row) {
+    for (row : distances, i counts) {
+        for (cell : row, j counts) {
             if ((i, j) == source) {
                 cell = 0;
             } else {
                 cell = #INFINITY;
             }
-            j++;
         }
-        i++;
     }
     // Initialize parents matrix
     let parents = [[#NIL | _ : [|0, #WIDTH[|] | _ : [|0, #HEIGHT[|];
     // Initialize priority queue
     let priorities: Grid;
-    let i = 0;
-    for (row : priorities) {
-        let j = 0;
-        for (priority : row) {
+    for (row : priorities, i counts) {
+        for (priority : row, j counts) {
             if ((i, j) == source) {
                 priority = h(source, goal);
             } else {
                 priority = #INFINITY;
             }
-            j++;
         }
-        i++;
     }
     // Main loop
     let open_count = 1;
@@ -114,28 +98,20 @@ func a_star(Grid grid, Cell source, Cell goal) -> Path {
         // Extract cell with minimum priority
         let min_priority = #INFINITY;
         let cell: Cell;
-        let i = 0;
-        for (row : priorities) {
-            let j = 0;
-            for (priority : row) {
+        for (row : priorities, i counts) {
+            for (priority : row, j counts) {
                 if (priority < min_priority) {
                     min_priority = priority;
                     cell = (i, j);
                 }
-                j++;
             }
-            i++;
         }
-        let i = 0;
-        for (row : priorities) {
-            let j = 0;
-            for (priority : row) {
+        for (row : priorities, i counts) {
+            for (priority : row, j counts) {
                 if ((i, j) == cell) {
                     priority = #INFINITY;
                 }
-                j++;
             }
-            i++;
         }
         open_count--;
         // Treat cell
@@ -145,22 +121,16 @@ func a_star(Grid grid, Cell source, Cell goal) -> Path {
         } else {
             // Get distances[cell] + 1
             let d: char;
-            let i = 0;
-            for (row : distances) {
-                let j = 0;
-                for (distance : row) {
+            for (row : distances, i counts) {
+                for (distance : row, j counts) {
                     if ((i, j) == cell) {
                         d = distance + 1;
                     }
-                    j++;
                 }
-                i++;
             }
             // For every cell
-            let i = 0;
-            for (distance_row : distances, parent_row : parents, priority_row : priorities, row : grid) {
-                let j = 0;
-                for (current_distance : distance_row, current_parent : parent_row, current_priority : priority_row, successor : row) {
+            for (distance_row : distances, parent_row : parents, priority_row : priorities, row : grid, i counts) {
+                for (current_distance : distance_row, current_parent : parent_row, current_priority : priority_row, successor : row, j counts) {
                     // If the cell is not a wall
                     if (!successor) {
                         // If `successor` is indeed a successor of cell
@@ -182,9 +152,7 @@ func a_star(Grid grid, Cell source, Cell goal) -> Path {
                             }
                         }
                     }
-                    j++;
                 }
-                i++;
             }
         }
     }
@@ -204,9 +172,9 @@ proc print_path(Path path, Cell source, Cell goal, Grid grid) {
     }
     println();
     // Grid
-    for (path_row : path, grid_row : grid, i : [|0, #HEIGHT[|) {
+    for (path_row : path, grid_row : grid, i counts) {
         print('A' + i, " |");
-        for ((parent_i, parent_j) : path_row, is_wall : grid_row, j : [|0, #WIDTH[|) {
+        for ((parent_i, parent_j) : path_row, is_wall : grid_row, j counts) {
             if ((i, j) == source) {
                 print(" ()");
             } else if (is_wall) {
