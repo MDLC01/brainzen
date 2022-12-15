@@ -131,6 +131,22 @@ class Iterator(ABC):
         ...
 
 
+class IteratorCounter(Iterator):
+    __slots__ = 'initial_value'
+
+    def __init__(self, location: Location, target: AssignmentTarget, initial_value: Expression | None) -> None:
+        super().__init__(location, target)
+        self.initial_value = initial_value
+
+    def __str__(self) -> str:
+        if self.initial_value is None:
+            return f'{self.target} counts'
+        return f'{self.target} counts from {self.initial_value}'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.target!r}]'
+
+
 class ArrayIterator(Iterator):
     __slots__ = 'array'
 
@@ -467,8 +483,8 @@ class ContextSnapshot(Instruction):
 
 
 __all__ = ['Instruction', 'InstructionBlock', 'Expression', 'ConstantReference', 'Char', 'Array', 'Range', 'Iterator',
-           'ArrayIterator', 'IteratorGroup', 'IteratorChain', 'ArrayComprehension', 'Tuple', 'Identifier',
-           'ArithmeticExpression', 'UnaryArithmeticExpression', 'BinaryArithmeticExpression',
+           'IteratorCounter', 'ArrayIterator', 'IteratorGroup', 'IteratorChain', 'ArrayComprehension', 'Tuple',
+           'Identifier', 'ArithmeticExpression', 'UnaryArithmeticExpression', 'BinaryArithmeticExpression',
            'ArraySubscriptExpression', 'ArraySlicingExpression', 'ProcedureCall', 'FunctionCall', 'Incrementation',
            'Decrementation', 'VariableDeclaration', 'VariableCreation', 'Assignment', 'LoopStatement',
            'WhileLoopStatement', 'DoWhileLoopStatement', 'ForLoopStatement', 'ConditionalStatement',

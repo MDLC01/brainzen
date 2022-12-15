@@ -938,8 +938,13 @@ class SubroutineCompiler(NameManager):
             range_variables = []
             array_variables = []
             for iterator in iterators.iterators:
+                # Counters
+                if isinstance(iterator, TypedIteratorCounter):
+                    variable = self.scoped_variable(iterator.type(), iterator.variable)
+                    self._set(iterator.initial_value, index=variable.index)
+                    range_variables.append((variable, 1))
                 # Range iterators
-                if isinstance(iterator, TypedRangeIterator):
+                elif isinstance(iterator, TypedRangeIterator):
                     variable = self.scoped_variable(iterator.type(), iterator.variable)
                     self._set(iterator.range.start, index=variable.index)
                     range_variables.append((variable, iterator.range.step))

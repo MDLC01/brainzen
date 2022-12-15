@@ -352,6 +352,14 @@ class ReturnKeyword(Token):
     keyword = 'return'
 
 
+class CountsKeyword(Token):
+    keyword = 'counts'
+
+
+class FromKeyword(Token):
+    keyword = 'from'
+
+
 class EOFToken(Token):
     """end of file"""
 
@@ -452,5 +460,5 @@ __all__ = ['is_allowed_in_word', 'is_valid_word', 'Priority', 'AnyToken', 'Token
            'ColonToken', 'DoubleColonToken', 'ArrowToken', 'HashToken', 'QuestionMarkToken', 'PrivateKeyword',
            'TypeKeyword', 'NamespaceKeyword', 'NativeKeyword', 'TildeToken', 'ProcKeyword', 'FuncKeyword', 'LetKeyword',
            'LoopKeyword', 'ForKeyword', 'WhileKeyword', 'DoKeyword', 'IfKeyword', 'ElseKeyword', 'ReturnKeyword',
-           'EOFToken', 'NumberLiteral', 'NumericLiteral', 'CharacterLiteral', 'StringLiteral', 'IdentifierToken',
-           'NativeCodeBlock']
+           'CountsKeyword', 'FromKeyword', 'EOFToken', 'NumberLiteral', 'NumericLiteral', 'CharacterLiteral',
+           'StringLiteral', 'IdentifierToken', 'NativeCodeBlock']

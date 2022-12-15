@@ -335,6 +335,8 @@ class TypedIterator(ABC):
 
     @classmethod
     def from_untyped(cls, context: CodeBlockTypingContext, iterator: Iterator) -> 'TypedIterator':
+        if isinstance(iterator, IteratorCounter):
+            return TypedIteratorCounter.from_untyped(context, iterator)
         if isinstance(iterator, ArrayIterator):
             if isinstance(iterator.array, Range):
                 return TypedRangeIterator.from_untyped(context, iterator)
@@ -345,7 +347,7 @@ class TypedIterator(ABC):
         self.location = location
 
     @abstractmethod
-    def count(self) -> int:
+    def count(self) -> int | None:
         ...
 
     @abstractmethod
@@ -359,6 +361,43 @@ class TypedIterator(ABC):
     @abstractmethod
     def __repr__(self) -> str:
         ...
+
+
+class TypedIteratorCounter(TypedIterator):
+    __slots__ = 'variable', 'initial_value'
+
+    @classmethod
+    def from_untyped(cls, context: CodeBlockTypingContext, iterator: IteratorCounter) -> 'TypedIteratorCounter':
+        location = iterator.location
+        target = TypedDeclarationTarget.from_untyped(context, iterator.target, Types.CHAR)
+        if iterator.initial_value is None:
+            initial_value = 0
+        else:
+            evaluated_initial_value = evaluate(context.namespace, iterator.initial_value)
+            if not isinstance(evaluated_initial_value, LiteralChar):
+                message = f'Expected {Types.CHAR} but found {evaluated_initial_value.type()}'
+                raise CompilationException(evaluated_initial_value.location, message)
+            initial_value = evaluated_initial_value.value
+        return cls(location, target, initial_value)
+
+    def __init__(self, location: Location, target: TypedDeclarationTarget, initial_value: int) -> None:
+        super().__init__(location)
+        if not isinstance(target, TypedIdentifierDeclarationTarget):
+            raise CompilerException(f'char cannot be assigned to {target.__class__.__name__}')
+        self.variable = target.identifier
+        self.initial_value = initial_value
+
+    def count(self) -> int | None:
+        return None
+
+    def type(self) -> DataType:
+        return Types.CHAR
+
+    def __str__(self) -> str:
+        return f'{self.variable} counts from {self.initial_value}'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}[{self.variable!r}]'
 
 
 class TypedRangeIterator(TypedIterator):
@@ -381,7 +420,7 @@ class TypedRangeIterator(TypedIterator):
         self.variable = target.identifier
         self.range = python_range
 
-    def count(self) -> int:
+    def count(self) -> int | None:
         return len(self.range)
 
     def type(self) -> DataType:
@@ -415,7 +454,7 @@ class TypedArrayIterator(TypedIterator):
             raise CompilerException(f'Expected array but found {array_type}')
         self.array_type = array_type
 
-    def count(self) -> int:
+    def count(self) -> int | None:
         return self.array_type.count
 
     def type(self) -> DataType:
@@ -429,7 +468,7 @@ class TypedArrayIterator(TypedIterator):
 
 
 class TypedIteratorGroup:
-    __slots__ = 'location', 'iterators'
+    __slots__ = 'location', 'iterators', '_count'
 
     @classmethod
     def from_untyped(cls, context: CodeBlockTypingContext, iterator_group: IteratorGroup) -> 'TypedIteratorGroup':
@@ -440,20 +479,24 @@ class TypedIteratorGroup:
             #  for (x : ["Aa", "Bb", "Cc"], y : x) {...}
             #  This should be invalid because iterators in a group do not interact with each other.
             iterator = TypedIterator.from_untyped(context, untyped_iterator)
+            iterator_count = iterator.count()
             if expected_count is None:
-                expected_count = iterator.count()
-            elif iterator.count() != expected_count:
+                expected_count = iterator_count
+            elif iterator_count is not None and iterator_count != expected_count:
                 message = f'Expected iterator of size {expected_count} but found iterator of size {iterator.count()}'
                 raise CompilationException(iterator.location, message)
             iterators.append(iterator)
-        return cls(iterator_group.location, iterators)
+        if expected_count is None:
+            raise CompilationException(iterator_group.location, 'An iterator group cannot contain only counters')
+        return cls(iterator_group.location, iterators, expected_count)
 
-    def __init__(self, location: Location, iterators: list[TypedIterator]) -> None:
+    def __init__(self, location: Location, iterators: list[TypedIterator], count: int) -> None:
         self.location = location
         self.iterators = iterators
+        self._count = count
 
     def count(self) -> int:
-        return self.iterators[0].count()
+        return self._count
 
     def __str__(self) -> str:
         return ', '.join(iterator.__str__() for iterator in self.iterators)
@@ -625,7 +668,7 @@ class TypedArraySubscriptExpression(TypedExpression):
         if not isinstance(subscript, LiteralChar):
             raise CompilationException(subscript.location, f'Expected {Types.CHAR} but found {subscript.type()}')
         index = subscript.value
-        # Assert the array is in fact an array
+        # Assert the array is indeed an array
         array_type = array.type()
         if not isinstance(array_type, ArrayType):
             raise CompilationException(location, f'Cannot subscript {array_type}')
@@ -1139,8 +1182,8 @@ class TypeCheckedContextSnapshot(TypeCheckedInstruction):
 
 
 __all__ = ['TypeCheckedInstruction', 'TypeCheckedInstructionBlock', 'TypedExpression', 'evaluate', 'LiteralChar',
-           'LiteralArray', 'TypedIterator', 'TypedRangeIterator', 'TypedArrayIterator', 'TypedIteratorGroup',
-           'TypedIteratorChain', 'TypedArrayComprehension', 'LiteralTuple', 'TypedIdentifier',
+           'LiteralArray', 'TypedIterator', 'TypedIteratorCounter', 'TypedRangeIterator', 'TypedArrayIterator',
+           'TypedIteratorGroup', 'TypedIteratorChain', 'TypedArrayComprehension', 'LiteralTuple', 'TypedIdentifier',
            'TypedArithmeticExpression', 'TypedUnaryArithmeticExpression', 'TypedBinaryArithmeticExpression',
            'TypedArraySubscriptExpression', 'TypedArraySlicingExpression', 'PrintCall', 'InputCall', 'LogCall',
            'TypeCheckedProcedureCall', 'TypedFunctionCall', 'TypeCheckedIncrementation', 'TypeCheckedDecrementation',

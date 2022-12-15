@@ -302,6 +302,12 @@ class ASTGenerator:
     def parse_iterator(self) -> Iterator:
         start_location = self._location()
         target = self.parse_assignment_target()
+        if self._eat(CountsKeyword):
+            initial_value = None
+            if self._eat(FromKeyword):
+                initial_value = self.parse_binary_operation()
+            iterator_location = self._location_from(start_location)
+            return IteratorCounter(iterator_location, target, initial_value)
         self._expect(ColonToken)
         loop_array = self.parse_binary_operation()
         iterator_location = self._location_from(start_location)
