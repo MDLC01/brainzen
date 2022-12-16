@@ -1,15 +1,15 @@
-from typing import Optional
+from typing import Optional, Self
 
 from exceptions import Location
 
 
 class Reference:
     @classmethod
-    def from_string(cls, string: str) -> 'Reference':
+    def from_string(cls, string: str) -> Self:
         parts = string.split('::')
-        reference = Reference(Location.unknown(), parts[0])
+        reference = cls(Location.unknown(), parts[0])
         for part in parts[1:]:
-            reference = Reference(Location.unknown(), part, reference)
+            reference = cls(Location.unknown(), part, reference)
         return reference
 
     def __init__(self, location: Location, identifier: str, namespace: Optional['Reference'] = None) -> None:

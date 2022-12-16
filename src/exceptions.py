@@ -1,24 +1,25 @@
 import sys
 from enum import Enum
+from typing import Self
 
 
 class Location:
     __slots__ = 'file', 'line', 'column', 'length'
 
     @classmethod
-    def unknown(cls) -> 'Location':
+    def unknown(cls) -> Self:
         return cls(None, None, None)
 
     @classmethod
-    def stdlib(cls) -> 'Location':
+    def stdlib(cls) -> Self:
         return cls('<stdlib>', None, None)
 
     @classmethod
-    def primitive(cls) -> 'Location':
+    def primitive(cls) -> Self:
         return cls('<primitive>', None, None)
 
     @classmethod
-    def in_file(cls, file: str) -> 'Location':
+    def in_file(cls, file: str) -> Self:
         return cls(file, None, None)
 
     def __init__(self, file: str | None, line: int | None = 1, column: int | None = 1, length: int = 1) -> None:
@@ -40,28 +41,28 @@ class Location:
                 location += f':{self.column}'
         return location
 
-    def __add__(self, offset: tuple[int, int]) -> 'Location':
+    def __add__(self, offset: tuple[int, int]) -> Self:
         return Location(self.file, self.line + offset[0], self.column + offset[1])
 
-    def next_line(self) -> 'Location':
+    def next_line(self) -> Self:
         return Location(self.file, self.line + 1)
 
-    def next_column(self) -> 'Location':
+    def next_column(self) -> Self:
         return Location(self.file, self.line, self.column + 1)
 
-    def with_length(self, length: int, *, offset: int = 0) -> 'Location':
+    def with_length(self, length: int, *, offset: int = 0) -> Self:
         return Location(self.file, self.line, self.column + offset, length)
 
-    def extend(self, amount: int) -> 'Location':
+    def extend(self, amount: int) -> Self:
         return Location(self.file, self.line, self.column, self.length + amount)
 
-    def extend_to(self, location: 'Location') -> 'Location':
+    def extend_to(self, location: 'Location') -> Self:
         if self.file != location.file:
             raise CompilerException('Cannot extend location to multiple files')
         end = location.column + location.length
         return Location(self.file, self.line, self.column, end - self.column)
 
-    def after(self) -> 'Location':
+    def after(self) -> Self:
         return Location(self.file, self.line, self.column + self.length)
 
     def print_position(self, source_code: str, *, out=sys.stderr) -> None:
@@ -124,34 +125,34 @@ class WarningType(Enum):
     DEBUG_FEATURE = 'debug-feature'
 
     @classmethod
-    def all(cls) -> set['WarningType']:
+    def all(cls) -> set[Self]:
         return {value for value in cls}
 
     @classmethod
-    def likely_errors(cls) -> set['WarningType']:
+    def likely_errors(cls) -> set[Self]:
         return {cls.OUT_OF_RANGE, cls.RESERVED_NAME}
 
     @classmethod
-    def default(cls) -> set['WarningType']:
+    def default(cls) -> set[Self]:
         return {cls.OUT_OF_RANGE, cls.REDECLARATION, cls.NAME_SHADOWING, cls.RESERVED_NAME, cls.DEBUG_FEATURE}
 
     @classmethod
-    def debug(cls) -> set['WarningType']:
+    def debug(cls) -> set[Self]:
         return {cls.OUT_OF_RANGE, cls.REDECLARATION, cls.NAME_SHADOWING, cls.RESERVED_NAME, cls.IGNORED_RESULT}
 
     @classmethod
-    def none(cls) -> set['WarningType']:
+    def none(cls) -> set[Self]:
         return set()
 
     @classmethod
-    def get(cls, name: str) -> 'WarningType':
+    def get(cls, name: str) -> Self:
         for warning_type in cls:
             if warning_type.value == name:
                 return warning_type
         raise ValueError(f'Unknown warning type: {name!r}')
 
     @classmethod
-    def get_selection_or_singleton(cls, name: str) -> set['WarningType']:
+    def get_selection_or_singleton(cls, name: str) -> set[Self]:
         if name == 'likely-errors':
             return cls.likely_errors()
         if name == 'default':
@@ -161,7 +162,7 @@ class WarningType(Enum):
         return {cls.get(name)}
 
     @classmethod
-    def selection_from_string(cls, allowed_warnings: str) -> set['WarningType']:
+    def selection_from_string(cls, allowed_warnings: str) -> set[Self]:
         if allowed_warnings == '*':
             return cls.all()
         if allowed_warnings in ('none', '-', ''):

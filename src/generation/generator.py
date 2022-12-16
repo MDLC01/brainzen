@@ -1,4 +1,5 @@
 from enum import IntEnum
+from typing import Self
 
 from exceptions import *
 from generation.brainfuck_code import *
@@ -17,14 +18,14 @@ class CommentLevel(IntEnum):
 
 class Context:
     @classmethod
-    def empty(cls) -> 'Context':
-        return Context({}, {})
+    def empty(cls) -> Self:
+        return cls({}, {})
 
     @classmethod
-    def with_global(cls, context: 'Context') -> 'Context':
+    def with_global(cls, context: Self) -> Self:
         return cls(context.namespaces.copy(), context.subroutines.copy())
 
-    def __init__(self, namespaces: dict[str, 'Context'], subroutines: dict[str, 'SubroutineCompiler']) -> None:
+    def __init__(self, namespaces: dict[str, Self], subroutines: dict[str, 'SubroutineCompiler']) -> None:
         self.namespaces = namespaces
         self.subroutines = subroutines
 
@@ -42,13 +43,13 @@ class Context:
             return namespace.subroutines[reference.identifier]
         raise CompilerException(f'Unable to find subroutine {reference!r}')
 
-    def with_namespace(self, identifier: str, namespace: 'Context') -> 'Context':
+    def with_namespace(self, identifier: str, namespace: 'Context') -> Self:
         namespaces = self.namespaces.copy()
         namespaces[identifier] = namespace
         subroutines = self.subroutines.copy()
         return type(self)(namespaces, subroutines)
 
-    def with_subroutine(self, identifier: str, subroutine: 'SubroutineCompiler') -> 'Context':
+    def with_subroutine(self, identifier: str, subroutine: 'SubroutineCompiler') -> Self:
         namespaces = self.namespaces.copy()
         subroutines = self.subroutines.copy()
         subroutines[identifier] = subroutine
@@ -1090,7 +1091,7 @@ class SubroutineCompiler(NameManager):
         return self.brainfuck_code
 
 
-def generate_namespace_context(namespace: TypeCheckedNamespace, global_context: Context = Context.empty()) -> 'Context':
+def generate_namespace_context(namespace: TypeCheckedNamespace, global_context: Context = Context.empty()) -> Context:
     context = Context.with_global(global_context)
     for element in namespace:
         if isinstance(element, TypeCheckedConstant):

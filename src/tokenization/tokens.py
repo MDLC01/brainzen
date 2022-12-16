@@ -1,6 +1,6 @@
 from abc import ABC
 from enum import IntEnum
-from typing import Type, TypeVar
+from typing import Self, Type, TypeVar
 
 from exceptions import *
 
@@ -382,7 +382,7 @@ class NumericLiteral(NumberLiteral):
     """numeric literal"""
 
     @classmethod
-    def parse(cls, location: Location, word: str) -> 'NumericLiteral':
+    def parse(cls, location: Location, word: str) -> Self:
         try:
             if word.startswith('0x'):
                 return cls(location, int(word[2:], base=16))

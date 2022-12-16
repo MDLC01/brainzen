@@ -1,4 +1,4 @@
-from typing import Generic, Optional, TYPE_CHECKING, TypeVar
+from typing import Generic, Optional, Self, TYPE_CHECKING, TypeVar
 
 from exceptions import *
 from intermediate_representation import *
@@ -14,8 +14,7 @@ class TypedSubroutineArgument:
     __slots__ = 'location', 'identifier', 'type'
 
     @classmethod
-    def from_untyped(cls, context: 'NamespaceTypingContext',
-                     subroutine_argument: SubroutineArgument) -> 'TypedSubroutineArgument':
+    def from_untyped(cls, context: 'NamespaceTypingContext', subroutine_argument: SubroutineArgument) -> Self:
         argument_type = context.build_type(subroutine_argument.type)
         return cls(subroutine_argument.location, subroutine_argument.identifier, argument_type)
 

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Generator
+from typing import Generator, Self
 
 from exceptions import CompilerException, Location
 from intermediate_representation.assignment_targets import AssignmentTarget
@@ -81,7 +81,7 @@ class Array(Expression):
     """An array literal."""
 
     @classmethod
-    def from_string(cls, location: Location, string: str) -> 'Array':
+    def from_string(cls, location: Location, string: str) -> Self:
         return cls(location, [Char(location, ord(char)) for char in string])
 
     def __init__(self, location: Location, value: list[Expression]) -> None:

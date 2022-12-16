@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Self
 
 from type_checking.data_types import *
 from exceptions import *
@@ -34,7 +35,7 @@ class TypedDeclarationTarget(ABC):
 class TypedIdentifierDeclarationTarget(TypedDeclarationTarget):
     @classmethod
     def from_untyped(cls, context: CodeBlockTypingContext, target: IdentifierAssignmentTarget,
-                     target_type: DataType) -> 'TypedIdentifierDeclarationTarget':
+                     target_type: DataType) -> Self:
         context.register_variable(target.location, target.identifier, target_type)
         return cls(target.location, target.identifier, target_type)
 
@@ -49,7 +50,7 @@ class TypedIdentifierDeclarationTarget(TypedDeclarationTarget):
 class TypedTupleDeclarationTarget(TypedDeclarationTarget):
     @classmethod
     def from_untyped(cls, context: CodeBlockTypingContext, target: TupleAssignmentTarget,
-                     target_type: DataType) -> 'TypedDeclarationTarget':
+                     target_type: DataType) -> Self:
         if not isinstance(target_type, ProductType):
             raise CompilationException(target.location, f'Invalid assignment target for {target_type}')
         if target_type.count() != len(target.elements):

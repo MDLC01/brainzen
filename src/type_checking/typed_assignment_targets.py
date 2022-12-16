@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Self
 
 from type_checking.data_types import ArrayType, DataType, ProductType
 from exceptions import *
@@ -32,8 +33,7 @@ class TypedAssignmentTarget(ABC):
 
 class TypedPrimitiveAssignmentTarget(TypedAssignmentTarget):
     @classmethod
-    def from_untyped(cls, context: CodeBlockTypingContext,
-                     target: PrimitiveAssignmentTarget) -> 'TypedPrimitiveAssignmentTarget':
+    def from_untyped(cls, context: CodeBlockTypingContext, target: PrimitiveAssignmentTarget) -> Self:
         # Get list of subscripts
         subscripts: list[tuple[Location, int]] = []
         while isinstance(target, ArrayElementAssignmentTarget):
@@ -78,7 +78,7 @@ class TypedPrimitiveAssignmentTarget(TypedAssignmentTarget):
 
 class TypedTupleAssignmentTarget(TypedAssignmentTarget):
     @classmethod
-    def from_untyped(cls, context: CodeBlockTypingContext, target: TupleAssignmentTarget) -> 'TypedAssignmentTarget':
+    def from_untyped(cls, context: CodeBlockTypingContext, target: TupleAssignmentTarget) -> Self:
         elements = [TypedAssignmentTarget.from_untyped(context, element) for element in target.elements]
         return cls(target.location, elements)
 

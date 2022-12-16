@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Generator, Optional
+from typing import Generator, Optional, Self
 
 from type_checking.data_types import *
 from exceptions import *
@@ -51,7 +51,7 @@ class TypeCheckedConstant(TypeCheckedNamespaceElement):
     __slots__ = 'expression'
 
     @classmethod
-    def from_untyped(cls, context: NamespaceTypingContext, constant: Constant) -> 'TypeCheckedConstant':
+    def from_untyped(cls, context: NamespaceTypingContext, constant: Constant) -> Self:
         value = evaluate(context, constant.expression)
         context.register_constant(constant.identifier, constant.is_private, value)
         return cls(constant.location, constant.identifier, constant.is_private, value)
@@ -114,8 +114,7 @@ class TypeCheckedNativeSubroutine(TypeCheckedSubroutine):
     __slots__ = 'offset', 'bf_code'
 
     @classmethod
-    def from_untyped(cls, context: NamespaceTypingContext,
-                     subroutine: NativeSubroutine) -> 'TypeCheckedNativeSubroutine':
+    def from_untyped(cls, context: NamespaceTypingContext, subroutine: NativeSubroutine) -> Self:
         arguments = [TypedSubroutineArgument.from_untyped(context, argument) for argument in subroutine.arguments]
         return_type = context.build_type(subroutine.return_type) if subroutine.return_type is not None else None
         signature = SubroutineSignature(subroutine.location, arguments, return_type)
@@ -143,7 +142,7 @@ class TypeCheckedProcedure(TypeCheckedSubroutine):
     __slots__ = 'body'
 
     @classmethod
-    def from_untyped(cls, context: NamespaceTypingContext, procedure: Procedure) -> 'TypeCheckedProcedure':
+    def from_untyped(cls, context: NamespaceTypingContext, procedure: Procedure) -> Self:
         arguments = [TypedSubroutineArgument.from_untyped(context, argument) for argument in procedure.arguments]
         return_type = context.build_type(procedure.return_type) if procedure.return_type is not None else None
         signature = SubroutineSignature(procedure.location, arguments, return_type)
@@ -168,12 +167,12 @@ class TypeCheckedNamespace(TypeCheckedNamespaceElement):
     __slots__ = 'elements'
 
     @classmethod
-    def from_file(cls, file: File) -> 'TypeCheckedNamespace':
+    def from_file(cls, file: File) -> Self:
         typing_context = FileTypingContext(file.identifier)
         return cls.from_untyped(typing_context, file)
 
     @classmethod
-    def from_untyped(cls, context: NamespaceTypingContext, namespace: Namespace) -> 'TypeCheckedNamespace':
+    def from_untyped(cls, context: NamespaceTypingContext, namespace: Namespace) -> Self:
         elements = []
         with context.namespace(namespace.identifier, namespace.is_private) as namespace_context:
             for element in namespace.elements:
