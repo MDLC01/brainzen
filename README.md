@@ -39,6 +39,14 @@ Here is a list of considered features in arbitrary order (this list is *not* com
 - In the long run, bigger integers (32-bit integers);
 - In the very long run, floating point numbers ([IEEE 754](https://en.wikipedia.org/wiki/IEEE_754)).
 
+### Turing-completeness
+
+In its current state, Brainzen is *not* Turing-complete. Instead, any given Brainzen program is a [finite-state machine](https://en.wikipedia.org/wiki/Finite-state_machine).
+
+#### Proof
+
+For any given Brainzen program, the amount of cells the resulting Brainfuck program uses is bounded. This is because the size of all variables are known at compile time, and every possible execution flow is hard coded, so the compiler knows the exact size of the memory at any point in the program.
+
 ### Code examples
 
 This section contains examples of basic programs and subroutines written in Brainzen. More complex examples are available in this repository, under the [`examples/`](examples) directory.
