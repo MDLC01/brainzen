@@ -19,8 +19,7 @@ class BrainfuckCode:
             if last_count < count:
                 self.instructions.pop()
                 return count - last_count
-            if last_count >= count:
-                self.instructions[-1] = command, last_count - count
+            self.instructions[-1] = command, last_count - count
             if self.instructions[-1][1] == 0:
                 self.instructions.pop()
             return 0
