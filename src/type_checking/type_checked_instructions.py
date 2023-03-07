@@ -764,10 +764,10 @@ class TypeCheckedProcedureCall(TypeCheckedInstruction):
             raise CompilationException(location, message)
         # Test if types match
         typed_arguments = []
-        for i, argument in enumerate(arguments):
+        for expected_type, argument in zip(expected_types, arguments):
             typed_argument = TypedExpression.from_untyped(context, argument)
-            if typed_argument.type() != expected_types[i]:
-                message = f'Expected {expected_types[i]} but found {typed_argument.type()}'
+            if typed_argument.type() != expected_type:
+                message = f'Expected {expected_type} but found {typed_argument.type()}'
                 raise CompilationException(typed_argument.location, message)
             typed_arguments.append(typed_argument)
         return cls(location, reference, typed_arguments)
