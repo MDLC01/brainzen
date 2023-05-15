@@ -125,15 +125,3 @@ proc fizzbuzz(char n) {
     }
 }
 ```
-
-## Contributing
-
-This is a personal project I want to lead myself. As such, I will likely not be accepting pull requests. But feel free to clone the project and fork it as you wish.
-
-### Project structure
-
-The current project structure is far from optimal, but structuring a Python project is a real pain. So it's not the priority at the moment to have a better project structure.
-
-## License
-
-This project is not yet licensed. The general guideline is to always link to this GitHub repo if you use it somewhere (although I have trouble understanding why anyone would do that).
