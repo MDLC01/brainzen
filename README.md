@@ -26,22 +26,14 @@ Here is a non-exhaustive list of major available features:
 
 Here is a list of considered features in arbitrary order (this list is *not* commitment, merely an indication of where the language is heading):
 
-- Some form of [overloading](https://en.wikipedia.org/wiki/Ad_hoc_polymorphism);
-- Separating a program in multiple files (import statements);
-- Ternary operator;
-- Python-like chained comparison (granted it preserves transitivity);
-- [String interpolation](https://en.wikipedia.org/wiki/String_interpolation);
-- Some form of named tuples (records or interfaces, depending on whether duck typing is used);
-- Generating more "readable" files (relevant comments);
 - Dynamic arrays (including arrays of arbitrary size);
 - Referencing subroutines before their respective declaration (including recursion);
-- Early exits (including exceptions and exception handling);
 - In the long run, bigger integers (32-bit integers);
 - In the very long run, floating point numbers ([IEEE 754](https://en.wikipedia.org/wiki/IEEE_754)).
 
 ### Turing-completeness
 
-In its current state, Brainzen is *not* Turing-complete. Instead, any given Brainzen program is a [finite-state machine](https://en.wikipedia.org/wiki/Finite-state_machine).
+In its current state, Brainzen is *not* Turing-complete. Indeed, any given Brainzen program is a [finite-state machine](https://en.wikipedia.org/wiki/Finite-state_machine).
 
 #### Proof
 
@@ -82,7 +74,9 @@ proc main() {
     if (i == '0') {
         print('0');
     } else {
-        while (1) print(i);
+        while (1) {
+            print(i);
+        }
     }
 }
 ```
