@@ -60,13 +60,21 @@ proc print10(char n) {
     let d2 = n / 100;
     let d1 = (n / 10) % 10;
     let d0 = n % 10;
-    if (d2) print('0' + d2);
-    if (d1 || d2) print('0' + d1);
+    if (d2) {
+        print('0' + d2);
+    }
+    if (d1 || d2) {
+        print('0' + d1);
+    }
     print('0' + d0);
 }
 ```
 
+Note that the native `log` procedure does exactly that when passed a `char`.
+
 #### Truth machine
+
+The following Brainzen program implements a [truth machine](https://esolangs.org/wiki/Truth-machine).
 
 ```braiznen
 proc main() {
@@ -83,7 +91,7 @@ proc main() {
 
 #### Fibonacci
 
-The following function computes the `n`th number of the [Fibonacci sequence](https://en.wikipedia.org/wiki/Fibonacci_number).
+The following function computes the `n`th number of the [Fibonacci sequence](https://en.wikipedia.org/wiki/Fibonacci_number) iteratively.
 
 ```brainzen
 func fibonacci(char n) -> char {
@@ -98,7 +106,7 @@ func fibonacci(char n) -> char {
 }
 ```
 
-#### Fizz Buzz
+#### [Fizz Buzz](https://en.wikipedia.org/wiki/Fizz_buzz)
 
 ```brainzen
 proc fizzbuzz(char n) {
