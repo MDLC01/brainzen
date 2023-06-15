@@ -1,8 +1,8 @@
-<img src="assets/icon.svg" alt="Brainzen icon: a brain over a blue background" width="128">
+<img src="assets/icon.svg" alt="Brainzen icon: a brain over a blue background" width="128" align="right">
 
 # Brainzen
 
-**Brainzen** is a programming language that compiles to Brainfuck. It has a C-like syntax and lets you to perform arithmetic and manipulate basic objects like numbers, strings and arrays.
+**Brainzen** is a programming language that compiles to Brainfuck. It has a C-like syntax and lets you perform arithmetic and manipulate basic objects like numbers, strings and arrays.
 
 ## About Brainfuck
 
