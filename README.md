@@ -35,11 +35,11 @@ Here is a list of considered features in arbitrary order (this list is *not* com
 
 ### Turing-completeness
 
-In its current state, Brainzen is *not* Turing-complete. Indeed, any given Brainzen program is a [finite-state machine](https://en.wikipedia.org/wiki/Finite-state_machine).
+In its current state, Brainzen is *not* Turing-complete. Indeed, any given Brainzen program is a [finite-state machine](https://en.wikipedia.org/wiki/Finite-state_machine) (with a standard output).
 
 #### Proof
 
-For any given Brainzen program, the amount of cells the resulting Brainfuck program uses is bounded. This is because the size of all variables are known at compile time, and every possible execution flow is hard coded, so the compiler knows the exact size of the memory at any point in the program.
+For any given Brainzen program, the amount of cells the resulting Brainfuck program uses is bounded. This is because the size of all variables is known at compile time, and every possible execution flow is hard coded (meaning recursion is not possible), so the compiler knows the exact size (and layout) of the memory at any point in the program.
 
 ### Code examples
 
