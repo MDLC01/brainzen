@@ -128,6 +128,6 @@ proc fizzbuzz(char n) {
 }
 ```
 
-# Attributions
+## Attributions
 
 The brain on the icon is from [Twemoji](https://twemoji.twitter.com/).
