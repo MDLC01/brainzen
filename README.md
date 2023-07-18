@@ -2,7 +2,7 @@
 
 # Brainzen
 
-**Brainzen** is a programming language that compiles to Brainfuck. It has a C-like syntax and lets you perform arithmetic and manipulate basic objects like numbers, strings and arrays.
+**Brainzen** is a programming language that compiles to Brainfuck. It has a C-like syntax and lets you perform arithmetic with 8-bit integers.
 
 ## About Brainfuck
 
@@ -12,7 +12,7 @@ Brainfuck is an extremely basic programming language created by Urban Müller in
 
 ### Specification
 
-Brainzen does not have an official specification yet. You can consider the compiler as the definition of the language (bugs aside). However, the language is currently under heavy development, so everything is bound to change at any time (including syntax and major features).
+Brainzen does not have an official specification yet. The current focus is on language design and the underlying implementation of more complex features. The syntax is therefore constantly evolving, with no guarantee of backward compatibility.
 
 ### Features
 
@@ -21,16 +21,17 @@ Here is a non-exhaustive list of major available features:
 - Subroutines;
 - Loops;
 - Conditional statements;
-- A strict type system with characters, static arrays, [product types](https://en.wikipedia.org/wiki/Product_type) and type aliases;
+- A strict type system with characters, [product types](https://en.wikipedia.org/wiki/Product_type) and type aliases;
 - Namespaces.
 
 ### Considered features
 
 Here is a list of considered features in arbitrary order (this list is *not* commitment, merely an indication of where the language is heading):
 
-- Dynamic arrays (including arrays of arbitrary size);
+- Strings of arbitrary length;
+- Arrays;
 - Referencing subroutines before their respective declaration (including recursion);
-- In the long run, bigger integers (32-bit integers);
+- In the long run, bigger integers (32-bit, 64-bit);
 - In the very long run, floating point numbers ([IEEE 754](https://en.wikipedia.org/wiki/IEEE_754)).
 
 ### Turing-completeness
@@ -48,7 +49,7 @@ This section contains examples of basic programs and subroutines written in Brai
 #### Hello world
 
 ```brainzen
-proc main() {
+func main() {
     println("Hello, World!");
 }
 ```
@@ -58,7 +59,7 @@ proc main() {
 The following procedure prints the passed number in base 10.
 
 ```brainzen
-proc print10(char n) {
+func print10(n: char) {
     let d2 = n / 100;
     let d1 = (n / 10) % 10;
     let d0 = n % 10;
@@ -79,7 +80,7 @@ Note that the native `log` procedure does exactly that when passed a `char`.
 The following Brainzen program implements a [truth machine](https://esolangs.org/wiki/Truth-machine).
 
 ```braiznen
-proc main() {
+func main() {
     let i = input();
     if (i == '0') {
         print('0');
@@ -96,7 +97,7 @@ proc main() {
 The following function computes the `n`th number of the [Fibonacci sequence](https://en.wikipedia.org/wiki/Fibonacci_number) iteratively.
 
 ```brainzen
-func fibonacci(char n) -> char {
+func fibonacci(n: char) -> char {
     let a = 0;
     let b = 1;
     loop (n) {
@@ -111,7 +112,7 @@ func fibonacci(char n) -> char {
 #### [Fizz Buzz](https://en.wikipedia.org/wiki/Fizz_buzz)
 
 ```brainzen
-proc fizzbuzz(char n) {
+func fizzbuzz(n: char) {
     let i = 1;
     loop (n) {
         if (i % 3 == 0 && i % 5 == 0) {
