@@ -352,7 +352,7 @@ class SubroutineCompiler(NameManager):
     def compile_strict_inequality_test(self, index: int, left: int, right: int) -> None:
         with self.variable() as tmp1, self.variable() as tmp2:
             self._loop_start(right)
-            # Duplicate right operand
+            # Duplicate left operand
             self._move({tmp1.index, tmp2.index}, left)
             self._move({left}, tmp2.index)
             self._increment(tmp2.index)
@@ -518,12 +518,12 @@ class SubroutineCompiler(NameManager):
             self._loop_end()
 
     def compile_division_operation(self, index: int, left: int, right: int) -> None:
-        # >,>, >(tmp1) >(tmp2) >(tmp3) <<<<<[->->+ <[->>+>+<<<]>>>[-<<<+>>>] + <[>-<[-]] >[-<<<<<+>>>[-<+>]>>]<<<<]
-        with self.variable() as tmp1, self.variable() as tmp2, self.variable() as tmp3:
+        # >,>, >(remainder) >(tmp2) >(tmp3) <<<<<[->->+ <[->>+>+<<<]>>>[-<<<+>>>] + <[>-<[-]] >[-<<<<<+>>>[-<+>]>>]<<<<]
+        with self.variable() as remainder, self.variable() as tmp2, self.variable() as tmp3:
             self._loop_start(left)
             self._decrement(left)
             self._decrement(right)
-            self._increment(tmp1.index)
+            self._increment(remainder.index)
             self._move({tmp2.index, tmp3.index}, right)
             self._move({right}, tmp3.index)
             self._increment(tmp3.index)
@@ -534,14 +534,14 @@ class SubroutineCompiler(NameManager):
             self._loop_start(tmp3.index)
             self._decrement(tmp3.index)
             self._increment(index)
-            self._move({right}, tmp1.index)
+            self._move({right}, remainder.index)
             self._loop_end()
             self._loop_end()
 
     def compile_modulo_operation(self, index: int, left: int, right: int) -> None:
         # Same as division, but result is in tmp1
-        # >,>, >(tmp1) >(tmp2) >(tmp3) <<<<<[->->+ <[->>+>+<<<]>>>[-<<<+>>>] + <[>-<[-]] >[-<<<<<+>>>[-<+>]>>]<<<<]
-        with self.variable() as tmp1, self.variable() as tmp2, self.variable() as tmp3:
+        # >,>, >(tmp1) >(tmp2) >(quotient) <<<<<[->->+ <[->>+>+<<<]>>>[-<<<+>>>] + <[>-<[-]] >[-<<<<<+>>>[-<+>]>>]<<<<]
+        with self.variable() as tmp1, self.variable() as tmp2, self.variable() as quotient:
             self._loop_start(left)
             self._decrement(left)
             self._decrement(right)
@@ -555,7 +555,7 @@ class SubroutineCompiler(NameManager):
             self._loop_end()
             self._loop_start(tmp2.index)
             self._decrement(tmp2.index)
-            self._increment(tmp3.index)
+            self._increment(quotient.index)
             self._move({right}, index)
             self._loop_end()
             self._loop_end()
