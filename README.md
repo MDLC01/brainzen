@@ -129,6 +129,6 @@ func fizzbuzz(n: char) {
 }
 ```
 
-# Attributions
+## Attributions
 
 The brain on the icon is from [Twemoji](https://twemoji.twitter.com/).
