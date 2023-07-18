@@ -1,3 +1,4 @@
+use std::mem;
 use std::path::Path;
 
 use crate::exceptions::{CompilationException, CompilationResult};
@@ -9,17 +10,26 @@ use crate::location::{Located, Location};
 pub struct Reader {
     chars: Vec<char>,
     cursor: usize,
+    previous_location: Location,
     location: Location,
 }
 
 impl Reader {
     /// Creates a new reader from the content of a file.
     pub fn new(content: &str, source: impl AsRef<Path>) -> Self {
+        let location = Location::start_of_file(source);
         Self {
             chars: content.chars().collect(),
             cursor: 0,
-            location: Location::start_of_file(source),
+            previous_location: location.clone(),
+            location,
         }
+    }
+
+    /// Updates the current location to the passed location.
+    #[inline]
+    fn update_location(&mut self, location: Location) {
+        self.previous_location = mem::replace(&mut self.location, location);
     }
 
     /// Returns the current location of the reader.
@@ -28,11 +38,11 @@ impl Reader {
         self.location.clone()
     }
 
-    /// Returns a location that spans between the start of the specified `start_location` and the
-    /// end of the current location.
+    /// Returns a location that starts at the start of the specified `start_location` and ends at
+    /// the end of the previous location.
     #[inline]
     pub fn location_from(&self, start_location: Location) -> Location {
-        start_location.extended_to(&self.location)
+        start_location.extended_to(&self.previous_location)
     }
 
     /// Returns the character at a specific offset from the current position of the reader.
@@ -60,10 +70,10 @@ impl Reader {
         self.cursor += 1;
         match next {
             Some('\n') => {
-                self.location = self.location.next_line()
+                self.update_location(self.location.next_line());
             }
             Some(_) => {
-                self.location = self.location.next_column()
+                self.update_location(self.location.next_column());
             }
             _ => ()
         };
