@@ -29,7 +29,7 @@ impl<D: Construct> Construct for Target<D> {
     fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
         let mut elements = tokens.read_separated_items(Symbol::Comma, parse_tuple_target_element)?;
         if elements.len() == 1 {
-            Ok(elements.remove(0).value())
+            Ok(elements.remove(0).value)
         } else {
             Ok(Target::Tuple(elements))
         }

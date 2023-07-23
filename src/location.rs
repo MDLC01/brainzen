@@ -296,7 +296,7 @@ impl Location {
     /// Boxes a value and locates it.
     #[inline]
     pub fn attach<T>(self, value: T) -> Located<Box<T>> {
-        Located(self, Box::new(value))
+        Located::new_boxed(self, value)
     }
 }
 
@@ -315,48 +315,30 @@ impl Display for Location {
 
 /// Attaches a [`Location`] to a value.
 #[derive(Clone)]
-pub struct Located<T>(pub Location, pub T);
+pub struct Located<T> {
+    pub location: Location,
+    pub value: T,
+}
 
 impl<T> Located<T> {
     /// Constructs a new located value.
     pub fn new(location: Location, value: T) -> Self {
-        Self(location, value)
+        Self { location, value }
     }
 
     /// Constructs a new located value with an [unknown location][`Location::UNKNOWN`].
     pub fn new_unknown(value: T) -> Self {
-        Self(Location::UNKNOWN, value)
-    }
-
-    /// Returns a reference to the location.
-    pub fn location_ref(&self) -> &Location {
-        &self.0
+        Self::new(Location::UNKNOWN, value)
     }
 
     /// Returns an owned location.
     pub fn location(&self) -> Location {
-        self.location_ref().to_owned()
-    }
-
-    /// Returns the value.
-    pub fn value(self) -> T {
-        self.1
-    }
-
-    /// Returns a reference to the value.
-    pub fn value_ref(&self) -> &T {
-        &self.1
-    }
-
-    /// Returns a clone of the value.
-    pub fn owned_value(&self) -> T where T: Clone {
-        self.1.clone()
+        self.location.to_owned()
     }
 
     /// Applies a function to this value and returns the result with the same location.
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Located<U> {
-        let Self(location, value) = self;
-        Located(location, f(value))
+        Located::new(self.location, f(self.value))
     }
 
     /// Tries to apply a function to this value.
@@ -364,9 +346,8 @@ impl<T> Located<T> {
     /// If the function returns an error, it is propagated. Otherwise, the result is returned, with
     /// the same location.
     pub fn try_map<R, E>(self, f: impl FnOnce(T) -> Result<R, E>) -> Result<Located<R>, E> {
-        let Self(location, value) = self;
-        let modified_value = f(value)?;
-        Ok(Located(location, modified_value))
+        let mapped_value = f(self.value)?;
+        Ok(Located::new(self.location, mapped_value))
     }
 
     /// Returns a located box containing this value (location is unchanged).
@@ -381,38 +362,35 @@ impl<T> Located<T> {
 
     /// Returns a located reference to this value.
     pub fn as_ref(&self) -> Located<&T> {
-        let Self(location, value) = self;
-        Located(location.to_owned(), value)
+        Located::new(self.location(), &self.value)
     }
 }
 
 impl<T> Located<Box<T>> {
     /// Constructs a new located [`Box<T>`].
     pub fn new_boxed(location: Location, value: T) -> Self {
-        Self(location, Box::new(value))
+        Self::new(location, Box::new(value))
     }
 
     /// Returns the unboxed value.
     pub fn unbox(self) -> T {
-        *self.value()
+        *self.value
     }
 
     /// Converts this located box to a located value.
     pub fn unboxed(self) -> Located<T> {
-        let Self(location, value) = self;
-        Located(location, *value)
+        Located::new(self.location, *self.value)
     }
 
     /// Returns a new located reference to the value inside this box.
     pub fn box_as_ref(&self) -> Located<&T> {
-        let Self(location, value) = self;
-        Located(location.to_owned(), value)
+        Located::new(self.location(), &self.value)
     }
 }
 
 impl<T: Eq> PartialEq for Located<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.1 == other.1
+        self.value == other.value
     }
 }
 
@@ -420,24 +398,23 @@ impl<T: Eq> Eq for Located<T> {}
 
 impl<T: Hash> Hash for Located<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.1.hash(state)
+        self.value.hash(state)
     }
 }
 
 impl<T: Debug> Debug for Located<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let Self(location, value) = self;
         if f.alternate() {
-            write!(f, "{}:{:#?}", location, value)
+            write!(f, "{}:{:#?}", self.location, self.value)
         } else {
-            write!(f, "{}:{:?}", location, value)
+            write!(f, "{}:{:?}", self.location, self.value)
         }
     }
 }
 
 impl<T: Display> Display for Located<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        self.1.fmt(f)
+        self.value.fmt(f)
     }
 }
 

@@ -59,11 +59,11 @@ pub(super) struct TokenStream {
 impl TokenStream {
     pub fn new(file: impl AsRef<Path>, tokens: Sequence<Token>) -> Self {
         let start_location = match tokens.first() {
-            Some(Located(location, _)) => location.collapse(),
+            Some(token) => token.location.collapse(),
             None => Location::start_of_file(&file)
         };
         let final_location = match tokens.last() {
-            Some(Located(location, _)) => location.after(),
+            Some(token) => token.location.after(),
             None => Location::start_of_file(&file)
         };
         Self {
@@ -80,7 +80,7 @@ impl TokenStream {
     /// if the stream has no more tokens.
     pub fn location(&self) -> Location {
         match self.tokens.get(self.index) {
-            Some(Located(location, _)) => location.clone(),
+            Some(token) => token.location.clone(),
             None => self.final_location.clone(),
         }
     }
@@ -91,8 +91,8 @@ impl TokenStream {
     /// first token if the stream is still at the first token.
     pub fn previous_location(&self) -> Location {
         if let Some(index) = self.index.checked_sub(1) {
-            if let Some(Located(location, _)) = self.tokens.get(index) {
-                return location.clone();
+            if let Some(token) = self.tokens.get(index) {
+                return token.location.clone();
             }
         }
         self.start_location.clone()
@@ -113,7 +113,7 @@ impl TokenStream {
     /// Returns a reference to the token at position `index` in the token sequence.
     fn token_at(&self, index: usize) -> Option<&Token> {
         match self.tokens.get(index) {
-            Some(Located(_, token)) => Some(token),
+            Some(token) => Some(&token.value),
             None => None,
         }
     }
@@ -296,7 +296,7 @@ impl TokenStream {
             let start_location = self.location();
             let item = item_reader(self)?;
             let location = self.location_from(&start_location);
-            accumulator.push(Located(location, item));
+            accumulator.push(Located::new(location, item));
             self.eat(&separator)
         } {}
         Ok(accumulator)
@@ -414,7 +414,7 @@ impl<T> ParseChoice<'_, T> {
     #[inline]
     pub fn locate(self, description: impl Display) -> LocatedResult<T> {
         let location = self.tokens.location_from(&self.start_location);
-        self.parse(description).map(|value| Located(location, value))
+        self.parse(description).map(|value| Located::new(location, value))
     }
 }
 
@@ -435,7 +435,7 @@ pub(super) trait Construct: Sized {
         let start_location = tokens.location();
         let construct = Self::parse(tokens)?;
         let location = tokens.location_from(&start_location);
-        Ok(Located(location, construct))
+        Ok(Located::new(location, construct))
     }
 
     /// Parses a sequence of constructs until the end of the stream is reached.
@@ -514,7 +514,7 @@ impl Construct for Reference {
         let mut location = tokens.location_from(&start_location);
         while tokens.eat(Symbol::DoubleColon) {
             let identifier = tokens.read_word()?;
-            reference = Reference::new(identifier, Located(location, reference));
+            reference = Reference::new(identifier, Located::new(location, reference));
             location = tokens.location_from(&start_location)
         }
         Ok(reference)

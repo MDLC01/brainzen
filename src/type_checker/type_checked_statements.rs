@@ -25,7 +25,7 @@ pub enum TypeCheckedInstruction {
 }
 
 impl TypeCheckedInstruction {
-    fn from_untyped(context: &mut ScopeStack, Located(location, untyped_instruction): Located<Instruction>, return_type: Option<&Type>) -> CompilationResult<Self> {
+    fn from_untyped(context: &mut ScopeStack, Located { location, value: untyped_instruction }: Located<Instruction>, return_type: Option<&Type>) -> CompilationResult<Self> {
         match untyped_instruction {
             Instruction::ProcedureCall(reference, arguments)
             if reference == "print" || reference == "println" => {
@@ -72,21 +72,21 @@ impl TypeCheckedInstruction {
                     Ok(Self::ProcedureCall(subroutine_index, typed_arguments))
                 }
             }
-            Instruction::Increment(Located(location, reference)) => {
+            Instruction::Increment(Located { location, value: reference }) => {
                 if context.find_value_type(location.clone(), &reference)?.is_char() {
                     Ok(Self::Increment(reference))
                 } else {
                     Err(CompilationException::increment_non_char(location))
                 }
             }
-            Instruction::Decrement(Located(location, reference)) => {
+            Instruction::Decrement(Located { location, value: reference }) => {
                 if context.find_value_type(location.clone(), &reference)?.is_char() {
                     Ok(Self::Decrement(reference))
                 } else {
                     Err(CompilationException::decrement_non_char(location))
                 }
             }
-            Instruction::Declaration(target, Located(descriptor_location, type_descriptor)) => {
+            Instruction::Declaration(target, Located { location: descriptor_location, value: type_descriptor }) => {
                 let r#type = Type::resolve_descriptor(context, descriptor_location, type_descriptor)?;
                 let type_checked_target = TypeCheckedDefinitionTarget::type_check_and_register_variables(context, target, r#type)?;
                 Ok(Self::Definition(type_checked_target, None))
@@ -113,7 +113,7 @@ impl TypeCheckedInstruction {
                     }
                 }
             }
-            Instruction::ContextSnapshot(Some(Located(location, reference))) => {
+            Instruction::ContextSnapshot(Some(Located { location, value: reference })) => {
                 // Makes sure the variable exists
                 let _ = context.find_value_type(location, &reference)?;
                 Ok(Self::ContextSnapshot(Some(reference)))
@@ -149,7 +149,7 @@ impl TypeCheckedStatement {
         })
     }
 
-    pub(super) fn type_check(context: &mut ScopeStack, Located(_, statement): Located<Statement>, return_type: Option<&Type>) -> CompilationResult<Self> {
+    pub(super) fn type_check(context: &mut ScopeStack, Located { location: _, value: statement }: Located<Statement>, return_type: Option<&Type>) -> CompilationResult<Self> {
         match statement {
             Statement::Block(block) => {
                 Self::type_check_block(context, block, return_type)

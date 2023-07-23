@@ -70,7 +70,7 @@ impl Construct for Instruction {
                 tokens.consume(Symbol::OpenParenthesis)?;
                 let arguments = Expression::parse_delimited_separated_sequence(tokens, Symbol::Comma, Symbol::CloseParenthesis)?;
                 tokens.consume(Symbol::Semicolon)?;
-                Ok(Self::ProcedureCall(reference.value(), arguments))
+                Ok(Self::ProcedureCall(reference.value, arguments))
             })
             // Assignment
             .branch(|tokens| {

@@ -34,7 +34,7 @@ impl TypedExpression {
     }
 
     /// Infers the type of an expression.
-    pub(super) fn infer_type(context: &mut ScopeStack, Located(location, untyped_expression): Located<Expression>) -> CompilationResult<Self> {
+    pub(super) fn infer_type(context: &mut ScopeStack, Located { location, value: untyped_expression }: Located<Expression>) -> CompilationResult<Self> {
         match untyped_expression {
             Expression::CharacterLiteral(value) => {
                 Ok(Self {
@@ -67,7 +67,7 @@ impl TypedExpression {
             Expression::ArrayLiteral(_elements) => {
                 Err(CompilationException::unimplemented_arrays(location))
             }
-            Expression::Variable(Located(location, reference)) => {
+            Expression::Variable(Located { location, value: reference }) => {
                 let r#type = context.find_value_type(location, &reference)?;
                 Ok(Self {
                     r#type: r#type.to_owned(),

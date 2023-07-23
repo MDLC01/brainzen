@@ -41,7 +41,7 @@ impl Construct for TypeDescriptor {
     fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
         let mut factors = tokens.read_separated_items(Symbol::Star, Self::parse_factor)?;
         if factors.len() == 1 {
-            Ok(factors.remove(0).value())
+            Ok(factors.remove(0).value)
         } else {
             Ok(Self::Product(factors))
         }

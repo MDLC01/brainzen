@@ -33,9 +33,9 @@ pub enum Expression {
 impl Expression {
     fn tuple_from_characters(characters: &Sequence<u8>) -> Self {
         let elements = characters.iter()
-            .map(|Located(location, character)| {
+            .map(|Located { location, value: character }| {
                 let literal = Self::CharacterLiteral(*character);
-                Located(location.clone(), literal)
+                Located::new(location.clone(), literal)
             })
             .collect();
         Self::TupleLiteral(elements)
@@ -47,7 +47,7 @@ impl Expression {
             // Parenthesized expression
             .branch(|tokens| {
                 tokens.expect(Symbol::OpenParenthesis)?;
-                let value = Self::locate_tuple(tokens)?.value();
+                let value = Self::locate_tuple(tokens)?.value;
                 tokens.consume(Symbol::CloseParenthesis)?;
                 Ok(value)
             })
@@ -98,16 +98,16 @@ impl Expression {
             let index = Self::locate_tuple(tokens)?;
             if tokens.eat(Symbol::CloseBracket) {
                 // Subscript
-                let location = operand.location_ref().extended_to(&tokens.location());
+                let location = operand.location.extended_to(&tokens.location());
                 let subscript = Self::Subscript { array: operand.boxed(), subscript: index.boxed() };
-                Self::locate_postfix_operations(tokens, Located(location, subscript))
+                Self::locate_postfix_operations(tokens, Located::new(location, subscript))
             } else if tokens.eat(Symbol::Colon) {
                 // Slice
-                let location = operand.location_ref().extended_to(&tokens.location());
+                let location = operand.location.extended_to(&tokens.location());
                 let index_stop = Self::locate_tuple(tokens)?;
                 tokens.consume(Symbol::CloseBracket)?;
                 let slice = Self::Slice { array: operand.boxed(), start: index.boxed(), stop: index_stop.boxed() };
-                Self::locate_postfix_operations(tokens, Located(location, slice))
+                Self::locate_postfix_operations(tokens, Located::new(location, slice))
             } else {
                 Err(CompilationException::expected(tokens.location(), format!("{} or {}", Symbol::CloseBracket, Symbol::Colon)))
             }
@@ -122,7 +122,7 @@ impl Expression {
             Some(operator) => {
                 let operand = Self::locate_prefix_operation(tokens)?;
                 let location = tokens.location_from(&start_location);
-                Ok(Located(location, Expression::UnaryArithmetic(operator, operand.boxed())))
+                Ok(Located::new(location, Expression::UnaryArithmetic(operator, operand.boxed())))
             }
             None => Self::locate_operand(tokens)
         }
@@ -136,32 +136,32 @@ impl Expression {
             match tokens.read_binary_operator() {
                 Some((new_operator, new_priority)) => {
                     if current_priority <= new_priority {
-                        let new_left_operand_location = current_left_operand.location_ref().extended_to(current_right_operand.location_ref());
+                        let new_left_operand_location = current_left_operand.location.extended_to(&current_right_operand.location);
                         let new_left_operand = Expression::BinaryArithmetic(
                             current_operator,
                             current_left_operand.boxed(),
                             current_right_operand.boxed(),
                         );
-                        aux(tokens, Located(new_left_operand_location, new_left_operand), new_operator, new_priority)
+                        aux(tokens, Located::new(new_left_operand_location, new_left_operand), new_operator, new_priority)
                     } else {
                         let new_right_operand = aux(tokens, current_right_operand, new_operator, new_priority)?;
-                        let location = current_left_operand.location_ref().extended_to(new_right_operand.location_ref());
+                        let location = current_left_operand.location.extended_to(&new_right_operand.location);
                         let expression = Expression::BinaryArithmetic(
                             current_operator,
                             current_left_operand.boxed(),
                             new_right_operand.boxed(),
                         );
-                        Ok(Located(location, expression))
+                        Ok(Located::new(location, expression))
                     }
                 }
                 None => {
-                    let location = current_left_operand.location_ref().extended_to(current_right_operand.location_ref());
+                    let location = current_left_operand.location.extended_to(&current_right_operand.location);
                     let expression = Expression::BinaryArithmetic(
                         current_operator,
                         current_left_operand.boxed(),
                         current_right_operand.boxed(),
                     );
-                    Ok(Located(location, expression))
+                    Ok(Located::new(location, expression))
                 }
             }
         }
@@ -182,7 +182,7 @@ impl Expression {
         let location = tokens.location_from(&start_location);
         match elements.get_single_element_or_self() {
             Ok(value) => Ok(value),
-            Err(elements) => Ok(Located(location, Self::TupleLiteral(elements)))
+            Err(elements) => Ok(Located::new(location, Self::TupleLiteral(elements)))
         }
     }
 }
@@ -193,7 +193,7 @@ impl Construct for Expression {
     /// This function does not allow unparenthesized tuples. To allow unparenthesized tuples, use
     /// [`Expression::locate_tuple`].
     fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
-        Self::locate_infix_operation(tokens).map(Located::value)
+        Self::locate_infix_operation(tokens).map(|expression| expression.value)
     }
 
     /// Parses and locates an expression.

@@ -283,7 +283,7 @@ impl Reader {
                         return Err(CompilationException::unterminated_string_literal(escape_location, delimiter));
                     }
                 };
-                Ok(Located(self.location_from(location), escaped_character))
+                Ok(Located::new(self.location_from(location), escaped_character))
             }
             // Invalid character
             Some(c) if !c.is_ascii() || c.is_control() => {
@@ -291,7 +291,7 @@ impl Reader {
             }
             // Valid (ASCII, non-control) character
             Some(c) if c != '\n' => {
-                Ok(Located(location, c as u8))
+                Ok(Located::new(location, c as u8))
             }
             // EOL / EOF
             _ => {

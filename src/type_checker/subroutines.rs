@@ -17,19 +17,19 @@ pub struct SubroutineSignature {
 impl SubroutineSignature {
     pub(super) fn from_untyped(context: &mut ScopeStack, untyped_arguments: Sequence<SubroutineArgument>, return_type: Option<Located<TypeDescriptor>>) -> CompilationResult<Self> {
         let arguments = untyped_arguments.into_iter()
-            .map(|Located(location, argument)| {
+            .map(|Located { location, value: argument }| {
                 let r#type = Type::resolve_descriptor(context, location.clone(), argument.r#type)?;
-                Ok(Located(location, (argument.name, r#type)))
+                Ok(Located::new(location, (argument.name, r#type)))
             })
             .try_collect()?;
         let return_type = return_type
-            .map(|Located(location, descriptor)| Type::resolve_descriptor(context, location, descriptor))
+            .map(|descriptor| Type::resolve_descriptor(context, descriptor.location, descriptor.value))
             .transpose()?;
         Ok(Self { arguments, return_type })
     }
 
     pub(super) fn register_variables(&self, context: &mut ScopeStack) -> CompilationResult<()> {
-        for Located(location, (identifier, r#type)) in self.arguments.clone() {
+        for Located { location, value: (identifier, r#type) } in self.arguments.clone() {
             context.register_variable(location, identifier, r#type)?;
         }
         Ok(())
@@ -38,7 +38,7 @@ impl SubroutineSignature {
     /// Returns the sum of the size of the arguments of the subroutine.
     pub fn arguments_size(&self) -> usize {
         self.arguments.iter()
-            .map(|Located(_, (_, r#type))| r#type.size())
+            .map(|Located { location: _, value: (_, r#type) }| r#type.size())
             .sum()
     }
 
@@ -52,7 +52,7 @@ impl SubroutineSignature {
 
     pub fn argument_types(&self) -> Vec<Type> {
         self.arguments.iter()
-            .map(|Located(_, (_, r#type))| r#type.clone())
+            .map(|Located { location: _, value: (_, r#type) }| r#type.clone())
             .collect()
     }
 
@@ -72,7 +72,7 @@ impl TypeCheckedSubroutineBody {
         match body {
             SubroutineBody::StatementBlock(block) => {
                 context.with_subscope(|context| {
-                    let type_checked_statement = TypeCheckedStatement::type_check_block(context, block.value(), return_type)?;
+                    let type_checked_statement = TypeCheckedStatement::type_check_block(context, block.value, return_type)?;
                     Ok(Self::StatementBlock(type_checked_statement))
                 })
             }

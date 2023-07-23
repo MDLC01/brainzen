@@ -27,7 +27,7 @@ fn read_token(reader: &mut Reader) -> CompilationResult<Option<Located<Token>>> 
         if reader.has('\'') {
             return Err(CompilationException::empty_character_literal(reader.location()));
         }
-        let Located(_, character) = reader.expect_literal_character('\'')?;
+        let character = reader.expect_literal_character('\'')?.value;
         if !reader.eat('\'') {
             return Err(CompilationException::unterminated_character_literal(reader.location()));
         }
@@ -67,7 +67,7 @@ fn read_token(reader: &mut Reader) -> CompilationResult<Option<Located<Token>>> 
         // Invalid character
         return Err(CompilationException::unexpected_character(location));
     };
-    Ok(Some(Located(reader.location_from(location), token)))
+    Ok(Some(Located::new(reader.location_from(location), token)))
 }
 
 /// Converts a string to a sequence of tokens.

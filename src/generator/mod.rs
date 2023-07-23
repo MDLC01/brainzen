@@ -5,7 +5,6 @@ use crate::generate;
 use crate::generator::brainfuck_code::{BalancedCode, BrainfuckCode};
 use crate::generator::memory::{Cell, Page};
 use crate::generator::segment::Generator;
-use crate::location::Located;
 use crate::reference::Reference;
 use crate::type_checker::operations::{BinaryOperation, UnaryOperation};
 use crate::type_checker::subroutines::{SubroutineSignature, TypeCheckedSubroutine, TypeCheckedSubroutineBody};
@@ -601,7 +600,8 @@ fn compile_statement(generator: &mut Generator, context: &mut Context, statement
 /// Declares the arguments of a subroutine.
 fn declare_arguments(context: &mut Context, signature: SubroutineSignature) {
     let mut offset = 0;
-    for Located(_, (identifier, r#type)) in signature.arguments {
+    for argument in signature.arguments {
+        let (identifier, r#type) = argument.value;
         let size = r#type.size();
         context.register(identifier, Page::Input.at(offset), size);
         offset += size;

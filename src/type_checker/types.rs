@@ -56,18 +56,18 @@ impl Type {
     /// Resolves a type descriptor within the specified context.
     pub(super) fn resolve_descriptor(context: &mut ScopeStack, location: Location, type_descriptor: TypeDescriptor) -> CompilationResult<Self> {
         match type_descriptor {
-            TypeDescriptor::Reference(Located(_, reference)) if reference == "bool" => {
+            TypeDescriptor::Reference(reference) if reference.value == "bool" => {
                 Ok(Self::BOOL)
             }
-            TypeDescriptor::Reference(Located(_, reference)) if reference == "char" => {
+            TypeDescriptor::Reference(reference) if reference.value == "char" => {
                 Ok(Self::CHAR)
             }
-            TypeDescriptor::Reference(Located(location, reference)) => {
+            TypeDescriptor::Reference(Located { location, value: reference }) => {
                 context.find_type(location, &reference)
             }
             TypeDescriptor::Product(factors) => {
                 let mut evaluated_factors = Vec::new();
-                for Located(location, operand) in factors {
+                for Located { location, value: operand } in factors {
                     evaluated_factors.push(Self::resolve_descriptor(context, location, operand)?)
                 }
                 Ok(Self::Product(evaluated_factors))

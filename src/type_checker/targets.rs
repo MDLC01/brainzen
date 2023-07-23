@@ -42,14 +42,14 @@ where
 pub type TypeCheckedDefinitionTarget = TypeCheckedTarget<String>;
 
 impl TypeCheckedDefinitionTarget {
-    fn type_check(Located(location, target): Located<DefinitionTarget>, expected_type: Type, created_variables: &mut HashMap<String, Located<Type>>) -> CompilationResult<Self> {
+    fn type_check(Located { location, value: target }: Located<DefinitionTarget>, expected_type: Type, created_variables: &mut HashMap<String, Located<Type>>) -> CompilationResult<Self> {
         match target {
             Target::Destination(DefinitionTargetDestination::Variable(identifier)) => {
-                match created_variables.insert(identifier.to_owned(), Located(location.clone(), expected_type.to_owned())) {
+                match created_variables.insert(identifier.to_owned(), Located::new(location.clone(), expected_type.to_owned())) {
                     None => {
                         Ok(Self::Destination(expected_type, identifier))
                     }
-                    Some(Located(initial_location, _)) => {
+                    Some(Located { location: initial_location, value: _ }) => {
                         Err(CompilationException::identifier_appears_multiple_times_in_target(location, identifier, initial_location))
                     }
                 }
@@ -70,7 +70,7 @@ impl TypeCheckedDefinitionTarget {
     pub(super) fn type_check_and_register_variables(context: &mut ScopeStack, target: Located<DefinitionTarget>, expected_type: Type) -> CompilationResult<Self> {
         let mut created_variables = HashMap::new();
         let type_checked_target = Self::type_check(target, expected_type, &mut created_variables)?;
-        for (identifier, Located(location, r#type)) in created_variables {
+        for (identifier, Located { location, value: r#type }) in created_variables {
             context.register_variable(location, identifier, r#type)?
         }
         Ok(type_checked_target)
@@ -107,7 +107,7 @@ pub struct TypeCheckedAssignmentTargetDestination {
 }
 
 impl TypeCheckedAssignmentTargetDestination {
-    fn type_check(context: &mut ScopeStack, Located(location, destination): Located<AssignmentTargetDestination>, expected_type: &Type) -> CompilationResult<Self> {
+    fn type_check(context: &mut ScopeStack, Located { location, value: destination }: Located<AssignmentTargetDestination>, expected_type: &Type) -> CompilationResult<Self> {
         match destination {
             AssignmentTargetDestination::Variable(reference) => {
                 let r#type = context.find_value_type(location.clone(), &reference)?;
@@ -128,10 +128,10 @@ impl TypeCheckedAssignmentTargetDestination {
 pub type TypeCheckedAssignmentTarget = TypeCheckedTarget<TypeCheckedAssignmentTargetDestination>;
 
 impl TypeCheckedAssignmentTarget {
-    pub(super) fn from_untyped(context: &mut ScopeStack, Located(location, target): Located<AssignmentTarget>, expected_type: Type) -> CompilationResult<Self> {
+    pub(super) fn from_untyped(context: &mut ScopeStack, Located { location, value: target }: Located<AssignmentTarget>, expected_type: Type) -> CompilationResult<Self> {
         match target {
             Target::Destination(destination) => {
-                let type_checked_destination = TypeCheckedAssignmentTargetDestination::type_check(context, Located(location, destination), &expected_type)?;
+                let type_checked_destination = TypeCheckedAssignmentTargetDestination::type_check(context, Located::new(location, destination), &expected_type)?;
                 Ok(Self::Destination(expected_type, type_checked_destination))
             }
             Target::Tuple(tuple_targets) => {

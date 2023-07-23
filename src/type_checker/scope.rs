@@ -81,7 +81,7 @@ pub(super) struct Namespace {
 impl Namespace {
     pub(super) fn type_check_and_register_elements(context: &mut ScopeStack, elements: Sequence<NamespaceElementHolder>) -> CompilationResult<()> {
         elements.into_iter()
-            .try_for_each(|Located(location, NamespaceElementHolder { visibility, identifier, element })| {
+            .try_for_each(|Located { location, value: NamespaceElementHolder { visibility, identifier, element } }| {
                 match element {
                     NamespaceElement::Constant(expression) => {
                         let expression_location = expression.location();
@@ -228,7 +228,7 @@ impl ScopeStack {
         let description = <Namespace as Scope<T>>::ELEMENT_DESCRIPTION;
         match &reference.namespace {
             // Foreign
-            Some(Located(namespace_location, namespace)) => {
+            Some(Located { location: namespace_location, value: namespace }) => {
                 let scope: &Namespace = self.find::<Namespace>(namespace_location.to_owned(), namespace)?;
                 match scope.get_entry(&reference.identifier) {
                     Some(Entry { visibility: Visibility::Public, value, .. }) => {
