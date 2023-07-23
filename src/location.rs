@@ -383,8 +383,8 @@ impl<T> Located<T> {
 
     /// Converts a `Located<T>` to a `Located<U>` using `<U as From<T>>::from`.
     #[inline]
-    pub fn into<U: From<T>>(self) -> Located<U> {
-        self.map(U::from)
+    pub fn into<U>(self) -> Located<U> where T: Into<U> {
+        self.map(T::into)
     }
 
     /// Returns a located reference to this value.
