@@ -1,7 +1,7 @@
 use std::{iter, mem};
 use std::collections::HashMap;
 
-use crate::exceptions::{CompilationException, CompilationResult};
+use crate::exceptions::{LocatedException, CompilationResult};
 use crate::location::{Located, Location, Sequence};
 use crate::parser::namespace_element::{NamespaceElement, NamespaceElementHolder};
 use crate::reference::Reference;
@@ -50,7 +50,7 @@ impl<T, S: RegistryBasedScope<T>> Scope<T> for S {
         match self.registry_mut().insert(identifier, entry) {
             None => Ok(()),
             Some(Entry { location: initial_location, .. }) => {
-                Err(CompilationException::element_name_is_already_used(location, Self::ELEMENT_DESCRIPTION, initial_location))
+                Err(LocatedException::element_name_is_already_used(location, Self::ELEMENT_DESCRIPTION, initial_location))
             }
         }
     }
@@ -90,7 +90,7 @@ impl Namespace {
                         if r#type.is_constant() {
                             context.register(location, identifier, visibility, Value(r#type))
                         } else {
-                            Err(CompilationException::expected_constant_value(expression_location, &r#type))
+                            Err(LocatedException::expected_constant_value(expression_location, &r#type))
                         }
                     }
                     NamespaceElement::TypeAlias(type_descriptor) => {
@@ -235,10 +235,10 @@ impl ScopeStack {
                         Ok(value)
                     }
                     Some(_) => {
-                        Err(CompilationException::inaccessible_element(location, description, reference))
+                        Err(LocatedException::inaccessible_element(location, description, reference))
                     }
                     None => {
-                        Err(CompilationException::unknown_element(location, description, reference))
+                        Err(LocatedException::unknown_element(location, description, reference))
                     }
                 }
             }
@@ -251,7 +251,7 @@ impl ScopeStack {
                         scope.get_entry(&reference.identifier)
                     })
                     .map(|Entry { value, .. }| value)
-                    .ok_or_else(|| CompilationException::unknown_element(location, description, reference))
+                    .ok_or_else(|| LocatedException::unknown_element(location, description, reference))
             }
         }
     }

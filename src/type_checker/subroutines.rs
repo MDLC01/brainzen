@@ -1,4 +1,4 @@
-use crate::exceptions::{CompilationException, CompilationResult};
+use crate::exceptions::{LocatedException, CompilationResult};
 use crate::location::{Located, Sequence};
 use crate::parser::namespace_element::{SubroutineArgument, SubroutineBody};
 use crate::parser::type_descriptor::TypeDescriptor;
@@ -80,7 +80,7 @@ impl TypeCheckedSubroutineBody {
                 let offset_location = offset.location();
                 let evaluated_offset = TypedExpression::expect_constant_integer(context, offset)?;
                 if evaluated_offset < 0 {
-                    Err(CompilationException::negative_offset(offset_location))
+                    Err(LocatedException::negative_offset(offset_location))
                 } else {
                     Ok(Self::Native { code, offset: evaluated_offset })
                 }

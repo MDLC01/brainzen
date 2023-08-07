@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::exceptions::{CompilationException, CompilationResult};
+use crate::exceptions::{CompilationResult, LocatedException};
 use crate::lexer::reader::Reader;
 use crate::lexer::tokens::Token;
 use crate::location::{Located, Sequence};
@@ -25,11 +25,11 @@ fn read_token(reader: &mut Reader) -> CompilationResult<Option<Located<Token>>> 
     } else if reader.eat('\'') {
         // Character literal
         if reader.has('\'') {
-            return Err(CompilationException::empty_character_literal(reader.location()));
+            return Err(LocatedException::empty_character_literal(reader.location()));
         }
         let character = reader.expect_literal_character('\'')?.value;
         if !reader.eat('\'') {
-            return Err(CompilationException::unterminated_character_literal(reader.location()));
+            return Err(LocatedException::unterminated_character_literal(reader.location()));
         }
         Token::Character(character)
     } else if reader.eat('"') {
@@ -53,7 +53,7 @@ fn read_token(reader: &mut Reader) -> CompilationResult<Option<Located<Token>>> 
         while !reader.eat_string(delimiter) {
             match reader.next() {
                 Some(character) => code.push(character),
-                None => return Err(CompilationException::unterminated_native_code_block(reader.location_from(location), delimiter)),
+                None => return Err(LocatedException::unterminated_native_code_block(reader.location_from(location), delimiter)),
             }
         }
         Token::NativeCodeBlock(code)
@@ -65,7 +65,7 @@ fn read_token(reader: &mut Reader) -> CompilationResult<Option<Located<Token>>> 
         return Ok(None);
     } else {
         // Invalid character
-        return Err(CompilationException::unexpected_character(location));
+        return Err(LocatedException::unexpected_character(location));
     };
     Ok(Some(Located::new(reader.location_from(location), token)))
 }

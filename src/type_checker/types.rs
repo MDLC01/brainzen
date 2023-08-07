@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use crate::exceptions::{CompilationException, CompilationResult};
+use crate::exceptions::{CompilationResult, LocatedException};
 use crate::location::{Located, Location};
 use crate::parser::type_descriptor::TypeDescriptor;
 use crate::type_checker::scope::ScopeStack;
@@ -73,7 +73,7 @@ impl Type {
                 Ok(Self::Product(evaluated_factors))
             }
             TypeDescriptor::Array(_) => {
-                Err(CompilationException::unimplemented_arrays(location))
+                Err(LocatedException::unimplemented_arrays(location))
             }
         }
     }
@@ -164,7 +164,7 @@ impl PartialEq for Type {
 
 
 impl TryFrom<Type> for TypedExpression {
-    type Error = CompilationException;
+    type Error = LocatedException;
 
     fn try_from(r#type: Type) -> Result<Self, Self::Error> {
         match &r#type {

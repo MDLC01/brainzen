@@ -1,4 +1,4 @@
-use crate::exceptions::{CompilationException, CompilationResult};
+use crate::exceptions::{LocatedException, CompilationResult};
 use crate::lexer::tokens::Symbol;
 use crate::location::Location;
 use crate::type_checker::types::{PredictedChar, Type};
@@ -36,7 +36,7 @@ macro_rules! define_operations {
                         )+
                     )+
                     (operator, [$( $operand_name ), +]) => {
-                        Err(CompilationException::invalid_operator($location, operator, &[$( $operand_name ), +]))
+                        Err(LocatedException::invalid_operator($location, operator, &[$( $operand_name ), +]))
                     }
                 }
             }

@@ -1,4 +1,4 @@
-use crate::exceptions::{CompilationException, CompilationResult};
+use crate::exceptions::{CompilationResult, LocatedException};
 use crate::location::Located;
 use crate::parser::statement::{Instruction, Statement, StatementBlock};
 use crate::reference::Reference;
@@ -34,7 +34,7 @@ impl TypeCheckedInstruction {
                     let argument_location = argument.location();
                     let typed_argument = TypedExpression::infer_type(context, argument)?;
                     if !typed_argument.r#type.is_string() {
-                        return Err(CompilationException::expected_string_like(argument_location, &typed_argument.r#type));
+                        return Err(LocatedException::expected_string_like(argument_location, &typed_argument.r#type));
                     }
                     typed_arguments.push(typed_argument)
                 }
@@ -45,7 +45,7 @@ impl TypeCheckedInstruction {
                 if arguments.is_empty() {
                     Ok(Self::Read)
                 } else {
-                    Err(CompilationException::wrong_arity(location, &reference, 0, arguments.len()))
+                    Err(LocatedException::wrong_arity(location, &reference, 0, arguments.len()))
                 }
             }
             Instruction::ProcedureCall(reference, arguments) if reference == "log" => {
@@ -54,7 +54,7 @@ impl TypeCheckedInstruction {
                     let typed_argument = TypedExpression::infer_type(context, argument)?;
                     Ok(Self::Log(typed_argument))
                 } else {
-                    Err(CompilationException::wrong_arity(location, &reference, 1, argument_count))
+                    Err(LocatedException::wrong_arity(location, &reference, 1, argument_count))
                 }
             }
             Instruction::ProcedureCall(reference, arguments) => {
@@ -62,7 +62,7 @@ impl TypeCheckedInstruction {
                 let signature = context.find_subroutine_signature(location.clone(), &reference)?;
                 let expected_types = signature.argument_types();
                 if expected_types.len() != arguments.len() {
-                    Err(CompilationException::wrong_arity(location, &reference, expected_types.len(), arguments.len()))
+                    Err(LocatedException::wrong_arity(location, &reference, expected_types.len(), arguments.len()))
                 } else {
                     let mut typed_arguments = Vec::new();
                     for (argument, expected_type) in arguments.into_iter().zip(expected_types.into_iter()) {
@@ -76,14 +76,14 @@ impl TypeCheckedInstruction {
                 if context.find_value_type(location.clone(), &reference)?.is_char() {
                     Ok(Self::Increment(reference))
                 } else {
-                    Err(CompilationException::increment_non_char(location))
+                    Err(LocatedException::increment_non_char(location))
                 }
             }
             Instruction::Decrement(Located { location, value: reference }) => {
                 if context.find_value_type(location.clone(), &reference)?.is_char() {
                     Ok(Self::Decrement(reference))
                 } else {
-                    Err(CompilationException::decrement_non_char(location))
+                    Err(LocatedException::decrement_non_char(location))
                 }
             }
             Instruction::Declaration(target, Located { location: descriptor_location, value: type_descriptor }) => {
@@ -109,7 +109,7 @@ impl TypeCheckedInstruction {
                     }
                     None => {
                         let typed_expression = TypedExpression::infer_type(context, value)?;
-                        Err(CompilationException::unexpected_return(location, &typed_expression.r#type))
+                        Err(LocatedException::unexpected_return(location, &typed_expression.r#type))
                     }
                 }
             }

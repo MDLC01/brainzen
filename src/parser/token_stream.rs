@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::path::Path;
 
-use crate::exceptions::{CompilationException, CompilationResult};
+use crate::exceptions::{CompilationResult, LocatedException};
 use crate::lexer::tokens::{Priority, Symbol, Token};
 use crate::location::{Located, LocatedResult, Location, Sequence};
 use crate::reference::Reference;
@@ -164,7 +164,7 @@ impl TokenStream {
         if self.eat(&matcher) {
             Ok(())
         } else {
-            Err(CompilationException::expected(self.previous_location().after(), format!("`{}`", matcher)))
+            Err(LocatedException::expected(self.previous_location().after(), format!("`{}`", matcher)))
         }
     }
 
@@ -177,7 +177,7 @@ impl TokenStream {
         if self.eat(&matcher) {
             Ok(())
         } else {
-            Err(CompilationException::expected(self.location(), format!("`{}`", matcher)))
+            Err(LocatedException::expected(self.location(), format!("`{}`", matcher)))
         }
     }
 
@@ -217,7 +217,7 @@ impl TokenStream {
                 self.advance();
                 Ok(identifier.clone())
             }
-            _ => Err(CompilationException::expected_identifier(self.location()))
+            _ => Err(LocatedException::expected_identifier(self.location()))
         }
     }
 
@@ -229,7 +229,7 @@ impl TokenStream {
                 self.advance();
                 Ok(characters.clone())
             }
-            _ => Err(CompilationException::expected_string(self.location()))
+            _ => Err(LocatedException::expected_string(self.location()))
         }
     }
 
@@ -241,7 +241,7 @@ impl TokenStream {
                 self.advance();
                 Ok(value)
             }
-            _ => Err(CompilationException::expected_number(self.location()))
+            _ => Err(LocatedException::expected_number(self.location()))
         }
     }
 
@@ -253,7 +253,7 @@ impl TokenStream {
                 self.advance();
                 Ok(value)
             }
-            _ => Err(CompilationException::expected_character(self.location()))
+            _ => Err(LocatedException::expected_character(self.location()))
         }
     }
 
@@ -265,7 +265,7 @@ impl TokenStream {
                 self.advance();
                 Ok(native_code)
             }
-            _ => Err(CompilationException::expected_native_code(self.location()))
+            _ => Err(LocatedException::expected_native_code(self.location()))
         }
     }
 
@@ -374,7 +374,7 @@ impl<T, E> ChoiceState<T, E> {
 pub(super) struct ParseChoice<'a, T> {
     tokens: &'a mut TokenStream,
     start_location: Location,
-    state: ChoiceState<T, CompilationException>,
+    state: ChoiceState<T, LocatedException>,
 }
 
 impl<T> ParseChoice<'_, T> {
@@ -397,20 +397,20 @@ impl<T> ParseChoice<'_, T> {
 
     /// Returns the result of the first parser that succeeded.
     ///
-    /// If no parser succeeded, returns the [`CompilationException`] corresponding to the first
+    /// If no parser succeeded, returns the [`LocatedException`] corresponding to the first
     /// parser that read at least one token. If no parser read at least one token, a generic
     /// "expected" compilation exception is returned.
     #[inline]
     pub fn parse(self, description: impl Display) -> CompilationResult<T> {
         match self.state {
-            ChoiceState::Nothing => Err(CompilationException::expected(self.tokens.location(), description)),
+            ChoiceState::Nothing => Err(LocatedException::expected(self.tokens.location(), description)),
             ChoiceState::Error(_, error) => Err(error),
             ChoiceState::Value(value) => Ok(value),
         }
     }
 
     /// Returns the located result of the first parser that succeeded. If no parser succeeded,
-    /// returns a [`CompilationException`].
+    /// returns a [`LocatedException`].
     #[inline]
     pub fn locate(self, description: impl Display) -> LocatedResult<T> {
         let location = self.tokens.location_from(&self.start_location);
@@ -496,7 +496,7 @@ pub(super) trait Construct: Sized {
             accumulator.push(item);
             if !tokens.eat(&separator) {
                 if !tokens.eat(&delimiter) {
-                    return Err(CompilationException::expected(tokens.location(), format!("{} or {}", separator, delimiter)));
+                    return Err(LocatedException::expected(tokens.location(), format!("{} or {}", separator, delimiter)));
                 }
                 break;
             }

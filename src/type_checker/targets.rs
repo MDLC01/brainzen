@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use crate::exceptions::{CompilationException, CompilationResult};
+use crate::exceptions::{LocatedException, CompilationResult};
 use crate::location::{Located, Location, Sequence};
 use crate::parser::target::{AssignmentTarget, AssignmentTargetDestination, DefinitionTarget, DefinitionTargetDestination, Target};
 use crate::reference::Reference;
@@ -22,7 +22,7 @@ where
         Type::Product(factors) => {
             debug_assert_ne!(factors.len(), 1);
             if tuple_targets.len() != factors.len() {
-                Err(CompilationException::invalid_unpack_size(location, factors.len(), tuple_targets.len()))
+                Err(LocatedException::invalid_unpack_size(location, factors.len(), tuple_targets.len()))
             } else {
                 tuple_targets.into_iter()
                     .zip(factors)
@@ -33,7 +33,7 @@ where
             }
         }
         _ => {
-            Err(CompilationException::unpack_non_tuple(location, expected_type))
+            Err(LocatedException::unpack_non_tuple(location, expected_type))
         }
     }
 }
@@ -50,7 +50,7 @@ impl TypeCheckedDefinitionTarget {
                         Ok(Self::Destination(expected_type, identifier))
                     }
                     Some(Located { location: initial_location, value: _ }) => {
-                        Err(CompilationException::identifier_appears_multiple_times_in_target(location, identifier, initial_location))
+                        Err(LocatedException::identifier_appears_multiple_times_in_target(location, identifier, initial_location))
                     }
                 }
             }
@@ -114,11 +114,11 @@ impl TypeCheckedAssignmentTargetDestination {
                 if r#type.is_assignable_to(expected_type) {
                     Ok(Self { variable: reference, offset: 0 })
                 } else {
-                    Err(CompilationException::wrong_type(location, expected_type, r#type))
+                    Err(LocatedException::wrong_type(location, expected_type, r#type))
                 }
             }
             AssignmentTargetDestination::Subscript(..) => {
-                Err(CompilationException::unimplemented_arrays(location))
+                Err(LocatedException::unimplemented_arrays(location))
             }
         }
     }

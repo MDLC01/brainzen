@@ -1,4 +1,4 @@
-use crate::exceptions::{CompilationException, CompilationResult};
+use crate::exceptions::{LocatedException, CompilationResult};
 use crate::lexer::tokens::{Priority, Symbol};
 use crate::location::{Located, LocatedResult, Sequence};
 use crate::reference::Reference;
@@ -85,7 +85,7 @@ impl Expression {
                 let value = tokens.read_integer()?;
                 match value.try_into() {
                     Ok(value) => Ok(Self::IntegerLiteral(value)),
-                    Err(_) => Err(CompilationException::invalid_char_literal(location))
+                    Err(_) => Err(LocatedException::invalid_char_literal(location))
                 }
             })
             .locate("value")?;
@@ -109,7 +109,7 @@ impl Expression {
                 let slice = Self::Slice { array: operand.boxed(), start: index.boxed(), stop: index_stop.boxed() };
                 Self::locate_postfix_operations(tokens, Located::new(location, slice))
             } else {
-                Err(CompilationException::expected(tokens.location(), format!("{} or {}", Symbol::CloseBracket, Symbol::Colon)))
+                Err(LocatedException::expected(tokens.location(), format!("{} or {}", Symbol::CloseBracket, Symbol::Colon)))
             }
         } else {
             Ok(operand)

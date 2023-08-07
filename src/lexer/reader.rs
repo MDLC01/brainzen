@@ -1,7 +1,7 @@
 use std::mem;
 use std::path::Path;
 
-use crate::exceptions::{CompilationException, CompilationResult};
+use crate::exceptions::{LocatedException, CompilationResult};
 use crate::lexer::tokens::Symbol;
 use crate::location::{Located, Location};
 
@@ -253,7 +253,7 @@ impl Reader {
     pub fn expect_digit(&mut self, radix: u32) -> CompilationResult<u32> {
         let location = self.location();
         self.eat_digit(radix)
-            .ok_or(CompilationException::expected_digit(location, radix))
+            .ok_or(LocatedException::expected_digit(location, radix))
     }
 
     /// Reads a character that is part of a character or string literal.
@@ -277,17 +277,17 @@ impl Reader {
                     Some('\'') => b'\'',
                     Some('x') => (self.expect_digit(16)? * 16 + self.expect_digit(16)?) as u8,
                     Some(c) if c != '\n' => {
-                        return Err(CompilationException::invalid_escape_sequence(location.extended_to(&escape_location)));
+                        return Err(LocatedException::invalid_escape_sequence(location.extended_to(&escape_location)));
                     }
                     _ => {
-                        return Err(CompilationException::unterminated_string_literal(escape_location, delimiter));
+                        return Err(LocatedException::unterminated_string_literal(escape_location, delimiter));
                     }
                 };
                 Ok(Located::new(self.location_from(location), escaped_character))
             }
             // Invalid character
             Some(c) if !c.is_ascii() || c.is_control() => {
-                Err(CompilationException::invalid_character_in_literal(location))
+                Err(LocatedException::invalid_character_in_literal(location))
             }
             // Valid (ASCII, non-control) character
             Some(c) if c != '\n' => {
@@ -295,7 +295,7 @@ impl Reader {
             }
             // EOL / EOF
             _ => {
-                Err(CompilationException::unterminated_string_literal(location, delimiter))
+                Err(LocatedException::unterminated_string_literal(location, delimiter))
             }
         }
     }

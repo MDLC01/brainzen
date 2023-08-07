@@ -1,4 +1,4 @@
-use crate::exceptions::{CompilationException, CompilationResult};
+use crate::exceptions::{LocatedException, CompilationResult};
 use crate::location::Located;
 use crate::parser::expression::Expression;
 use crate::reference::Reference;
@@ -49,7 +49,7 @@ impl TypedExpression {
                         expression: TypeCheckedExpression::Char(c),
                     })
                 } else {
-                    Err(CompilationException::does_not_fit_in_char(location, value))
+                    Err(LocatedException::does_not_fit_in_char(location, value))
                 }
             }
             Expression::TupleLiteral(elements) => {
@@ -65,7 +65,7 @@ impl TypedExpression {
                 })
             }
             Expression::ArrayLiteral(_elements) => {
-                Err(CompilationException::unimplemented_arrays(location))
+                Err(LocatedException::unimplemented_arrays(location))
             }
             Expression::Variable(Located { location, value: reference }) => {
                 let r#type = context.find_value_type(location, &reference)?;
@@ -92,16 +92,16 @@ impl TypedExpression {
                 })
             }
             Expression::Subscript { .. } => {
-                Err(CompilationException::unimplemented_arrays(location))
+                Err(LocatedException::unimplemented_arrays(location))
             }
             Expression::Slice { .. } => {
-                Err(CompilationException::unimplemented_arrays(location))
+                Err(LocatedException::unimplemented_arrays(location))
             }
             Expression::FunctionCall(reference, _)
             if reference == "print"
                 || reference == "println"
                 || reference == "log" => {
-                Err(CompilationException::not_a_function(location, &reference))
+                Err(LocatedException::not_a_function(location, &reference))
             }
             Expression::FunctionCall(reference, arguments)
             if reference == "input" => {
@@ -111,7 +111,7 @@ impl TypedExpression {
                         expression: TypeCheckedExpression::InputCall,
                     })
                 } else {
-                    Err(CompilationException::wrong_arity(location, &reference, 0, arguments.len()))
+                    Err(LocatedException::wrong_arity(location, &reference, 0, arguments.len()))
                 }
             }
             Expression::FunctionCall(reference, arguments) => {
@@ -120,7 +120,7 @@ impl TypedExpression {
                     Some(return_type) => {
                         let expected_types = signature.argument_types();
                         if arguments.len() != expected_types.len() {
-                            Err(CompilationException::wrong_arity(location, &reference, expected_types.len(), arguments.len()))
+                            Err(LocatedException::wrong_arity(location, &reference, expected_types.len(), arguments.len()))
                         } else {
                             let index = context.find_subroutine_index(location.clone(), &reference)?;
                             let typed_arguments = arguments.into_iter()
@@ -134,7 +134,7 @@ impl TypedExpression {
                         }
                     }
                     None => {
-                        Err(CompilationException::not_a_function(location, &reference))
+                        Err(LocatedException::not_a_function(location, &reference))
                     }
                 }
             }
@@ -149,7 +149,7 @@ impl TypedExpression {
         if typed_expression.r#type.is_assignable_to(expected_type) {
             Ok(typed_expression)
         } else {
-            Err(CompilationException::wrong_type(location, expected_type, &typed_expression.r#type))
+            Err(LocatedException::wrong_type(location, expected_type, &typed_expression.r#type))
         }
     }
 
@@ -159,7 +159,7 @@ impl TypedExpression {
         match typed_expression.r#type {
             Type::Char(PredictedChar::Exact(value)) => Ok(value as i32),
             Type::Integer(value) => Ok(value),
-            r#type => Err(CompilationException::expected_constant_integer(location, &r#type))
+            r#type => Err(LocatedException::expected_constant_integer(location, &r#type))
         }
     }
 }
