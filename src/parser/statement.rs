@@ -18,7 +18,7 @@ pub enum Instruction {
     Assignment(Located<AssignmentTarget>, Located<Expression>),
     Return(Located<Expression>),
     Capture(Located<Expression>),
-    ContextSnapshot(Option<Located<Reference>>),
+    ContextSnapshot(Option<Located<String>>),
 }
 
 impl Construct for Instruction {
@@ -82,10 +82,10 @@ impl Construct for Instruction {
             })
             // Context snapshot on variable
             .branch(|tokens| {
-                let reference = Reference::locate(tokens)?;
+                let identifier = tokens.locate_word()?;
                 tokens.consume(Symbol::QuestionMark)?;
                 tokens.consume(Symbol::Semicolon)?;
-                Ok(Self::ContextSnapshot(Some(reference)))
+                Ok(Self::ContextSnapshot(Some(identifier)))
             })
             // Global context snapshot
             .branch(|tokens| {

@@ -1,7 +1,6 @@
+use std::iter;
 use std::collections::{BTreeMap, HashMap};
 use std::hash::Hash;
-use std::iter;
-
 
 pub trait OptionFlatten<'a, T> {
     /// Flattens an `Option<&Option<T>>` to an `Option<&T>`.
@@ -113,10 +112,6 @@ pub trait VecExtensions<T> {
     /// ```
     fn get_single_element(self) -> Option<T>;
 
-    /// If this vector contains a single element `x`, returns [`Ok(x)`]. Otherwise, returns
-    /// [`Err(self)`].
-    fn get_single_element_or_self(self) -> Result<T, Self> where Self: Sized;
-
     /// Puts an element at a specific index in a [`Vec`]. If the vector is not long enough, it is
     /// resized to `index + 1` and unspecified elements are set to `T::default`.
     fn put(&mut self, index: usize, element: T) where T: Default;
@@ -138,14 +133,6 @@ impl<T> VecExtensions<T> for Vec<T> {
             None
         } else {
             self.pop()
-        }
-    }
-
-    fn get_single_element_or_self(mut self) -> Result<T, Self> where Self: Sized {
-        if self.len() == 1 {
-            Ok(self.pop().unwrap())
-        } else {
-            Err(self)
         }
     }
 

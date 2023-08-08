@@ -221,6 +221,14 @@ impl TokenStream {
         }
     }
 
+    /// If the next token is a word, returns its value and location and advances the stream.
+    /// Otherwise, returns an error.
+    pub fn locate_word(&mut self) -> LocatedResult<String> {
+        let location = self.location();
+        let word = self.read_word()?;
+        Ok(Located::new(location, word))
+    }
+
     /// If the next token is a string literal, returns its value and advances the stream. Otherwise,
     /// returns an error.
     pub fn read_string(&mut self) -> CompilationResult<Sequence<u8>> {

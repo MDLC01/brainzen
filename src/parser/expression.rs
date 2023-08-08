@@ -1,19 +1,21 @@
-use crate::exceptions::{LocatedException, CompilationResult};
+use crate::exceptions::{CompilationResult, LocatedException};
 use crate::lexer::tokens::{Priority, Symbol};
 use crate::location::{Located, LocatedResult, Sequence};
-use crate::reference::Reference;
 use crate::parser::token_stream::{Construct, TokenStream};
-use crate::utils::extensions::VecExtensions;
+use crate::reference::Reference;
+use crate::utils::product::{MaybeProduct2, Product};
 
 /// An expression is a peace of code that can be evaluated.
 #[derive(Debug)]
 pub enum Expression {
+    /// The unit expression: `()`.
+    Unit,
     /// A character literal.
     CharacterLiteral(u8),
     /// An integer literal.
     IntegerLiteral(i32),
     /// A tuple literal.
-    TupleLiteral(Sequence<Expression>),
+    TupleLiteral(Product<Located<Expression>, 2>),
     /// An array literal.
     ArrayLiteral(Sequence<Expression>),
     /// A reference to a variable.
@@ -38,7 +40,11 @@ impl Expression {
                 Located::new(location.clone(), literal)
             })
             .collect();
-        Self::TupleLiteral(elements)
+        match elements {
+            MaybeProduct2::None => Self::Unit,
+            MaybeProduct2::Single(element) => element.value,
+            MaybeProduct2::Product(elements) => Self::TupleLiteral(elements),
+        }
     }
 
     /// Parses an operand for a prefix or infix operation.
@@ -180,9 +186,10 @@ impl Expression {
         let start_location = tokens.location();
         let elements = Expression::parse_separated_sequence(tokens, Symbol::Comma)?;
         let location = tokens.location_from(&start_location);
-        match elements.get_single_element_or_self() {
-            Ok(value) => Ok(value),
-            Err(elements) => Ok(Located::new(location, Self::TupleLiteral(elements)))
+        match elements.into() {
+            MaybeProduct2::None => Ok(Located::new(location, Self::Unit)),
+            MaybeProduct2::Single(element) => Ok(element),
+            MaybeProduct2::Product(elements) => Ok(Located::new(location, Self::TupleLiteral(elements))),
         }
     }
 }

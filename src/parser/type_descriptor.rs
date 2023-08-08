@@ -7,6 +7,7 @@ use crate::reference::Reference;
 /// A type descriptor is a sort of expression that corresponds to a type instead of a runtime value.
 #[derive(Debug)]
 pub enum TypeDescriptor {
+    Unit,
     Reference(Located<Reference>),
     Product(Sequence<TypeDescriptor>),
     Array(Located<Box<TypeDescriptor>>),
@@ -15,9 +16,13 @@ pub enum TypeDescriptor {
 impl TypeDescriptor {
     fn parse_operand(tokens: &mut TokenStream) -> CompilationResult<Self> {
         if tokens.eat(Symbol::OpenParenthesis) {
-            let descriptor = TypeDescriptor::parse(tokens)?;
-            tokens.expect(Symbol::CloseParenthesis)?;
-            Ok(descriptor)
+            if tokens.eat(Symbol::CloseParenthesis) {
+                Ok(Self::Unit)
+            } else {
+                let descriptor = TypeDescriptor::parse(tokens)?;
+                tokens.expect(Symbol::CloseParenthesis)?;
+                Ok(descriptor)
+            }
         } else {
             let reference = Reference::locate(tokens)?;
             Ok(Self::Reference(reference))

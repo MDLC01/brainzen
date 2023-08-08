@@ -1,85 +1,120 @@
-use crate::exceptions::{LocatedException, CompilationResult};
+use std::fmt::{Display, Formatter};
+use std::rc::Rc;
+
+use crate::exceptions::{CompilationException, CompilationResult};
 use crate::lexer::tokens::Symbol;
-use crate::location::Location;
-use crate::type_checker::types::{PredictedChar, Type};
+use crate::location::{Located, Location};
+use crate::type_checker::types::{Type, Value};
+use crate::utils::product::Product;
 
-macro_rules! define_operations {
-    (
-        $( #[$enum_attribute:meta] )*
-        $visibility:vis $enum_name:ident($location:ident, $( $operand_name:ident ), + $(,)?) {
-            $(
-                $( #[$operation_attribute:meta] )*
-                $symbol:pat => $operation_name:ident {
-                    $(
-                        $( ($( $operand_type:pat ), +) ) | + $( if $condition:expr )? => $return_type:expr
-                    ), + $(,)?
-                }
-            )+
-        }
-    ) => {
-        $( #[$enum_attribute] )*
-        $visibility enum $enum_name {
-            $(
-                $( #[$operation_attribute] )*
-                $operation_name(Type)
-            ), +
-        }
+/// An `Operation` has a [result type](Self::result_type) and can be [applied to values](Self::apply).
+pub trait Operation<const N: usize>: Copy {
+    /// Returns the operation corresponding to an operator and the types of its operands.
+    fn from_untyped(location: Location, operator: Symbol, operands: [&Type; N]) -> CompilationResult<Self>;
 
-        impl $enum_name {
-            pub(super) fn from_untyped($location: Location, operator: Symbol, $( $operand_name: Type ), +) -> CompilationResult<Self> {
-                match (operator, [$( $operand_name ), +]) {
-                    $(
-                        $(
-                            ($symbol, $( [$( $operand_type ), +] ) | +) $( if $condition )? => {
-                                Ok(Self::$operation_name($return_type))
-                            }
-                        )+
-                    )+
-                    (operator, [$( $operand_name ), +]) => {
-                        Err(LocatedException::invalid_operator($location, operator, &[$( $operand_name ), +]))
-                    }
-                }
-            }
+    /// Returns the type of the result of this operation.
+    fn result_type(self) -> Type;
 
-            /// Returns the type of the result of this operation.
-            pub fn get_result_type(&self) -> Type {
-                match self {
-                    $( Self::$operation_name(return_type) => return_type.to_owned(), ) +
-                }
-            }
-
-            /// If this operation returns a `char`, returns the optional predicted value.
-            pub fn get_predicted_char_value(&self) -> Option<u8> {
-                match self {
-                    $( Self::$operation_name(Type::Char(PredictedChar::Exact(value))) => Some(*value), ) +
-                    _ => None,
-                }
-            }
-        }
-    };
+    /// Applies this operation to a constant value.
+    fn apply(self, operands: [Located<Value>; N]) -> CompilationResult<Value>;
 }
 
-define_operations! {
-    #[derive(Clone, Debug)]
-    pub UnaryOperation(location, operand) {
-        /// Negates a `char`.
-        Symbol::Bang => Negation {
-            (Type::Char(PredictedChar::Exact(value))) => Type::bool(value == 0),
-            (Type::Char(_)) => Type::BOOL,
+
+#[derive(Copy, Clone, Debug)]
+pub enum UnaryOperation {
+    Negation,
+    BooleanNormalization,
+    Opposition,
+}
+
+impl Operation<1> for UnaryOperation {
+    fn from_untyped(location: Location, operator: Symbol, operands: [&Type; 1]) -> CompilationResult<Self> {
+        match (operator, operands) {
+            (Symbol::Bang, [Type::Char]) => Ok(Self::Negation),
+            (Symbol::DoubleBang, [Type::Char]) => Ok(Self::BooleanNormalization),
+            (Symbol::Minus, [Type::Char]) => Ok(Self::Opposition),
+            _ => Err(CompilationException::invalid_operator(location, operator, &operands))
         }
-        /// Converts the value of a `char` to a boolean value.
-        Symbol::DoubleBang => BooleanNormalization {
-            (Type::Char(PredictedChar::Exact(value))) => Type::bool(value != 0),
-            (Type::Char(_)) => Type::BOOL,
+    }
+
+    fn result_type(self) -> Type {
+        match self {
+            Self::Negation => Type::Char,
+            Self::BooleanNormalization => Type::Char,
+            Self::Opposition => Type::Char,
         }
-        /// Opposes a `char`. That is, computes `0 - x`.
-        Symbol::Minus => Opposition {
-            (Type::Char(PredictedChar::Exact(value))) => Type::char(value.wrapping_neg()),
-            (Type::Char(_)) => Type::CHAR,
+    }
+
+    fn apply(self, [operand]: [Located<Value>; 1]) -> CompilationResult<Value> {
+        match self {
+            Self::Negation => Ok(Value::bool(!operand.into_bool()?)),
+            Self::BooleanNormalization => Ok(Value::bool(operand.into_bool()?)),
+            Self::Opposition => Ok(Value::Char(operand.into_char()?.wrapping_neg())),
         }
     }
 }
 
+impl Display for UnaryOperation {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Self::Negation => write!(f, "negation"),
+            Self::BooleanNormalization => write!(f, "boolean normalization"),
+            Self::Opposition => write!(f, "opposition"),
+        }
+    }
+}
+
+
+#[derive(Copy, Clone, Debug)]
+pub enum BinaryOperation {
+    /// Tests if two values of the same type are equal.
+    EqualityTest,
+    /// Tests if two values of the same type are different.
+    DifferenceTest,
+    /// Tests if the left operand is strictly less than the right operand.
+    StrictInequalityTest,
+    /// Tests if the left operand is less than or equal to the right operand.
+    LargeInequalityTest,
+    /// Tests if the left operand is strictly greater than the right operand.
+    InverseStrictInequalityTest,
+    /// Tests if the left operand is greater than or equal to the right operand.
+    InverseLargeInequalityTest,
+    /// Computes the logical conjunction of two [`char`s](Type::Char).
+    Conjunction,
+    /// Computes the logical disjunction of two [`char`s](Type::Char).
+    ///
+    /// The result of this operation is a boolean value (either 0 or 1). To get the value of the
+    /// first non-zero operand, use [`Self::Disjunction`].
+    BooleanDisjunction,
+    /// Returns the left-hand side if non-zero, the right-hand side otherwise.
+    ///
+    /// To get a normalized boolean value (either 0 or 1), use [`Self::BooleanDisjunction`].
+    Disjunction,
+    /// Computes the sum of two [`char`s](Type::Char).
+    ///
+    /// Overflows result in a wrap around.
+    Addition,
+    /// Computes the subtraction of two [`char`s](Type::Char).
+    ///
+    /// Overflows result in a wrap around.
+    Subtraction,
+    /// Computes the product of two [`char`s](Type::Char).
+    ///
+    /// Overflows result in a wrap around.
+    Multiplication,
+    /// Computes the floor division of two [`char`s](Type::Char).
+    ///
+    /// Division by zero has an undefined result.
+    Division,
+    /// Computes the remainder of the euclidean division of two [`char`s](Type::Char).
+    ///
+    /// Modulo zero has an undefined result.
+    Modulo,
+    /// Computes the euclidean division of two [`char`s](Type::Char).
+    ///
+    /// Division by zero has an undefined result.
+    EuclideanDivision,
+}
 
 fn division(lhs: u8, rhs: u8) -> u8 {
     if rhs == 0 {
@@ -89,7 +124,7 @@ fn division(lhs: u8, rhs: u8) -> u8 {
     }
 }
 
-fn remainder(lhs: u8, rhs: u8) -> u8 {
+fn modulo(lhs: u8, rhs: u8) -> u8 {
     if rhs == 0 {
         0
     } else {
@@ -97,123 +132,97 @@ fn remainder(lhs: u8, rhs: u8) -> u8 {
     }
 }
 
-define_operations! {
-    #[derive(Clone, Debug)]
-    pub BinaryOperation(location, left_operand, right_operand) {
-        /// Tests if two values of the same type are equal.
-        Symbol::DoubleEqual => EqualityTest {
-            (Type::Char(PredictedChar::Exact(lhs)), Type::Char(PredictedChar::Exact(rhs))) => Type::bool(lhs == rhs),
-            (Type::Integer(lhs), Type::Integer(rhs)) => Type::bool(lhs == rhs),
-            (Type::Char(_), Type::Char(_)) | (Type::Char(_), Type::Integer(_)) | (Type::Integer(_), Type::Char(_)) => Type::BOOL,
-            (lhs, rhs) if rhs.is_same_concrete_type(&lhs) => Type::BOOL,
+impl Operation<2> for BinaryOperation {
+    fn from_untyped(location: Location, operator: Symbol, operands: [&Type; 2]) -> CompilationResult<Self> {
+        match (operator, operands) {
+            (Symbol::DoubleEqual, _) => Ok(Self::EqualityTest),
+            (Symbol::BangEqual, _) => Ok(Self::DifferenceTest),
+            (Symbol::LessThan, [Type::Char, Type::Char]) => Ok(Self::StrictInequalityTest),
+            (Symbol::LessThanEqual, [Type::Char, Type::Char]) => Ok(Self::LargeInequalityTest),
+            (Symbol::GreaterThan, [Type::Char, Type::Char]) => Ok(Self::InverseStrictInequalityTest),
+            (Symbol::GreaterThanEqual, [Type::Char, Type::Char]) => Ok(Self::InverseLargeInequalityTest),
+            (Symbol::DoubleAmpersand, [Type::Char, Type::Char]) => Ok(Self::Conjunction),
+            (Symbol::DoublePipe, [Type::Char, Type::Char]) => Ok(Self::BooleanDisjunction),
+            (Symbol::DoubleQuestionMark, [Type::Char, Type::Char]) => Ok(Self::Disjunction),
+            (Symbol::Plus, [Type::Char, Type::Char]) => Ok(Self::Addition),
+            (Symbol::Minus, [Type::Char, Type::Char]) => Ok(Self::Subtraction),
+            (Symbol::Star, [Type::Char, Type::Char]) => Ok(Self::Multiplication),
+            (Symbol::Slash, [Type::Char, Type::Char]) => Ok(Self::Division),
+            (Symbol::Percent, [Type::Char, Type::Char]) => Ok(Self::Modulo),
+            (Symbol::DoublePercent, [Type::Char, Type::Char]) => Ok(Self::EuclideanDivision),
+            _ => Err(CompilationException::invalid_operator(location, operator, &operands))
         }
-        /// Tests if two values of the same type are different.
-        Symbol::BangEqual => DifferenceTest {
-            (Type::Char(PredictedChar::Exact(lhs)), Type::Char(PredictedChar::Exact(rhs))) => Type::bool(lhs != rhs),
-            (Type::Char(_), Type::Char(_)) => Type::BOOL,
-            (Type::Integer(lhs), Type::Integer(rhs)) => Type::bool(lhs != rhs),
-            (lhs, rhs) if rhs.is_same_concrete_type(&lhs) => Type::BOOL,
-        }
-        /// Tests if the left operand is strictly less than the right operand.
-        Symbol::LessThan => StrictInequalityTest {
-            (Type::Char(PredictedChar::Exact(lhs)), Type::Char(PredictedChar::Exact(rhs))) => Type::bool(lhs < rhs),
-            (Type::Char(_), Type::Char(_)) => Type::BOOL,
-            (Type::Integer(lhs), Type::Integer(rhs)) => Type::bool(lhs < rhs),
-        }
-        /// Tests if the left operand is less than or equal to the right operand.
-        Symbol::LessThanEqual => LargeInequalityTest {
-            (Type::Char(PredictedChar::Exact(lhs)), Type::Char(PredictedChar::Exact(rhs))) => Type::bool(lhs <= rhs),
-            (Type::Char(_), Type::Char(_)) => Type::BOOL,
-            (Type::Integer(lhs), Type::Integer(rhs)) => Type::bool(lhs <= rhs),
-        }
-        /// Tests if the left operand is strictly greater than the right operand.
-        Symbol::GreaterThan => InverseStrictInequalityTest {
-            (Type::Char(PredictedChar::Exact(lhs)), Type::Char(PredictedChar::Exact(rhs))) => Type::bool(lhs > rhs),
-            (Type::Char(_), Type::Char(_)) => Type::BOOL,
-            (Type::Integer(lhs), Type::Integer(rhs)) => Type::bool(lhs > rhs),
-        }
-        /// Tests if the left operand is greater than or equal to the right operand.
-        Symbol::GreaterThanEqual => InverseLargeInequalityTest {
-            (Type::Char(PredictedChar::Exact(lhs)), Type::Char(PredictedChar::Exact(rhs))) => Type::bool(lhs >= rhs),
-            (Type::Char(_), Type::Char(_)) => Type::BOOL,
-            (Type::Integer(lhs), Type::Integer(rhs)) => Type::bool(lhs >= rhs),
-        }
-        /// Computes the logical conjunction of two `char`s.
-        Symbol::DoubleAmpersand => Conjunction {
-            (Type::Char(PredictedChar::Exact(lhs)), Type::Char(PredictedChar::Exact(rhs))) => Type::bool((lhs != 0) && (rhs != 0)),
-            (Type::Char(_), Type::Char(_)) => Type::BOOL,
-            (Type::Integer(lhs), Type::Integer(rhs)) => Type::bool((lhs != 0) && (rhs != 0)),
-        }
-        /// Computes the logical disjunction of two `char`s.
-        ///
-        /// The result of this operation is a boolean value (either 0 or 1). To get the value of the
-        /// first non-zero operand, use [`Self::Disjunction`].
-        Symbol::DoublePipe => BooleanDisjunction {
-            (Type::Char(PredictedChar::Exact(lhs)), Type::Char(PredictedChar::Exact(rhs))) => Type::bool((lhs != 0) || (rhs != 0)),
-            (Type::Char(_), Type::Char(_)) => Type::BOOL,
-            (Type::Integer(lhs), Type::Integer(rhs)) => Type::bool((lhs != 0) || (rhs != 0)),
-        }
-        /// Returns the left-hand side if non-zero, the right-hand side otherwise.
-        ///
-        /// To get a normalized boolean value (either 0 or 1), use [`Self::BooleanDisjunction`].
-        Symbol::DoubleQuestionMark => Disjunction {
-            (Type::Char(PredictedChar::Exact(lhs)), Type::Char(PredictedChar::Exact(rhs))) => Type::char(if lhs != 0 {lhs} else {rhs}),
-            (Type::Char(_), Type::Char(_)) => Type::CHAR,
-            (Type::Integer(lhs), Type::Integer(rhs)) => Type::Integer(if lhs != 0 {lhs} else {rhs}),
-        }
-        /// Computes the sum of two `char`s.
-        ///
-        /// Overflows result in a wrap around.
-        Symbol::Plus => Addition {
-            (Type::Char(PredictedChar::Exact(lhs)), Type::Char(PredictedChar::Exact(rhs))) => Type::char(lhs.wrapping_add(rhs)),
-            (Type::Integer(lhs), Type::Integer(rhs)) => Type::Integer(lhs + rhs),
-            (Type::Char(_) | Type::Integer(_), Type::Char(_) | Type::Integer(_)) => Type::CHAR,
-        }
-        /// Computes the subtraction of two `char`s.
-        ///
-        /// Overflows result in a wrap around.
-        Symbol::Minus => Subtraction {
-            (Type::Char(PredictedChar::Exact(lhs)), Type::Char(PredictedChar::Exact(rhs))) => Type::char(lhs.wrapping_sub(rhs)),
-            (Type::Integer(lhs), Type::Integer(rhs)) => Type::Integer(lhs - rhs),
-            (Type::Char(_) | Type::Integer(_), Type::Char(_) | Type::Integer(_)) => Type::CHAR,
-        }
-        /// Computes the product of two `char`s.
-        ///
-        /// Overflows result in a wrap around.
-        Symbol::Star => Multiplication {
-            (Type::Char(PredictedChar::Exact(lhs)), Type::Char(PredictedChar::Exact(rhs))) => Type::char(lhs.wrapping_mul(rhs)),
-            (Type::Integer(lhs), Type::Integer(rhs)) => Type::Integer(lhs * rhs),
-            (Type::Char(_) | Type::Integer(_), Type::Char(_) | Type::Integer(_)) => Type::CHAR,
-        }
-        /// Computes the division of two `char`s.
-        ///
-        /// Division by zero has an undefined result.
-        Symbol::Slash => Division {
-            (Type::Char(PredictedChar::Exact(lhs)), Type::Char(PredictedChar::Exact(rhs))) => Type::char(division(lhs, rhs)),
-            (Type::Integer(lhs), Type::Integer(rhs)) => Type::Integer(lhs / rhs),
-            (Type::Char(_) | Type::Integer(_), Type::Char(_) | Type::Integer(_)) => Type::CHAR,
-        }
-        /// Computes the remainder of the euclidean division of the left `char` by the right `char`.
-        ///
-        /// Modulo zero has an undefined result.
-        Symbol::Percent => Modulo {
-            (Type::Char(_), Type::Char(PredictedChar::Exact(0))) => Type::CHAR,
-            (Type::Char(PredictedChar::Exact(lhs)), Type::Char(PredictedChar::Exact(rhs))) => Type::char(remainder(lhs, rhs)),
-            (Type::Integer(lhs), Type::Integer(rhs)) => Type::Integer(lhs % rhs),
-            (Type::Char(_) | Type::Integer(_), Type::Char(_) | Type::Integer(_)) => Type::CHAR,
-        }
-        /// Computes the euclidean division of the left `char` by the right `char`.
-        ///
-        /// Division by zero has an undefined result.
-        Symbol::DoublePercent => EuclideanDivision {
-            (Type::Char(PredictedChar::Exact(lhs)), Type::Char(PredictedChar::Exact(rhs))) => {
-                let div = division(lhs, rhs);
-                let rem = remainder(lhs, rhs);
-                Type::Product(vec![Type::char(div), Type::char(rem)])
-            },
-            (Type::Integer(lhs), Type::Integer(rhs)) => Type::Product(vec![Type::Integer(lhs / rhs), Type::Integer(lhs % rhs)]),
-            (Type::Char(_) | Type::Integer(_), Type::Char(_) | Type::Integer(_)) => Type::Product(vec![Type::CHAR, Type::CHAR]),
-        }
+    }
 
+    fn result_type(self) -> Type {
+        match self {
+            Self::EqualityTest => Type::Char,
+            Self::DifferenceTest => Type::Char,
+            Self::StrictInequalityTest => Type::Char,
+            Self::LargeInequalityTest => Type::Char,
+            Self::InverseStrictInequalityTest => Type::Char,
+            Self::InverseLargeInequalityTest => Type::Char,
+            Self::Conjunction => Type::Char,
+            Self::BooleanDisjunction => Type::Char,
+            Self::Disjunction => Type::Char,
+            Self::Addition => Type::Char,
+            Self::Subtraction => Type::Char,
+            Self::Multiplication => Type::Char,
+            Self::Division => Type::Char,
+            Self::Modulo => Type::Char,
+            Self::EuclideanDivision => Type::from_operands(&[Type::Char, Type::Char]),
+        }
+    }
+
+    fn apply(self, [lhs, rhs]: [Located<Value>; 2]) -> CompilationResult<Value> {
+        match self {
+            BinaryOperation::EqualityTest => Ok(Value::bool(lhs == rhs)),
+            BinaryOperation::DifferenceTest => Ok(Value::bool(lhs != rhs)),
+            BinaryOperation::StrictInequalityTest => Ok(Value::bool(lhs.into_char()? < rhs.into_char()?)),
+            BinaryOperation::LargeInequalityTest => Ok(Value::bool(lhs.into_char()? <= rhs.into_char()?)),
+            BinaryOperation::InverseStrictInequalityTest => Ok(Value::bool(lhs.into_char()? > rhs.into_char()?)),
+            BinaryOperation::InverseLargeInequalityTest => Ok(Value::bool(lhs.into_char()? >= rhs.into_char()?)),
+            BinaryOperation::Conjunction => Ok(Value::bool(lhs.into_bool()? && rhs.into_bool()?)),
+            BinaryOperation::BooleanDisjunction => Ok(Value::bool(lhs.into_bool()? || rhs.into_bool()?)),
+            BinaryOperation::Disjunction => Ok(Value::Char({
+                let l = lhs.into_char()?;
+                let r = rhs.into_char()?;
+                if l == 0 { r } else { l }
+            })),
+            BinaryOperation::Addition => Ok(Value::Char(lhs.into_char()?.wrapping_add(rhs.into_char()?))),
+            BinaryOperation::Subtraction => Ok(Value::Char(lhs.into_char()?.wrapping_sub(rhs.into_char()?))),
+            BinaryOperation::Multiplication => Ok(Value::Char(lhs.into_char()?.wrapping_mul(rhs.into_char()?))),
+            BinaryOperation::Division => Ok(Value::Char(division(lhs.into_char()?, rhs.into_char()?))),
+            BinaryOperation::Modulo => Ok(Value::Char(modulo(lhs.into_char()?, rhs.into_char()?))),
+            BinaryOperation::EuclideanDivision => Ok({
+                let l = lhs.into_char()?;
+                let r = rhs.into_char()?;
+                let div = Value::Char(division(l, r));
+                let rem = Value::Char(modulo(l, r));
+                Value::Tuple(Rc::new(Product::new_minimal([div, rem])))
+            }),
+        }
+    }
+}
+
+impl Display for BinaryOperation {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Self::EqualityTest => write!(f, "equality test"),
+            Self::DifferenceTest => write!(f, "difference test"),
+            Self::StrictInequalityTest => write!(f, "strict inequality test"),
+            Self::LargeInequalityTest => write!(f, "large inequality test"),
+            Self::InverseStrictInequalityTest => write!(f, "inverse strict equality test"),
+            Self::InverseLargeInequalityTest => write!(f, "inverse large inequality test"),
+            Self::Conjunction => write!(f, "conjunction"),
+            Self::BooleanDisjunction => write!(f, "boolean disjunction"),
+            Self::Disjunction => write!(f, "disjunction"),
+            Self::Addition => write!(f, "addition"),
+            Self::Subtraction => write!(f, "subtraction"),
+            Self::Multiplication => write!(f, "multiplication"),
+            Self::Division => write!(f, "division"),
+            Self::Modulo => write!(f, "modulo"),
+            Self::EuclideanDivision => write!(f, "euclidean division"),
+        }
     }
 }

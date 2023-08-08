@@ -1,9 +1,10 @@
 use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
 use crate::lexer::tokens::{PUBLIC_KEYWORD, Symbol};
 use crate::location::Location;
 use crate::reference::Reference;
+use crate::type_checker::operations::Operation;
 use crate::type_checker::types::Type;
 
 #[derive(Debug)]
@@ -207,6 +208,16 @@ impl<S> CompilationException<S> {
             .build_without_hint()
     }
 
+    pub fn unknown_variable(source: S, identifier: &str) -> Self {
+        ExceptionBuilder::new_type_error(source, format!("Unknown variable: {}", identifier))
+            .build_without_hint()
+    }
+
+    pub fn unknown_variable_or_constant(source: S, reference: &Reference) -> Self {
+        ExceptionBuilder::new_type_error(source, format!("Unknown variable or constant: {}", reference))
+            .build_without_hint()
+    }
+
     pub fn inaccessible_element(source: S, element_type: &str, reference: &Reference) -> Self {
         ExceptionBuilder::new_type_error(source, format!("{} {} is inaccessible from here", element_type, reference))
             .build(format!("If possible, try making {} public using the {} keyword.", reference, PUBLIC_KEYWORD))
@@ -237,10 +248,10 @@ impl<S> CompilationException<S> {
             .build_without_hint()
     }
 
-    pub fn expected_constant_value(source: S, found_type: &Type) -> Self {
-        ExceptionBuilder::new_expected_found(source, "constant", found_type)
+    pub fn expected_constant_value(source: S) -> Self {
+        ExceptionBuilder::new_expected(source, "constant")
             .with_type(ExceptionType::ConstantEvaluation)
-            .build("The only types that can be used as a constant value are: bool, char, <integer> and tuples.")
+            .build("The only types that can be used as a constant value are: bool, char, and tuples. Function calls are not allowed in constant context.")
     }
 
     pub fn expected_constant_integer(source: S, found_type: &Type) -> Self {
@@ -264,7 +275,7 @@ impl<S> CompilationException<S> {
             .build(format!("Try changing the procedure to a function returning {}.", returned_type))
     }
 
-    pub fn invalid_operator(source: S, operator: Symbol, operand_types: &[Type]) -> Self {
+    pub fn invalid_operator(source: S, operator: Symbol, operand_types: &[&Type]) -> Self {
         let formatted_operand_types = operand_types.iter()
             .enumerate()
             .fold(String::new(), |accumulator, (i, operand)| {
@@ -275,8 +286,26 @@ impl<S> CompilationException<S> {
                 }
             });
         ExceptionBuilder::new_type_error(source, format!(
-            "`{}` is not defined for ({})",
+            "`{}` is not a valid operator for ({})",
             operator,
+            formatted_operand_types,
+        ))
+            .build_without_hint()
+    }
+
+    pub fn invalid_operands<const N: usize>(source: S, operation: impl Operation<N> + Display, operand_types: &[Type]) -> Self {
+        let formatted_operand_types = operand_types.iter()
+            .enumerate()
+            .fold(String::new(), |accumulator, (i, operand)| {
+                if i == 0 {
+                    operand.to_string()
+                } else {
+                    accumulator + ", " + &operand.to_string()
+                }
+            });
+        ExceptionBuilder::new_type_error(source, format!(
+            "Operation {} is not defined for ({})",
+            operation,
             formatted_operand_types,
         ))
             .build_without_hint()
@@ -289,7 +318,7 @@ impl<S> CompilationException<S> {
 
     pub fn expected_string_like(source: S, found_type: &Type) -> Self {
         ExceptionBuilder::new_expected_found(source, "string-like", found_type)
-            .build(format!("String-like values are of type {}, or arrays of string-like values.", Type::CHAR))
+            .build(format!("String-like values are of type {}, or tuple of string-like values.", Type::Char))
     }
 
     pub fn unpack_non_tuple(source: S, value_type: &Type) -> Self {

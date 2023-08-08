@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
 pub mod extensions;
+pub mod product;
 pub mod with_owned;
 
 /// Used to generate unique values using [`UniquenessProvider::next`].

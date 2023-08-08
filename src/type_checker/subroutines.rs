@@ -2,7 +2,7 @@ use crate::exceptions::{LocatedException, CompilationResult};
 use crate::location::{Located, Sequence};
 use crate::parser::namespace_element::{SubroutineArgument, SubroutineBody};
 use crate::parser::type_descriptor::TypeDescriptor;
-use crate::type_checker::scope::ScopeStack;
+use crate::type_checker::scope::{NamespaceContext, SubroutineContext};
 use crate::type_checker::type_checked_statements::TypeCheckedStatement;
 use crate::type_checker::typed_expressions::TypedExpression;
 use crate::type_checker::types::Type;
@@ -15,7 +15,7 @@ pub struct SubroutineSignature {
 }
 
 impl SubroutineSignature {
-    pub(super) fn from_untyped(context: &mut ScopeStack, untyped_arguments: Sequence<SubroutineArgument>, return_type: Option<Located<TypeDescriptor>>) -> CompilationResult<Self> {
+    pub(super) fn from_untyped(context: &mut NamespaceContext, untyped_arguments: Sequence<SubroutineArgument>, return_type: Option<Located<TypeDescriptor>>) -> CompilationResult<Self> {
         let arguments = untyped_arguments.into_iter()
             .map(|Located { location, value: argument }| {
                 let r#type = Type::resolve_descriptor(context, location.clone(), argument.r#type)?;
@@ -28,7 +28,7 @@ impl SubroutineSignature {
         Ok(Self { arguments, return_type })
     }
 
-    pub(super) fn register_variables(&self, context: &mut ScopeStack) -> CompilationResult<()> {
+    pub(super) fn register_variables(&self, context: &mut SubroutineContext) -> CompilationResult<()> {
         for Located { location, value: (identifier, r#type) } in self.arguments.clone() {
             context.register_variable(location, identifier, r#type)?;
         }
@@ -68,7 +68,7 @@ pub enum TypeCheckedSubroutineBody {
 }
 
 impl TypeCheckedSubroutineBody {
-    pub(super) fn type_check(context: &mut ScopeStack, body: SubroutineBody, return_type: Option<&Type>) -> CompilationResult<Self> {
+    pub(super) fn type_check(context: &mut SubroutineContext, body: SubroutineBody, return_type: Option<&Type>) -> CompilationResult<Self> {
         match body {
             SubroutineBody::StatementBlock(block) => {
                 context.with_subscope(|context| {

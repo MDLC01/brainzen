@@ -125,28 +125,24 @@ impl Context {
 
 /// Compiles the evaluation of a unary operation. The result is computed at runtime in the
 /// `destination` cell.
-fn compile_unary_operation(generator: &mut Generator, context: &Context, operation: &UnaryOperation, operand: &TypedExpression, destination: Cell) {
+fn compile_unary_operation(generator: &mut Generator, context: &Context, operation: UnaryOperation, operand: &TypedExpression, destination: Cell) {
     let op = allocate_and_evaluate(generator, context, operand);
-    if let Some(value) = operation.get_predicted_char_value() {
-        generator.generate_set(destination, value);
-        return;
-    }
     match operation {
-        UnaryOperation::Negation(_) => generate! {
+        UnaryOperation::Negation => generate! {
             (generator)
             SET destination 1;
             IF op [
                 DECR destination;
             ];
         },
-        UnaryOperation::BooleanNormalization(_) => generate! {
+        UnaryOperation::BooleanNormalization => generate! {
             (generator)
             RESET destination;
             IF op [
                 INCR destination;
             ];
         },
-        UnaryOperation::Opposition(_) => generate! {
+        UnaryOperation::Opposition => generate! {
             (generator)
             RESET destination;
             LOOP op [
@@ -191,17 +187,13 @@ fn compile_divmod(generator: &mut Generator, lhs: Cell, rhs: Cell, quo: Cell, re
 
 /// Compiles the evaluation of a binary operation. The result is computed at runtime in the
 /// `destination` cell.
-fn compile_binary_operation(generator: &mut Generator, context: &Context, operation: &BinaryOperation, left_operand: &TypedExpression, right_operand: &TypedExpression, destination: Cell) {
+fn compile_binary_operation(generator: &mut Generator, context: &Context, operation: BinaryOperation, left_operand: &TypedExpression, right_operand: &TypedExpression, destination: Cell) {
     let left_operand_size = left_operand.size();
     let right_operand_size = right_operand.size();
     let lhs = allocate_and_evaluate(generator, context, left_operand);
     let rhs = allocate_and_evaluate(generator, context, right_operand);
-    if let Some(value) = operation.get_predicted_char_value() {
-        generator.generate_set(destination, value);
-        return;
-    }
     match operation {
-        BinaryOperation::EqualityTest(_) => {
+        BinaryOperation::EqualityTest => {
             // If the values have different sizes, they cannot be equal
             if right_operand_size != left_operand_size {
                 generator.generate_set(destination, 0);
@@ -220,7 +212,7 @@ fn compile_binary_operation(generator: &mut Generator, context: &Context, operat
                 }
             }
         }
-        BinaryOperation::DifferenceTest(_) => {
+        BinaryOperation::DifferenceTest => {
             // If the values have different sizes, they cannot be equal
             if right_operand_size != left_operand_size {
                 generator.generate_set(destination, 1);
@@ -241,7 +233,7 @@ fn compile_binary_operation(generator: &mut Generator, context: &Context, operat
                 }
             }
         }
-        BinaryOperation::StrictInequalityTest(_) => generate! {
+        BinaryOperation::StrictInequalityTest => generate! {
             (generator)
             RESET destination;
             LOOP rhs [
@@ -252,7 +244,7 @@ fn compile_binary_operation(generator: &mut Generator, context: &Context, operat
                 DECR lhs;
             ];
         },
-        BinaryOperation::LargeInequalityTest(_) => generate! {
+        BinaryOperation::LargeInequalityTest => generate! {
             (generator)
             SET destination 1;
             LOOP lhs [
@@ -263,7 +255,7 @@ fn compile_binary_operation(generator: &mut Generator, context: &Context, operat
                 DECR rhs;
             ];
         },
-        BinaryOperation::InverseStrictInequalityTest(_) => generate! {
+        BinaryOperation::InverseStrictInequalityTest => generate! {
             (generator)
             RESET destination;
             LOOP lhs [
@@ -274,7 +266,7 @@ fn compile_binary_operation(generator: &mut Generator, context: &Context, operat
                 DECR rhs;
             ];
         },
-        BinaryOperation::InverseLargeInequalityTest(_) => generate! {
+        BinaryOperation::InverseLargeInequalityTest => generate! {
             (generator)
             SET destination 1;
             LOOP rhs [
@@ -285,7 +277,7 @@ fn compile_binary_operation(generator: &mut Generator, context: &Context, operat
                 DECR lhs;
             ];
         },
-        BinaryOperation::Conjunction(_) => generate! {
+        BinaryOperation::Conjunction => generate! {
             (generator)
             SET destination 1;
             IFNULL lhs [
@@ -295,7 +287,7 @@ fn compile_binary_operation(generator: &mut Generator, context: &Context, operat
                 RESET destination;
             ];
         },
-        BinaryOperation::BooleanDisjunction(_) => generate! {
+        BinaryOperation::BooleanDisjunction => generate! {
             (generator)
             RESET destination;
             IF lhs [
@@ -305,7 +297,7 @@ fn compile_binary_operation(generator: &mut Generator, context: &Context, operat
                 SET destination 1;
             ];
         },
-        BinaryOperation::Disjunction(_) => generate! {
+        BinaryOperation::Disjunction => generate! {
             (generator)
             RESET destination;
             ALLOC is_first_false 1;
@@ -319,13 +311,13 @@ fn compile_binary_operation(generator: &mut Generator, context: &Context, operat
                 MOVE rhs destination;
             ];
         },
-        BinaryOperation::Addition(_) => generate! {
+        BinaryOperation::Addition => generate! {
             (generator)
             RESET destination;
             MOVE lhs destination;
             MOVE rhs destination;
         },
-        BinaryOperation::Subtraction(_) => generate! {
+        BinaryOperation::Subtraction => generate! {
             (generator)
             RESET destination;
             MOVE lhs destination;
@@ -333,22 +325,22 @@ fn compile_binary_operation(generator: &mut Generator, context: &Context, operat
                 DECR destination;
             ];
         },
-        BinaryOperation::Multiplication(_) => generate! {
+        BinaryOperation::Multiplication => generate! {
             (generator)
             RESET destination;
             LOOP lhs [
                 COPY rhs destination;
             ];
         },
-        BinaryOperation::Division(_) => {
+        BinaryOperation::Division => {
             let remainder = generator.allocate();
             compile_divmod(generator, lhs, rhs, destination, remainder)
         }
-        BinaryOperation::Modulo(_) => {
+        BinaryOperation::Modulo => {
             let quotient = generator.allocate();
             compile_divmod(generator, lhs, rhs, quotient, destination)
         }
-        BinaryOperation::EuclideanDivision(_) => {
+        BinaryOperation::EuclideanDivision => {
             compile_divmod(generator, lhs, rhs, destination, destination.offset(1))
         }
     }
@@ -368,6 +360,7 @@ fn compile_call(generator: &mut Generator, context: &Context, index: usize, argu
 /// Compiles the evaluation of an expression in `destination`.
 fn compile_expression_evaluation(generator: &mut Generator, context: &Context, TypedExpression { r#type, expression }: &TypedExpression, destination: Cell) {
     match expression {
+        TypeCheckedExpression::Unit => {}
         TypeCheckedExpression::Char(value) => {
             generator.generate_set(destination, *value);
         }
@@ -381,10 +374,10 @@ fn compile_expression_evaluation(generator: &mut Generator, context: &Context, T
             }
         }
         TypeCheckedExpression::UnaryOperation(operation, operand) => {
-            compile_unary_operation(generator, context, operation, operand, destination);
+            compile_unary_operation(generator, context, *operation, operand, destination);
         }
         TypeCheckedExpression::BinaryOperation(operation, left_operand, right_operand) => {
-            compile_binary_operation(generator, context, operation, left_operand, right_operand, destination);
+            compile_binary_operation(generator, context, *operation, left_operand, right_operand, destination);
         }
         TypeCheckedExpression::FunctionCall { index, arguments } => {
             let output = compile_call(generator, context, *index, arguments);
@@ -419,7 +412,7 @@ fn compile_immutable_expression_evaluation(generator: &mut Generator, context: &
 }
 
 /// Compiles the evaluation of multiple expressions in consecutive cells, starting at `destination`.
-fn compile_adjacent_expression_evaluation(generator: &mut Generator, context: &Context, expressions: &[TypedExpression], destination: Cell) {
+fn compile_adjacent_expression_evaluation<'a>(generator: &mut Generator, context: &Context, expressions: impl IntoIterator<Item=&'a TypedExpression>, destination: Cell) {
     let mut offset = 0;
     for expression in expressions {
         let size = expression.size();
@@ -438,19 +431,19 @@ fn allocate_and_evaluate(generator: &mut Generator, context: &Context, expressio
 /// Compiles code that will log the value contained in the passed cell, as the specified type.
 fn compile_log(generator: &mut Generator, r#type: &Type, value: Cell) {
     match r#type {
-        Type::Char(_) => {
+        Type::Unit => {
+            generator.generate_static_write("()");
+        }
+        Type::Char => {
             generator.generate_static_write("'");
             generator.generate_write(value);
             generator.generate_static_write("'\n");
-        }
-        Type::Integer(value) => {
-            generator.generate_static_write(&value.to_string());
         }
         Type::Product(factors) => {
             generator.generate_static_write("(");
             let mut is_first = true;
             let mut offset = 0;
-            for factor in factors {
+            for factor in factors.as_ref() {
                 if is_first {
                     is_first = false
                 } else {
@@ -522,7 +515,7 @@ fn compile_instruction(generator: &mut Generator, context: &mut Context, instruc
             let result = allocate_and_evaluate(generator, context, value);
             let mut offset = 0;
             for (destination, size) in target.get_destinations() {
-                let variable = context.get_variable_by_reference(&destination.variable);
+                let variable = context.get_variable(&destination.variable);
                 for i in 0..size {
                     generator.generate_move(result.offset(offset + i), variable.at(destination.offset + i))
                 }
@@ -532,10 +525,10 @@ fn compile_instruction(generator: &mut Generator, context: &mut Context, instruc
         TypeCheckedInstruction::Return(expression) => {
             compile_expression_evaluation(generator, context, expression, Page::Output.base());
         }
-        TypeCheckedInstruction::ContextSnapshot(reference) => {
-            let cell = reference
+        TypeCheckedInstruction::ContextSnapshot(identifier) => {
+            let cell = identifier
                 .as_ref()
-                .map(|reference| context.get_variable_by_reference(reference).origin());
+                .map(|identifier| context.get_variable(identifier).origin());
             compile_context_snapshot(generator, context, cell);
         }
         TypeCheckedInstruction::Capture(test) => {
