@@ -25,6 +25,6 @@ impl BrainzenFile {
 
 pub fn parse_file(file: impl AsRef<Path>, tokens: Sequence<Token>) -> CompilationResult<BrainzenFile> {
     let mut token_stream = TokenStream::new(file, tokens);
-    let elements = NamespaceElementHolder::parse_sequence(&mut token_stream)?;
+    let elements = Sequence::parse(&mut token_stream)?;
     Ok(BrainzenFile(elements))
 }

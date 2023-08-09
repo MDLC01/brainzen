@@ -50,12 +50,15 @@ impl Expression {
     /// Parses an operand for a prefix or infix operation.
     fn locate_operand(tokens: &mut TokenStream) -> LocatedResult<Self> {
         let operand = tokens.parse_choice()
-            // Parenthesized expression
+            // Unit, parenthesized expression, or tuple
             .branch(|tokens| {
                 tokens.expect(Symbol::OpenParenthesis)?;
-                let value = Self::locate_tuple(tokens)?.value;
-                tokens.consume(Symbol::CloseParenthesis)?;
-                Ok(value)
+                let elements = Expression::parse_delimited_separated_sequence(tokens, Symbol::Comma, Symbol::CloseParenthesis)?;
+                match elements.into() {
+                    MaybeProduct2::None => Ok(Self::Unit),
+                    MaybeProduct2::Single(element) => Ok(element.value),
+                    MaybeProduct2::Product(elements) => Ok(Self::TupleLiteral(elements)),
+                }
             })
             // Array literal
             .branch(|tokens| {
@@ -101,7 +104,7 @@ impl Expression {
     /// Parses postfix operations for the passed operand.
     fn locate_postfix_operations(tokens: &mut TokenStream, operand: Located<Self>) -> LocatedResult<Self> {
         if tokens.eat(Symbol::OpenBracket) {
-            let index = Self::locate_tuple(tokens)?;
+            let index = Self::locate(tokens)?;
             if tokens.eat(Symbol::CloseBracket) {
                 // Subscript
                 let location = operand.location.extended_to(&tokens.location());
@@ -110,7 +113,7 @@ impl Expression {
             } else if tokens.eat(Symbol::Colon) {
                 // Slice
                 let location = operand.location.extended_to(&tokens.location());
-                let index_stop = Self::locate_tuple(tokens)?;
+                let index_stop = Self::locate(tokens)?;
                 tokens.consume(Symbol::CloseBracket)?;
                 let slice = Self::Slice { array: operand.boxed(), start: index.boxed(), stop: index_stop.boxed() };
                 Self::locate_postfix_operations(tokens, Located::new(location, slice))
@@ -177,36 +180,13 @@ impl Expression {
             None => Ok(operand)
         }
     }
-
-    /// Parses and locates a tuple of one or more elements.
-    ///
-    /// This function parses an unparenthesized tuple. To force tuples to be parenthesized, use
-    /// [`Expression::locate`].
-    pub(super) fn locate_tuple(tokens: &mut TokenStream) -> LocatedResult<Self> {
-        let start_location = tokens.location();
-        let elements = Expression::parse_separated_sequence(tokens, Symbol::Comma)?;
-        let location = tokens.location_from(&start_location);
-        match elements.into() {
-            MaybeProduct2::None => Ok(Located::new(location, Self::Unit)),
-            MaybeProduct2::Single(element) => Ok(element),
-            MaybeProduct2::Product(elements) => Ok(Located::new(location, Self::TupleLiteral(elements))),
-        }
-    }
 }
 
 impl Construct for Expression {
-    /// Parses an expression.
-    ///
-    /// This function does not allow unparenthesized tuples. To allow unparenthesized tuples, use
-    /// [`Expression::locate_tuple`].
     fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
         Self::locate_infix_operation(tokens).map(|expression| expression.value)
     }
 
-    /// Parses and locates an expression.
-    ///
-    /// This function does not allow unparenthesized tuples. To allow unparenthesized tuples, use
-    /// [`Expression::locate_tuple`].
     fn locate(tokens: &mut TokenStream) -> LocatedResult<Self> {
         Self::locate_infix_operation(tokens)
     }

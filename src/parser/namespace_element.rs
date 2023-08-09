@@ -78,7 +78,7 @@ impl Construct for NamespaceElementHolder {
                 tokens.expect(Symbol::Hash)?;
                 let identifier = tokens.read_word()?;
                 tokens.expect(Symbol::Equal)?;
-                let value = Expression::locate_tuple(tokens)?;
+                let value = Expression::locate(tokens)?;
                 Ok((identifier, NamespaceElement::Constant(value)))
             })
             // Type alias

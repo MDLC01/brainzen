@@ -446,21 +446,6 @@ pub(super) trait Construct: Sized {
         Ok(Located::new(location, construct))
     }
 
-    /// Parses a sequence of constructs until the end of the stream is reached.
-    ///
-    /// After this method is called, the stream will be advanced to after the sequence, i.e., the
-    /// end of the stream.
-    ///
-    /// The sequence might be empty.
-    fn parse_sequence(tokens: &mut TokenStream) -> CompilationResult<Sequence<Self>> {
-        let mut accumulator = Vec::new();
-        while tokens.can_read() {
-            let item = Self::locate(tokens)?;
-            accumulator.push(item)
-        }
-        Ok(accumulator)
-    }
-
     /// Parses a sequence of `separator`-separated constructs until one is not immediately followed
     /// by `separator`.
     ///
@@ -508,6 +493,24 @@ pub(super) trait Construct: Sized {
                 }
                 break;
             }
+        }
+        Ok(accumulator)
+    }
+}
+
+
+impl<C: Construct> Construct for Sequence<C> {
+    /// Parses a sequence of `C`s until the end of the stream is reached.
+    ///
+    /// After this method is called, the stream will be advanced to after the sequence, i.e., the
+    /// end of the stream.
+    ///
+    /// The sequence might be empty.
+    fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
+        let mut accumulator = Sequence::new();
+        while tokens.can_read() {
+            let item = C::locate(tokens)?;
+            accumulator.push(item)
         }
         Ok(accumulator)
     }

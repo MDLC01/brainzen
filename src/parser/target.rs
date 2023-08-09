@@ -15,28 +15,18 @@ pub enum Target<D> {
     Tuple(Product<Located<Target<D>>, 2>),
 }
 
-fn parse_tuple_target_element<D: Construct>(tokens: &mut TokenStream) -> CompilationResult<Target<D>> {
-    if tokens.eat(Symbol::OpenParenthesis) {
-        if tokens.eat(Symbol::CloseParenthesis) {
-            Ok(Target::Unit)
-        } else {
-            let target = Target::parse(tokens)?;
-            tokens.expect(Symbol::CloseParenthesis)?;
-            Ok(target)
-        }
-    } else {
-        let destination = D::parse(tokens)?;
-        Ok(Target::Destination(destination))
-    }
-}
-
 impl<D: Construct> Construct for Target<D> {
     fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
-        let elements = tokens.read_separated_items(Symbol::Comma, parse_tuple_target_element)?;
-        match elements.into() {
-            MaybeProduct2::None => Ok(Self::Unit),
-            MaybeProduct2::Single(element) => Ok(element.value),
-            MaybeProduct2::Product(product) => Ok(Self::Tuple(product)),
+        if tokens.eat(Symbol::OpenParenthesis) {
+            let elements = Self::parse_delimited_separated_sequence(tokens, Symbol::Comma, Symbol::CloseParenthesis)?;
+            match elements.into() {
+                MaybeProduct2::None => Ok(Self::Unit),
+                MaybeProduct2::Single(element) => Ok(element.value),
+                MaybeProduct2::Product(elements) => Ok(Self::Tuple(elements)),
+            }
+        } else {
+            let destination = D::parse(tokens)?;
+            Ok(Self::Destination(destination))
         }
     }
 }
@@ -71,7 +61,7 @@ impl Construct for AssignmentTargetDestination {
         let mut location = tokens.location_from(&start_location);
         let mut target = Self::Variable(identifier);
         while tokens.eat(Symbol::OpenBracket) {
-            let subscript = Expression::locate_tuple(tokens)?;
+            let subscript = Expression::locate(tokens)?;
             tokens.consume(Symbol::CloseBracket)?;
             target = Self::Subscript(location.attach(target), subscript);
             location = tokens.location_from(&start_location)

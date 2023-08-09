@@ -30,7 +30,7 @@ impl Construct for Instruction {
                 tokens.expect(LET_KEYWORD)?;
                 let target = DefinitionTarget::locate(tokens)?;
                 tokens.consume(Symbol::Equal)?;
-                let value = Expression::locate_tuple(tokens)?;
+                let value = Expression::locate(tokens)?;
                 tokens.consume(Symbol::Semicolon)?;
                 Ok(Self::Initialization(target, value))
             })
@@ -76,7 +76,7 @@ impl Construct for Instruction {
             .branch(|tokens| {
                 let target = AssignmentTarget::locate(tokens)?;
                 tokens.consume(Symbol::Equal)?;
-                let value = Expression::locate_tuple(tokens)?;
+                let value = Expression::locate(tokens)?;
                 tokens.consume(Symbol::Semicolon)?;
                 Ok(Self::Assignment(target, value))
             })
