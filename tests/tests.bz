@@ -1,7 +1,4 @@
 namespace Tests {
-    // Note that most tests for operations do not work properly because the result is computed at compile time.
-    // This can be disabled by modifying `{Unary,Binary}Operation::get_predicted_char_value` to always return None.
-
     /// Tests equality and difference tests.
     func equality_difference() {
         // Equality

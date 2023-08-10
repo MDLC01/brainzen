@@ -1,10 +1,11 @@
 use crate::exceptions::{CompilationResult, LocatedException};
 use crate::location::Located;
+use crate::OptimizationSettings;
 use crate::parser::statement::{Instruction, Statement, StatementBlock};
 use crate::reference::Reference;
+use crate::type_checker::expressions::TypedExpression;
 use crate::type_checker::scope::SubroutineContext;
 use crate::type_checker::targets::{TypeCheckedAssignmentTarget, TypeCheckedDefinitionTarget};
-use crate::type_checker::typed_expressions::TypedExpression;
 use crate::type_checker::types::Type;
 use crate::utils::extensions::{TryCollectResult, VecExtensions};
 
@@ -25,7 +26,7 @@ pub enum TypeCheckedInstruction {
 }
 
 impl TypeCheckedInstruction {
-    fn from_untyped(context: &mut SubroutineContext, Located { location, value: untyped_instruction }: Located<Instruction>, return_type: Option<&Type>) -> CompilationResult<Self> {
+    fn from_untyped(context: &mut SubroutineContext, Located { location, value: untyped_instruction }: Located<Instruction>, return_type: Option<&Type>, optimizations: &OptimizationSettings) -> CompilationResult<Self> {
         let namespace_context = context.namespace_context_mut();
         match untyped_instruction {
             Instruction::ProcedureCall(reference, arguments)
@@ -33,7 +34,7 @@ impl TypeCheckedInstruction {
                 let mut typed_arguments = Vec::new();
                 for argument in arguments {
                     let argument_location = argument.location();
-                    let typed_argument = TypedExpression::infer_type(context, argument)?;
+                    let typed_argument = TypedExpression::infer_type(context, argument, optimizations)?;
                     if !typed_argument.r#type.is_string() {
                         return Err(LocatedException::expected_string_like(argument_location, &typed_argument.r#type));
                     }
@@ -52,7 +53,7 @@ impl TypeCheckedInstruction {
             Instruction::ProcedureCall(reference, arguments) if reference == "log" => {
                 let argument_count = arguments.len();
                 if let Some(argument) = arguments.get_single_element() {
-                    let typed_argument = TypedExpression::infer_type(context, argument)?;
+                    let typed_argument = TypedExpression::infer_type(context, argument, optimizations)?;
                     Ok(Self::Log(typed_argument))
                 } else {
                     Err(LocatedException::wrong_arity(location, &reference, 1, argument_count))
@@ -67,7 +68,7 @@ impl TypeCheckedInstruction {
                 } else {
                     let mut typed_arguments = Vec::new();
                     for (argument, expected_type) in arguments.into_iter().zip(expected_types.into_iter()) {
-                        let typed_argument = TypedExpression::expect_type(context, argument, &expected_type)?;
+                        let typed_argument = TypedExpression::expect_type(context, argument, &expected_type, optimizations)?;
                         typed_arguments.push(typed_argument)
                     }
                     Ok(Self::ProcedureCall(subroutine_index, typed_arguments))
@@ -93,23 +94,23 @@ impl TypeCheckedInstruction {
                 Ok(Self::Definition(type_checked_target, None))
             }
             Instruction::Initialization(target, value) => {
-                let typed_expression = TypedExpression::infer_type(context, value)?;
+                let typed_expression = TypedExpression::infer_type(context, value, optimizations)?;
                 let type_checked_target = TypeCheckedDefinitionTarget::type_check_and_register_variables(context, target, typed_expression.r#type.clone())?;
                 Ok(Self::Definition(type_checked_target, Some(typed_expression)))
             }
             Instruction::Assignment(target, value) => {
-                let typed_expression = TypedExpression::infer_type(context, value)?;
+                let typed_expression = TypedExpression::infer_type(context, value, optimizations)?;
                 let type_checked_target = TypeCheckedAssignmentTarget::from_untyped(context, target, typed_expression.r#type.clone())?;
                 Ok(Self::Assignment(type_checked_target, typed_expression))
             }
             Instruction::Return(value) => {
                 match return_type {
                     Some(return_type) => {
-                        let typed_expression = TypedExpression::expect_type(context, value, return_type)?;
+                        let typed_expression = TypedExpression::expect_type(context, value, return_type, optimizations)?;
                         Ok(Self::Return(typed_expression))
                     }
                     None => {
-                        let typed_expression = TypedExpression::infer_type(context, value)?;
+                        let typed_expression = TypedExpression::infer_type(context, value, optimizations)?;
                         Err(LocatedException::unexpected_return(location, &typed_expression.r#type))
                     }
                 }
@@ -123,7 +124,7 @@ impl TypeCheckedInstruction {
                 Ok(Self::ContextSnapshot(None))
             }
             Instruction::Capture(test) => {
-                let typed_test = TypedExpression::expect_type(context, test, &Type::Char)?;
+                let typed_test = TypedExpression::expect_type(context, test, &Type::Char, optimizations)?;
                 Ok(Self::Capture(typed_test))
             }
         }
@@ -141,48 +142,48 @@ pub enum TypeCheckedStatement {
 }
 
 impl TypeCheckedStatement {
-    pub(super) fn type_check_block(context: &mut SubroutineContext, block: StatementBlock, return_type: Option<&Type>) -> CompilationResult<Self> {
+    pub(super) fn type_check_block(context: &mut SubroutineContext, block: StatementBlock, return_type: Option<&Type>, optimizations: &OptimizationSettings) -> CompilationResult<Self> {
         context.with_subscope(|context| {
             let type_checked_statements = block.into_iter()
-                .map(|statement| Self::type_check(context, statement, return_type))
+                .map(|statement| Self::type_check(context, statement, return_type, optimizations))
                 .try_collect()?;
             Ok(Self::Block(type_checked_statements))
         })
     }
 
-    pub(super) fn type_check(context: &mut SubroutineContext, Located { location: _, value: statement }: Located<Statement>, return_type: Option<&Type>) -> CompilationResult<Self> {
+    pub(super) fn type_check(context: &mut SubroutineContext, Located { location: _, value: statement }: Located<Statement>, return_type: Option<&Type>, optimizations: &OptimizationSettings) -> CompilationResult<Self> {
         match statement {
             Statement::Block(block) => {
-                Self::type_check_block(context, block, return_type)
+                Self::type_check_block(context, block, return_type, optimizations)
             }
             Statement::Loop { count, body } => {
-                let count = TypedExpression::expect_type(context, count, &Type::Char)?;
-                let type_checked_body = Self::type_check_block(context, body, return_type)?;
+                let count = TypedExpression::expect_type(context, count, &Type::Char, optimizations)?;
+                let type_checked_body = Self::type_check_block(context, body, return_type, optimizations)?;
                 Ok(Self::Loop { count, body: Box::new(type_checked_body) })
             }
             Statement::WhileLoop { test, body } => {
-                let type_checked_test = TypedExpression::expect_type(context, test, &Type::Char)?;
-                let type_checked_body = Self::type_check_block(context, body, return_type)?;
+                let type_checked_test = TypedExpression::expect_type(context, test, &Type::Char, optimizations)?;
+                let type_checked_body = Self::type_check_block(context, body, return_type, optimizations)?;
                 Ok(Self::WhileLoop { test: type_checked_test, body: Box::new(type_checked_body) })
             }
             Statement::DoWhileLoop { body, test } => {
-                let type_checked_body = Self::type_check_block(context, body, return_type)?;
-                let type_checked_test = TypedExpression::expect_type(context, test, &Type::Char)?;
+                let type_checked_body = Self::type_check_block(context, body, return_type, optimizations)?;
+                let type_checked_test = TypedExpression::expect_type(context, test, &Type::Char, optimizations)?;
                 Ok(Self::DoWhileLoop { body: Box::new(type_checked_body), test: type_checked_test })
             }
             Statement::ConditionalBranching { test, if_body, else_body: Some(else_body) } => {
-                let type_checked_test = TypedExpression::expect_type(context, test, &Type::Char)?;
-                let type_checked_if_body = Self::type_check_block(context, if_body, return_type)?;
-                let type_checked_else_body = Self::type_check_block(context, else_body, return_type)?;
+                let type_checked_test = TypedExpression::expect_type(context, test, &Type::Char, optimizations)?;
+                let type_checked_if_body = Self::type_check_block(context, if_body, return_type, optimizations)?;
+                let type_checked_else_body = Self::type_check_block(context, else_body, return_type, optimizations)?;
                 Ok(Self::ConditionalBranching { test: type_checked_test, if_body: Box::new(type_checked_if_body), else_body: Some(Box::new(type_checked_else_body)) })
             }
             Statement::ConditionalBranching { test, if_body, else_body: None } => {
-                let type_checked_test = TypedExpression::expect_type(context, test, &Type::Char)?;
-                let type_checked_if_body = Self::type_check_block(context, if_body, return_type)?;
+                let type_checked_test = TypedExpression::expect_type(context, test, &Type::Char, optimizations)?;
+                let type_checked_if_body = Self::type_check_block(context, if_body, return_type, optimizations)?;
                 Ok(Self::ConditionalBranching { test: type_checked_test, if_body: Box::new(type_checked_if_body), else_body: None })
             }
             Statement::Instruction(instruction) => {
-                let type_checked_instruction = TypeCheckedInstruction::from_untyped(context, instruction, return_type)?;
+                let type_checked_instruction = TypeCheckedInstruction::from_untyped(context, instruction, return_type, optimizations)?;
                 Ok(Self::Instruction(type_checked_instruction))
             }
         }

@@ -6,9 +6,9 @@ use crate::exceptions::{CompilationResult, LocatedException};
 use crate::location::{Located, Location};
 use crate::parser::expression::Expression;
 use crate::parser::type_descriptor::TypeDescriptor;
+use crate::type_checker::expressions::{TypeCheckedExpression, TypedExpression};
 use crate::type_checker::operations::{BinaryOperation, Operation, UnaryOperation};
 use crate::type_checker::scope::NamespaceContext;
-use crate::type_checker::typed_expressions::{TypeCheckedExpression, TypedExpression};
 use crate::utils::extensions::TryCollectResult;
 use crate::utils::product::{MaybeProduct2, Product};
 use crate::utils::write_iterator;
@@ -241,29 +241,18 @@ impl Located<Value> {
 }
 
 
+impl From<Value> for TypeCheckedExpression {
+    fn from(value: Value) -> Self {
+        Self::Literal(value)
+    }
+}
+
+
 impl From<Value> for TypedExpression {
     fn from(value: Value) -> Self {
-        let r#type = value.get_type();
-        match value {
-            Value::Unit => {
-                Self {
-                    expression: TypeCheckedExpression::Unit,
-                    r#type,
-                }
-            }
-            Value::Char(c) => {
-                Self {
-                    expression: TypeCheckedExpression::Char(c),
-                    r#type,
-                }
-            }
-            Value::Tuple(elements) => {
-                let typed_elements = (*elements).clone().map(Self::from);
-                Self {
-                    expression: TypeCheckedExpression::Tuple(typed_elements),
-                    r#type,
-                }
-            }
+        Self {
+            r#type: value.get_type(),
+            expression: value.into(),
         }
     }
 }

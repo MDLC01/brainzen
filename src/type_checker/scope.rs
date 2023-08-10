@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 use crate::exceptions::{CompilationResult, LocatedException};
 use crate::location::{Located, Location, Sequence};
+use crate::OptimizationSettings;
 use crate::parser::namespace_element::{NamespaceElement, NamespaceElementHolder};
 use crate::reference::Reference;
 use crate::type_checker::subroutines::{SubroutineSignature, TypeCheckedSubroutine, TypeCheckedSubroutineBody};
@@ -76,7 +77,7 @@ pub struct Namespace {
 }
 
 impl Namespace {
-    pub fn type_check_and_register_elements(context: &mut NamespaceContext, elements: Sequence<NamespaceElementHolder>) -> CompilationResult<()> {
+    pub fn type_check_and_register_elements(context: &mut NamespaceContext, elements: Sequence<NamespaceElementHolder>, optimizations: &OptimizationSettings) -> CompilationResult<()> {
         elements.into_iter()
             .try_for_each(|Located { location, value: NamespaceElementHolder { visibility, identifier, element } }| {
                 match element {
@@ -92,14 +93,14 @@ impl Namespace {
                         let signature = SubroutineSignature::from_untyped(context, arguments, return_type)?;
                         let type_checked_body = context.within_subroutine(|context| {
                             signature.register_variables(context)?;
-                            TypeCheckedSubroutineBody::type_check(context, body, signature.return_type())
+                            TypeCheckedSubroutineBody::type_check(context, body, signature.return_type(), optimizations)
                         })?;
                         let subroutine = TypeCheckedSubroutine { signature, body: type_checked_body };
                         context.register_subroutine(location, identifier, visibility, subroutine)
                     }
                     NamespaceElement::Namespace(elements) => {
                         context.register_namespace(location, identifier, visibility, |context| {
-                            Self::type_check_and_register_elements(context, elements)
+                            Self::type_check_and_register_elements(context, elements, optimizations)
                         })
                     }
                 }

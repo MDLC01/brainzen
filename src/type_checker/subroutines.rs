@@ -1,10 +1,11 @@
-use crate::exceptions::{LocatedException, CompilationResult};
+use crate::exceptions::{CompilationResult, LocatedException};
 use crate::location::{Located, Sequence};
+use crate::OptimizationSettings;
 use crate::parser::namespace_element::{SubroutineArgument, SubroutineBody};
 use crate::parser::type_descriptor::TypeDescriptor;
+use crate::type_checker::expressions::TypedExpression;
 use crate::type_checker::scope::{NamespaceContext, SubroutineContext};
-use crate::type_checker::type_checked_statements::TypeCheckedStatement;
-use crate::type_checker::typed_expressions::TypedExpression;
+use crate::type_checker::statements::TypeCheckedStatement;
 use crate::type_checker::types::Type;
 use crate::utils::extensions::TryCollectResult;
 
@@ -68,11 +69,11 @@ pub enum TypeCheckedSubroutineBody {
 }
 
 impl TypeCheckedSubroutineBody {
-    pub(super) fn type_check(context: &mut SubroutineContext, body: SubroutineBody, return_type: Option<&Type>) -> CompilationResult<Self> {
+    pub(super) fn type_check(context: &mut SubroutineContext, body: SubroutineBody, return_type: Option<&Type>, optimizations: &OptimizationSettings) -> CompilationResult<Self> {
         match body {
             SubroutineBody::StatementBlock(block) => {
                 context.with_subscope(|context| {
-                    let type_checked_statement = TypeCheckedStatement::type_check_block(context, block.value, return_type)?;
+                    let type_checked_statement = TypeCheckedStatement::type_check_block(context, block.value, return_type, optimizations)?;
                     Ok(Self::StatementBlock(type_checked_statement))
                 })
             }

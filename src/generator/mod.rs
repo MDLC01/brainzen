@@ -6,11 +6,11 @@ use crate::generator::brainfuck_code::{BalancedCode, BrainfuckCode};
 use crate::generator::memory::{Cell, Page};
 use crate::generator::segment::Generator;
 use crate::reference::Reference;
+use crate::type_checker::expressions::{TypeCheckedExpression, TypedExpression};
 use crate::type_checker::operations::{BinaryOperation, UnaryOperation};
+use crate::type_checker::statements::{TypeCheckedInstruction, TypeCheckedStatement};
 use crate::type_checker::subroutines::{SubroutineSignature, TypeCheckedSubroutine, TypeCheckedSubroutineBody};
-use crate::type_checker::type_checked_statements::{TypeCheckedInstruction, TypeCheckedStatement};
-use crate::type_checker::typed_expressions::{TypeCheckedExpression, TypedExpression};
-use crate::type_checker::types::Type;
+use crate::type_checker::types::{Type, Value};
 
 pub mod brainfuck_code;
 mod segment;
@@ -357,12 +357,29 @@ fn compile_call(generator: &mut Generator, context: &Context, index: usize, argu
     output
 }
 
+/// Compiles the evaluation of a literal value in `destination`.
+fn compile_literal_evaluation(generator: &mut Generator, value: &Value, destination: Cell) {
+    match value {
+        Value::Unit => {}
+        Value::Char(value) => {
+            generator.generate_set(destination, *value);
+        }
+        Value::Tuple(elements) => {
+            let mut offset = 0;
+            for element in elements.iter() {
+                let size = element.get_type().size();
+                compile_literal_evaluation(generator, element, destination.offset(offset));
+                offset += size;
+            }
+        }
+    }
+}
+
 /// Compiles the evaluation of an expression in `destination`.
 fn compile_expression_evaluation(generator: &mut Generator, context: &Context, TypedExpression { r#type, expression }: &TypedExpression, destination: Cell) {
     match expression {
-        TypeCheckedExpression::Unit => {}
-        TypeCheckedExpression::Char(value) => {
-            generator.generate_set(destination, *value);
+        TypeCheckedExpression::Literal(value) => {
+            compile_literal_evaluation(generator, value, destination);
         }
         TypeCheckedExpression::Tuple(elements) => {
             compile_adjacent_expression_evaluation(generator, context, elements, destination);
