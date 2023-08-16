@@ -1,6 +1,4 @@
 use std::iter;
-use std::collections::{BTreeMap, HashMap};
-use std::hash::Hash;
 
 pub trait OptionFlatten<'a, T> {
     /// Flattens an `Option<&Option<T>>` to an `Option<&T>`.
@@ -141,49 +139,5 @@ impl<T> VecExtensions<T> for Vec<T> {
             self.resize_with(index + 1, T::default);
         }
         self[index] = element;
-    }
-}
-
-
-pub trait MapExtensions<K, V> {
-    /// Gets a mutable reference to an element of a map. If the key does not exist in the map, a
-    /// default value is created and inserted, and a mutable reference to it is returned.
-    fn get_mut_or_create(&mut self, key: K, default: impl FnOnce() -> V) -> &mut V;
-
-    /// Gets a mutable reference to an element of a map. If the key does not exist in the map, the
-    /// default value for the type is constructed and inserted, and a mutable reference to it is
-    /// returned.
-    fn get_mut_or_default(&mut self, key: K) -> &mut V
-    where V: Default
-    {
-        self.get_mut_or_create(key, V::default)
-    }
-
-    /// Gets a mutable reference to an element of a map. If the key does not exist in the map, the
-    /// default value is created and inserted, and a mutable reference to it is returned.
-    fn get_mut_or(&mut self, key: K, default: V) -> &mut V {
-        self.get_mut_or_create(key, || default)
-    }
-}
-
-impl<K: Eq + Hash + Clone, V> MapExtensions<K, V> for HashMap<K, V> {
-    fn get_mut_or_create(&mut self, key: K, default: impl FnOnce() -> V) -> &mut V {
-        if !self.contains_key(&key) {
-            // There is no way that does not invoke using `unsafe` to not clone the key here.
-            self.insert(key.clone(), default());
-        }
-        // SAFETY: If the key was not present, we just inserted it.
-        self.get_mut(&key).unwrap()
-    }
-}
-
-impl<K: Eq + Ord + Clone, V> MapExtensions<K, V> for BTreeMap<K, V> {
-    fn get_mut_or_create(&mut self, key: K, default: impl FnOnce() -> V) -> &mut V {
-        if !self.contains_key(&key) {
-            // There is no way that does not invoke using `unsafe` to not clone the key here.
-            self.insert(key.clone(), default());
-        }
-        // SAFETY: If the key was not present, we just inserted it.
-        self.get_mut(&key).unwrap()
     }
 }

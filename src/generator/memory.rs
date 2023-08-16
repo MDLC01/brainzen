@@ -186,7 +186,6 @@ mod chunk_manager {
     use std::num::NonZeroUsize;
 
     use crate::generator::memory::{ChunkIndex, ChunkSize};
-    use crate::utils::extensions::MapExtensions;
     use crate::utils::with_owned::WithOwned;
 
     /// Common behavior for [`Chunk`] and [`NonEmptyChunk`].
@@ -500,7 +499,7 @@ mod chunk_manager {
             //  - (2) is preserved because we never remove an element from any value of `by_size`.
             let previous = self.by_start.insert(chunk.start(), chunk.size());
             debug_assert!(previous.is_none());
-            self.by_size.get_mut_or_default(chunk.size()).insert(chunk.start());
+            self.by_size.entry(chunk.size()).or_default().insert(chunk.start());
             debug_assert!(self.test_invariants_1(), "invariants (1a) and (1b) should hold");
             debug_assert!(self.test_invariant_2(), "invariant (2) should hold");
         }
