@@ -15,7 +15,7 @@ mod reader;
 /// The word might be empty.
 fn locate_word(reader: &mut Reader) -> String {
     let mut word = String::new();
-    while let Some(c) = reader.eat_word_character() {
+    while let Some(c) = reader.next_word_character() {
         word.push(c)
     }
     word
@@ -31,7 +31,7 @@ fn read_token(reader: &mut Reader) -> CompilationResult<Option<Located<Token>>> 
         // Numeric literal
         let radix = if reader.eat_string("0x") { 16 } else { 10 };
         let mut value = 0;
-        while let Some(digit) = reader.eat_digit(radix) {
+        while let Some(digit) = reader.next_digit(radix) {
             value = value * radix + digit
         }
         Token::Numeric(value)
@@ -79,7 +79,7 @@ fn read_token(reader: &mut Reader) -> CompilationResult<Option<Located<Token>>> 
             }
         }
         Token::NativeCodeBlock(code)
-    } else if let Some(symbol) = reader.eat_symbol() {
+    } else if let Some(symbol) = reader.next_symbol() {
         // Symbol
         Token::Symbol(symbol)
     } else if !reader.can_read() {

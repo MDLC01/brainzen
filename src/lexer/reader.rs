@@ -196,7 +196,7 @@ impl Reader {
 
     /// Skips the next character and returns it if, and only if, it is a word character, according
     /// to [`Self::is_word_character`].
-    pub fn eat_word_character(&mut self) -> Option<char> {
+    pub fn next_word_character(&mut self) -> Option<char> {
         match self.peek() {
             Some(c) if Self::is_word_character(c) => {
                 self.next()
@@ -210,7 +210,7 @@ impl Reader {
     ///
     /// If multiple symbols correspond to this description, the one with the longest value is
     /// chosen. If multiple symbols have the same value, an arbitrary one is chosen.
-    pub fn eat_symbol(&mut self) -> Option<Symbol> {
+    pub fn next_symbol(&mut self) -> Option<Symbol> {
         for (string, symbol) in Symbol::symbols() {
             if self.eat_string(string) {
                 return Some(symbol);
@@ -221,7 +221,7 @@ impl Reader {
 
     /// If the next character is a digit for the specified radix, skips it and returns its value,
     /// using [`char::to_digit`]. Otherwise, returns [`None`].
-    pub fn eat_digit(&mut self, radix: u32) -> Option<u32> {
+    pub fn next_digit(&mut self, radix: u32) -> Option<u32> {
         let digit = self.peek()
             .and_then(|c| c.to_digit(radix));
         if digit.is_some() {
@@ -234,7 +234,7 @@ impl Reader {
     /// using [`char::to_digit`]. Otherwise, returns an error.
     pub fn expect_digit(&mut self, radix: u32) -> CompilationResult<u32> {
         let location = self.location();
-        self.eat_digit(radix)
+        self.next_digit(radix)
             .ok_or(LocatedException::expected_digit(location, radix))
     }
 
