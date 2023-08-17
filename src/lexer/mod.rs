@@ -66,12 +66,16 @@ fn read_token(reader: &mut Reader) -> CompilationResult<Option<Located<Token>>> 
         Token::Reference(reference)
     } else if reader.eat('`') {
         // Native code
-        let delimiter = if reader.eat_string("``") { "```" } else { "`" };
+        let mut delimiter_size = 1;
+        while reader.eat('`') {
+            delimiter_size += 1;
+        }
+        let delimiter = "`".repeat(delimiter_size);
         let mut code = String::new();
-        while !reader.eat_string(delimiter) {
+        while !reader.eat_string(&delimiter) {
             match reader.next() {
                 Some(character) => code.push(character),
-                None => return Err(LocatedException::unterminated_native_code_block(reader.location_from(&location), delimiter)),
+                None => return Err(LocatedException::unterminated_native_code_block(reader.location_from(&location), &delimiter)),
             }
         }
         Token::NativeCodeBlock(code)
