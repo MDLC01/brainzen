@@ -1,3 +1,8 @@
+//! # The lexer
+//!
+//! The *lexer* is responsible for converting a string of characters into Brainzen tokens,
+//! represented by the [`Token`] type. This conversion is achieved using the [`tokenize`] function.
+
 use std::path::Path;
 
 use crate::exceptions::{CompilationResult, LocatedException};

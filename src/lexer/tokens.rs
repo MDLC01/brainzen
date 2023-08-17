@@ -145,6 +145,9 @@ define_symbols! {
 }
 
 
+/// A Brainzen token.
+///
+/// A token corresponds to a substring of the input, and carries some additional meaning.
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Token {
     /// Represents a symbol (like `==`, `->` or `}`).

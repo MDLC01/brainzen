@@ -1,3 +1,8 @@
+//! # The parser
+//!
+//! The *parser* converts a sequence of [tokens](crate::lexer) into an abstract syntax tree. This is
+//! done using the [`parse_file`] function.
+
 use std::path::Path;
 
 use crate::exceptions::CompilationResult;
@@ -22,11 +27,18 @@ impl BrainzenFile {
     }
 }
 
+impl Construct for BrainzenFile {
+    fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
+        let elements = Sequence::parse(tokens)?;
+        Ok(BrainzenFile(elements))
+    }
+}
 
+
+/// Generates the abstract syntax tree from the tokens of a Brainzen program.
 pub fn parse_file(file: impl AsRef<Path>, tokens: Sequence<Token>) -> CompilationResult<BrainzenFile> {
     let mut token_stream = TokenStream::new(file, tokens);
-    let elements = Sequence::parse(&mut token_stream)?;
-    Ok(BrainzenFile(elements))
+    BrainzenFile::parse(&mut token_stream)
 }
 
 

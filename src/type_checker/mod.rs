@@ -1,3 +1,9 @@
+//! # The type checker
+//!
+//! The *type checker* converts the type-free abstract syntax tree of a Brainzen program, generated
+//! by the [parser](crate::parser), to a collection of subroutines with type information. This
+//! conversion can be achieved using [`type_check_and_get_subroutines`].
+
 use crate::exceptions::CompilationResult;
 use crate::location::Location;
 use crate::OptimizationSettings;

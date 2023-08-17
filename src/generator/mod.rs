@@ -1,3 +1,12 @@
+//! # The generator
+//!
+//! The *generator* generates Brainfuck code from a [type checked](crate::type_checker) Brainzen
+//! program. The generator never fails, as all necessary checks have been performed earlier, mainly
+//! during the type checking phase.
+//!
+//! Use [`compile_subroutines`] to generate Brainfuck code for all subroutines in a Brainzen
+//! program.
+
 use std::{iter, mem};
 use std::collections::HashMap;
 
@@ -618,6 +627,9 @@ fn declare_arguments(context: &mut Context, signature: SubroutineSignature) {
     }
 }
 
+/// Converts each subroutine in the passed vector to Brainfuck code that executes the subroutine.
+///
+/// Each subroutine can use any subroutine with a strictly smaller index in the vector.
 pub fn compile_subroutines(subroutines: Vec<TypeCheckedSubroutine>) -> Vec<BrainfuckCode> {
     subroutines.into_iter()
         .fold(Vec::new(), |compiled_subroutines, subroutine| {
