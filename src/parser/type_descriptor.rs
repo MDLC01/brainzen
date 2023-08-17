@@ -24,7 +24,7 @@ impl TypeDescriptor {
                 Ok(descriptor)
             }
         } else {
-            let reference = Reference::locate(tokens)?;
+            let reference = tokens.read_located_reference()?;
             Ok(Self::Reference(reference))
         }
     }

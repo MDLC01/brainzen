@@ -32,7 +32,7 @@ impl TokenMatcher for &str {
     /// Matches a specific word.
     fn matches(&self, token: &Token) -> bool {
         match token {
-            Token::Word(word) => word == self,
+            Token::Reference(Reference { namespace: None, identifier }) => identifier == self,
             _ => false,
         }
     }
@@ -120,14 +120,14 @@ impl TokenStream {
 
     /// Returns a clone of the next token without advancing the stream.
     ///
-    /// If there is no next token, [`None`] is returned.
+    /// If there is no next token, returns [`None`].
     pub fn peek(&self) -> Option<Token> {
         self.token_at(self.index).cloned()
     }
 
     /// Tests if a token matcher matches the next token.
     ///
-    /// If there is no next token, `false` is returned.
+    /// If there is no next token, returns `false`.
     pub fn is(&self, matcher: impl TokenMatcher) -> bool {
         match self.token_at(self.index) {
             Some(token) if matcher.matches(token) => true,
@@ -156,7 +156,7 @@ impl TokenStream {
     }
 
     /// Advances the stream if the next token is matched. Otherwise, returns an error located after
-    /// the previous location.
+    /// the previous location without advancing the stream.
     ///
     /// The difference with [`Self::expect`] is that the error is located after the previous
     /// token instead of at the current token.
@@ -169,7 +169,7 @@ impl TokenStream {
     }
 
     /// Advances the stream if the next token is matched. Otherwise, returns an error located at the
-    /// current location.
+    /// current location without advancing the stream.
     ///
     /// The difference with [`Self::consume`]  is that the error is located at the current
     /// token instead of after the previous token.
@@ -182,8 +182,8 @@ impl TokenStream {
     }
 
     /// If the next token is a unary operator, returns the corresponding symbol and advances the
-    /// stream. Otherwise, returns [`None`].
-    pub fn read_unary_operator(&mut self) -> Option<Symbol> {
+    /// stream. Otherwise, returns [`None`] without advancing the stream.
+    pub fn eat_unary_operator(&mut self) -> Option<Symbol> {
         match self.peek() {
             Some(Token::Symbol(operator)) if operator.is_unary_operator() => {
                 self.advance();
@@ -194,8 +194,8 @@ impl TokenStream {
     }
 
     /// If the next token is an operator, returns the corresponding symbol and its priority and
-    /// advances the stream. Otherwise, returns [`None`].
-    pub fn read_binary_operator(&mut self) -> Option<(Symbol, Priority)> {
+    /// advances the stream. Otherwise, returns [`None`] without advancing the stream.
+    pub fn eat_binary_operator(&mut self) -> Option<(Symbol, Priority)> {
         match self.peek() {
             Some(Token::Symbol(operator)) => {
                 if let Some(priority) = operator.binary_operator_priority() {
@@ -209,64 +209,98 @@ impl TokenStream {
         }
     }
 
-    /// If the next token is a word, returns its value and advances the stream. Otherwise, returns
-    /// an error.
-    pub fn read_word(&mut self) -> CompilationResult<String> {
+    /// If the next token is a reference, returns it with its location, and advances the stream.
+    /// Otherwose, returns an error without advancing the stream.
+    pub fn read_located_reference(&mut self) -> LocatedResult<Reference> {
         match self.peek() {
-            Some(Token::Word(identifier)) => {
+            Some(Token::Reference(reference)) => {
+                let location = self.location();
                 self.advance();
-                Ok(identifier.clone())
+                Ok(Located::new(location, reference))
             }
-            _ => Err(LocatedException::expected_identifier(self.location()))
+            _ => Err(LocatedException::expected_reference(self.location())),
         }
     }
 
-    /// If the next token is a word, returns its value and location and advances the stream.
-    /// Otherwise, returns an error.
-    pub fn locate_word(&mut self) -> LocatedResult<String> {
-        let location = self.location();
-        let word = self.read_word()?;
-        Ok(Located::new(location, word))
+    /// If the next token is a reference, returns it with its location, and advances the stream.
+    /// Otherwise, returns [`None`] without advancing the stream.
+    pub fn eat_located_reference(&mut self) -> Option<Located<Reference>> {
+        match self.peek() {
+            Some(Token::Reference(reference)) => {
+                let location = self.location();
+                self.advance();
+                Some(Located::new(location, reference))
+            }
+            _ => None,
+        }
     }
 
-    /// If the next token is a string literal, returns its value and advances the stream. Otherwise,
-    /// returns an error.
-    pub fn read_string(&mut self) -> CompilationResult<Sequence<u8>> {
+    /// If the next token is a reference, followed by a token that matches a specific matcher,
+    /// returns the reference with its location, and advances the stream. Otherwise, returns
+    /// [`None`] without advancing the stream.
+    pub fn eat_located_reference_with(&mut self, matcher: impl TokenMatcher) -> Option<Located<Reference>> {
         match self.peek() {
-            Some(Token::String(characters)) => {
+            Some(Token::Reference(reference))
+            if self.token_at(self.index + 1).is_some_and(|token| matcher.matches(token)) => {
+                let location = self.location();
                 self.advance();
-                Ok(characters.clone())
+                self.advance();
+                Some(Located::new(location, reference))
             }
-            _ => Err(LocatedException::expected_string(self.location()))
+            _ => None,
+        }
+    }
+
+    /// If the next token is a single identifier, with no namespace, returns its value and advances
+    /// the stream. Otherwise, returns an error without advancing the stream.
+    pub fn read_identifier(&mut self) -> CompilationResult<String> {
+        match self.peek() {
+            Some(Token::Reference(Reference { namespace: None, identifier })) => {
+                self.advance();
+                Ok(identifier.clone())
+            }
+            _ => Err(LocatedException::expected_identifier(self.location())),
         }
     }
 
     /// If the next token is a numeric literal, returns its value and advances the stream.
-    /// Otherwise, returns an error.
-    pub fn read_integer(&mut self) -> CompilationResult<u32> {
+    /// Otherwise, returns [`None`] without advancing the stream.
+    pub fn eat_integer(&mut self) -> Option<u32> {
         match self.peek() {
             Some(Token::Numeric(value)) => {
                 self.advance();
-                Ok(value)
+                Some(value)
             }
-            _ => Err(LocatedException::expected_number(self.location()))
+            _ => None,
         }
     }
 
     /// If the next token is a character literal, returns its value and advances the stream.
-    /// Otherwise, returns an error.
-    pub fn read_character(&mut self) -> CompilationResult<u8> {
+    /// Otherwise, returns [`None`] without advancing the stream.
+    pub fn eat_character(&mut self) -> Option<u8> {
         match self.peek() {
             Some(Token::Character(value)) => {
                 self.advance();
-                Ok(value)
+                Some(value)
             }
-            _ => Err(LocatedException::expected_character(self.location()))
+            _ => None,
+        }
+    }
+
+    /// If the next token is a string literal, returns its value and advances the stream. Otherwise,
+    /// returns [`None`] without advancing the stream.
+    pub fn eat_string(&mut self) -> Option<Sequence<u8>> {
+        match self.peek() {
+            Some(Token::String(characters)) => {
+                self.advance();
+                Some(characters.clone())
+            }
+            _ => None,
         }
     }
 
     /// If the next token is a native code block, returns its value and advances the stream.
-    /// Otherwise, returns an error.
+    /// Otherwise, returns an error without advancing the stream.
     pub fn read_native_code_block(&mut self) -> CompilationResult<String> {
         match self.peek() {
             Some(Token::NativeCodeBlock(native_code)) => {
@@ -309,125 +343,13 @@ impl TokenStream {
         } {}
         Ok(accumulator)
     }
-
-    /// Tries to parse a `T` using the provided parser, advancing the stream if, and only if, the
-    /// [`Ok`] variant is returned.
-    ///
-    /// If the parser returns the [`Ok`] variant, the value is returned and the stream is advanced.
-    /// If the parser returns the [`Err`] variant, the stream is not advanced,
-    /// `Err((offset, error))` is returned, where `offset` is the amount the stream was advanced by
-    /// after executing the parser, and `error` is the error that was returned.
-    pub fn try_parse<T, E>(&mut self, parser: impl FnOnce(&mut Self) -> Result<T, E>) -> Result<T, (usize, E)> {
-        let initial_index = self.index;
-        match parser(self) {
-            Ok(value) => {
-                Ok(value)
-            }
-            Err(error) => {
-                let offset = self.index - initial_index;
-                self.index = initial_index;
-                Err((offset, error))
-            }
-        }
-    }
-
-    /// Returns a [`ParseChoice`] which can be used to indicate multiple parsers that will be tried
-    /// in order until one succeeds.
-    pub fn parse_choice<T>(&mut self) -> ParseChoice<T> {
-        let start_location = self.location();
-        ParseChoice {
-            tokens: self,
-            start_location,
-            state: ChoiceState::default(),
-        }
-    }
 }
 
 
-#[derive(Default)]
-enum ChoiceState<T, E> {
-    #[default] Nothing,
-    Error(usize, E),
-    Value(T),
-}
-
-impl<T, E> ChoiceState<T, E> {
-    fn update(self, updater: impl FnOnce() -> Result<T, (usize, E)>) -> Self {
-        match self {
-            Self::Nothing => {
-                match updater() {
-                    Ok(value) => Self::Value(value),
-                    Err((0, _)) => Self::Nothing,
-                    Err((offset, error)) => Self::Error(offset, error),
-                }
-            }
-            Self::Error(offset, error) => {
-                match updater() {
-                    Ok(value) => Self::Value(value),
-                    Err((new_offset, new_error)) => {
-                        if new_offset > offset {
-                            Self::Error(new_offset, new_error)
-                        } else {
-                            Self::Error(offset, error)
-                        }
-                    }
-                }
-            }
-            Self::Value(value) => Self::Value(value)
-        }
-    }
-}
-
-/// Lets you specify multiple parsers to try until one succeeds.
-pub(super) struct ParseChoice<'a, T> {
-    tokens: &'a mut TokenStream,
-    start_location: Location,
-    state: ChoiceState<T, LocatedException>,
-}
-
-impl<T> ParseChoice<'_, T> {
-    /// Tries another parser. If a parser already succeeded, this does not do anything.
-    pub fn branch(mut self, parser: impl FnOnce(&mut TokenStream) -> CompilationResult<T>) -> Self {
-        self.state = self.state.update(|| self.tokens.try_parse(parser));
-        self
-    }
-
-    /// Returns the result of the first parser that succeeded. If no parser succeeded, returns the
-    /// result of the provided default parser.
-    pub fn parse_or(self, default: impl FnOnce(&mut TokenStream) -> CompilationResult<T>) -> CompilationResult<T> {
-        match self.state {
-            ChoiceState::Value(value) => Ok(value),
-            _ => default(self.tokens),
-        }
-    }
-
-    /// Returns the result of the first parser that succeeded.
-    ///
-    /// If no parser succeeded, returns the [`LocatedException`] corresponding to the first
-    /// parser that read at least one token. If no parser read at least one token, a generic
-    /// "expected" compilation exception is returned.
-    pub fn parse(self, description: impl Display) -> CompilationResult<T> {
-        match self.state {
-            ChoiceState::Nothing => Err(LocatedException::expected(self.tokens.location(), description)),
-            ChoiceState::Error(_, error) => Err(error),
-            ChoiceState::Value(value) => Ok(value),
-        }
-    }
-
-    /// Returns the located result of the first parser that succeeded. If no parser succeeded,
-    /// returns a [`LocatedException`].
-    pub fn locate(self, description: impl Display) -> LocatedResult<T> {
-        let location = self.tokens.location_from(&self.start_location);
-        self.parse(description).map(|value| Located::new(location, value))
-    }
-}
-
-
-/// A syntactic construct is a piece of syntax that typically consists of multiple tokens. It can be
-/// parsed from a [`TokenStream`].
+/// A syntactic construct is a piece of syntax that typically consists of multiple tokens.
 ///
-/// A construct can be parsed using [`Construct::parse`]. Alternatively, you can use
-/// [`Construct::locate`] to get a [`Located`] construct.
+/// A construct can be parsed from a [`tokenStream`] using [`Construct::parse`]. Alternatively, you
+/// can use [`Construct::locate`] to get a [`Located`] construct.
 pub(super) trait Construct: Sized {
     /// Parses this construct from a [`TokenStream`]. Advances the stream to after the construct if
     /// parsed successfully.
@@ -509,21 +431,5 @@ impl<C: Construct> Construct for Sequence<C> {
             accumulator.push(item)
         }
         Ok(accumulator)
-    }
-}
-
-
-impl Construct for Reference {
-    fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
-        let start_location = tokens.location();
-        let identifier = tokens.read_word()?;
-        let mut reference = Self::new_identifier(identifier);
-        let mut location = tokens.location_from(&start_location);
-        while tokens.eat(Symbol::DoubleColon) {
-            let identifier = tokens.read_word()?;
-            reference = Reference::new(identifier, Located::new(location, reference));
-            location = tokens.location_from(&start_location)
-        }
-        Ok(reference)
     }
 }

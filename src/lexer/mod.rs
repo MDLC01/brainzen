@@ -4,9 +4,22 @@ use crate::exceptions::{CompilationResult, LocatedException};
 use crate::lexer::reader::Reader;
 use crate::lexer::tokens::Token;
 use crate::location::{Located, Sequence};
+use crate::reference::Reference;
 
 pub mod tokens;
 mod reader;
+
+
+/// Reads a single word.
+///
+/// The word might be empty.
+fn locate_word(reader: &mut Reader) -> String {
+    let mut word = String::new();
+    while let Some(c) = reader.eat_word_character() {
+        word.push(c)
+    }
+    word
+}
 
 
 /// Reads a token from a [`Reader`]. If no token can be read due to the end of the input having been
@@ -40,12 +53,17 @@ fn read_token(reader: &mut Reader) -> CompilationResult<Option<Located<Token>>> 
         };
         Token::String(characters)
     } else if reader.has_word_character() {
-        // Word
-        let mut word = String::new();
-        while let Some(c) = reader.eat_word_character() {
-            word.push(c)
+        // Reference
+        // References are parsed at the lexer level because it makes the parser LL2.
+        let start_location = reader.location();
+        let word = locate_word(reader);
+        let mut reference = Reference::new_identifier(word);
+        while reader.eat_string("::") {
+            let location = reader.location_from(&start_location);
+            let identifier = locate_word(reader);
+            reference = Reference::new(identifier, Located::new(location, reference));
         }
-        Token::Word(word)
+        Token::Reference(reference)
     } else if reader.eat('`') {
         // Native code
         let delimiter = if reader.eat_string("``") { "```" } else { "`" };
@@ -53,7 +71,7 @@ fn read_token(reader: &mut Reader) -> CompilationResult<Option<Located<Token>>> 
         while !reader.eat_string(delimiter) {
             match reader.next() {
                 Some(character) => code.push(character),
-                None => return Err(LocatedException::unterminated_native_code_block(reader.location_from(location), delimiter)),
+                None => return Err(LocatedException::unterminated_native_code_block(reader.location_from(&location), delimiter)),
             }
         }
         Token::NativeCodeBlock(code)
@@ -67,7 +85,7 @@ fn read_token(reader: &mut Reader) -> CompilationResult<Option<Located<Token>>> 
         // Invalid character
         return Err(LocatedException::unexpected_character(location));
     };
-    Ok(Some(Located::new(reader.location_from(location), token)))
+    Ok(Some(Located::new(reader.location_from(&location), token)))
 }
 
 /// Converts a string to a sequence of tokens.

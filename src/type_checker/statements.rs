@@ -115,10 +115,14 @@ impl TypeCheckedInstruction {
                     }
                 }
             }
-            Instruction::ContextSnapshot(Some(Located { location, value: identifier })) => {
+            Instruction::ContextSnapshot(Some(Located { location, value: reference })) => {
                 // Makes sure the variable exists
-                let _ = context.get_variable_type(location, &identifier)?;
-                Ok(Self::ContextSnapshot(Some(identifier)))
+                if let Reference { namespace: None, identifier } = reference {
+                    let _ = context.get_variable_type(location, &identifier)?;
+                    Ok(Self::ContextSnapshot(Some(identifier)))
+                } else {
+                    Err(LocatedException::context_snapshot_on_non_variable(location))
+                }
             }
             Instruction::ContextSnapshot(None) => {
                 Ok(Self::ContextSnapshot(None))

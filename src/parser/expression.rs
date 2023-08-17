@@ -33,11 +33,11 @@ pub enum Expression {
 }
 
 impl Expression {
-    fn tuple_from_characters(characters: &Sequence<u8>) -> Self {
-        let elements = characters.iter()
+    fn tuple_from_characters(characters: Sequence<u8>) -> Self {
+        let elements = characters.into_iter()
             .map(|Located { location, value: character }| {
-                let literal = Self::CharacterLiteral(*character);
-                Located::new(location.clone(), literal)
+                let literal = Self::CharacterLiteral(character);
+                Located::new(location, literal)
             })
             .collect();
         match elements {
@@ -49,56 +49,45 @@ impl Expression {
 
     /// Parses an operand for a prefix or infix operation.
     fn locate_operand(tokens: &mut TokenStream) -> LocatedResult<Self> {
-        let operand = tokens.parse_choice()
+        let start_location = tokens.location();
+        let operand = if tokens.eat(Symbol::OpenParenthesis) {
             // Unit, parenthesized expression, or tuple
-            .branch(|tokens| {
-                tokens.expect(Symbol::OpenParenthesis)?;
-                let elements = Expression::parse_delimited_separated_sequence(tokens, Symbol::Comma, Symbol::CloseParenthesis)?;
-                match elements.into() {
-                    MaybeProduct2::None => Ok(Self::Unit),
-                    MaybeProduct2::Single(element) => Ok(element.value),
-                    MaybeProduct2::Product(elements) => Ok(Self::TupleLiteral(elements)),
-                }
-            })
+            let elements = Expression::parse_delimited_separated_sequence(tokens, Symbol::Comma, Symbol::CloseParenthesis)?;
+            match elements.into() {
+                MaybeProduct2::None => Self::Unit,
+                MaybeProduct2::Single(element) => element.value,
+                MaybeProduct2::Product(elements) => Self::TupleLiteral(elements),
+            }
+        } else if tokens.eat(Symbol::OpenBracket) {
             // Array literal
-            .branch(|tokens| {
-                tokens.expect(Symbol::OpenBracket)?;
-                let elements = Expression::parse_delimited_separated_sequence(tokens, Symbol::Comma, Symbol::CloseBracket)?;
-                Ok(Self::ArrayLiteral(elements))
-            })
+            let elements = Expression::parse_delimited_separated_sequence(tokens, Symbol::Comma, Symbol::CloseBracket)?;
+            Self::ArrayLiteral(elements)
+        } else if let Some(reference) = tokens.eat_located_reference_with(Symbol::OpenParenthesis) {
             // Function call
-            .branch(|tokens| {
-                let reference = Reference::parse(tokens)?;
-                tokens.consume(Symbol::OpenParenthesis)?;
-                let arguments = Expression::parse_delimited_separated_sequence(tokens, Symbol::Comma, Symbol::CloseParenthesis)?;
-                Ok(Self::FunctionCall(reference, arguments))
-            })
+            let arguments = Expression::parse_delimited_separated_sequence(tokens, Symbol::Comma, Symbol::CloseParenthesis)?;
+            Self::FunctionCall(reference.value, arguments)
+        } else if let Some(reference) = tokens.eat_located_reference() {
             // Variable
-            .branch(|tokens| {
-                let identifier = Reference::locate(tokens)?;
-                Ok(Self::Variable(identifier))
-            })
-            // String literal
-            .branch(|tokens| {
-                let characters = tokens.read_string()?;
-                Ok(Self::tuple_from_characters(&characters))
-            })
-            // Character literal
-            .branch(|tokens| {
-                let value = tokens.read_character()?;
-                Ok(Self::CharacterLiteral(value))
-            })
+            Self::Variable(reference)
+        } else if let Some(value) = tokens.eat_integer() {
             // Integer literal
-            .branch(|tokens| {
-                let location = tokens.location();
-                let value = tokens.read_integer()?;
-                match value.try_into() {
-                    Ok(value) => Ok(Self::IntegerLiteral(value)),
-                    Err(_) => Err(LocatedException::invalid_char_literal(location))
+            match value.try_into() {
+                Ok(value) => Self::IntegerLiteral(value),
+                Err(_) => {
+                    return Err(LocatedException::integer_literal_too_large(tokens.previous_location()));
                 }
-            })
-            .locate("value")?;
-        Self::locate_postfix_operations(tokens, operand)
+            }
+        } else if let Some(value) = tokens.eat_character() {
+            // Character literal
+            Self::CharacterLiteral(value)
+        } else if let Some(characters) = tokens.eat_string() {
+            // String literal
+            Self::tuple_from_characters(characters)
+        } else {
+            return Err(LocatedException::expected_expression(start_location));
+        };
+        let location = tokens.location_from(&start_location);
+        Self::locate_postfix_operations(tokens, Located::new(location, operand))
     }
 
     /// Parses postfix operations for the passed operand.
@@ -127,7 +116,7 @@ impl Expression {
 
     fn locate_prefix_operation(tokens: &mut TokenStream) -> LocatedResult<Self> {
         let start_location = tokens.location();
-        match tokens.read_unary_operator() {
+        match tokens.eat_unary_operator() {
             Some(operator) => {
                 let operand = Self::locate_prefix_operation(tokens)?;
                 let location = tokens.location_from(&start_location);
@@ -142,7 +131,7 @@ impl Expression {
         /// `current_priority`, which must be the priority of `current_operator`.
         fn aux(tokens: &mut TokenStream, current_left_operand: Located<Expression>, current_operator: Symbol, current_priority: Priority) -> LocatedResult<Expression> {
             let current_right_operand = Expression::locate_prefix_operation(tokens)?;
-            match tokens.read_binary_operator() {
+            match tokens.eat_binary_operator() {
                 Some((new_operator, new_priority)) => {
                     if current_priority <= new_priority {
                         let new_left_operand_location = current_left_operand.location.extended_to(&current_right_operand.location);
@@ -175,7 +164,7 @@ impl Expression {
             }
         }
         let operand = Self::locate_prefix_operation(tokens)?;
-        match tokens.read_binary_operator() {
+        match tokens.eat_binary_operator() {
             Some((operator, priority)) => aux(tokens, operand, operator, priority),
             None => Ok(operand)
         }

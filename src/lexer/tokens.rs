@@ -2,6 +2,7 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 
 use crate::location::Sequence;
+use crate::reference::Reference;
 use crate::utils::write_iterator;
 
 /// Lower priorities are applied first. For example, [`Priority::Multiplication`] < [`Priority::Addition`].
@@ -148,10 +149,14 @@ define_symbols! {
 pub enum Token {
     /// Represents a symbol (like `==`, `->` or `}`).
     Symbol(Symbol),
-    /// Represents a word.
+    /// Represents a [`Reference`].
     ///
-    /// A word is a sequence of word characters (`A` - `Z`, `a` - `z`, `0` - `9`) surrounded by non-word characters.
-    Word(String),
+    /// Might be a single word, i.e., a sequence of word characters (`A`–`Z`, `a`–`z`, `0`–`9`)
+    /// surrounded by non-word characters.
+    ///
+    /// Note that keywords are actually parsed as a reference with no namespace. There is no such
+    /// thing as keywords from the lexer's point of view.
+    Reference(Reference),
     /// Represents a numeric literal.
     Numeric(u32),
     /// Represents a character literal.
@@ -168,7 +173,7 @@ impl Display for Token {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             Token::Symbol(symbol) => write!(f, "{}", symbol),
-            Token::Word(word) => write!(f, "{}", word),
+            Token::Reference(reference) => write!(f, "{}", reference),
             Token::Numeric(value) => write!(f, "{}", value),
             Token::Character(character) => write!(f, "'{}'", *character as char),
             Token::String(characters) => write_iterator!(f, characters, "", "\"", "\""),
@@ -176,17 +181,3 @@ impl Display for Token {
         }
     }
 }
-
-
-pub const PUBLIC_KEYWORD: &str = "public";
-pub const TYPE_KEYWORD: &str = "type";
-pub const NATIVE_KEYWORD: &str = "native";
-pub const FUNC_KEYWORD: &str = "func";
-pub const NAMESPACE_KEYWORD: &str = "namespace";
-pub const LOOP_KEYWORD: &str = "loop";
-pub const WHILE_KEYWORD: &str = "while";
-pub const DO_KEYWORD: &str = "do";
-pub const IF_KEYWORD: &str = "if";
-pub const ELSE_KEYWORD: &str = "else";
-pub const LET_KEYWORD: &str = "let";
-pub const RETURN_KEYWORD: &str = "return";

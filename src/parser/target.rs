@@ -39,7 +39,7 @@ pub enum DefinitionTargetDestination {
 
 impl Construct for DefinitionTargetDestination {
     fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
-        let identifier = tokens.read_word()?;
+        let identifier = tokens.read_identifier()?;
         Ok(Self::Variable(identifier))
     }
 }
@@ -57,7 +57,7 @@ pub enum AssignmentTargetDestination {
 impl Construct for AssignmentTargetDestination {
     fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
         let start_location = tokens.location();
-        let identifier = tokens.read_word()?;
+        let identifier = tokens.read_identifier()?;
         let mut location = tokens.location_from(&start_location);
         let mut target = Self::Variable(identifier);
         while tokens.eat(Symbol::OpenBracket) {

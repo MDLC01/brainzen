@@ -1,8 +1,9 @@
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 
-use crate::lexer::tokens::{PUBLIC_KEYWORD, Symbol};
+use crate::lexer::tokens::Symbol;
 use crate::location::Location;
+use crate::parser::PUBLIC_KEYWORD;
 use crate::reference::Reference;
 use crate::type_checker::operations::Operation;
 use crate::type_checker::types::Type;
@@ -168,23 +169,13 @@ impl<S> CompilationException<S> {
             .build_without_hint()
     }
 
+    pub fn expected_reference(source: S) -> Self {
+        ExceptionBuilder::new_expected(source, "reference")
+            .build_without_hint()
+    }
+
     pub fn expected_identifier(source: S) -> Self {
         ExceptionBuilder::new_expected(source, "identifier")
-            .build_without_hint()
-    }
-
-    pub fn expected_string(source: S) -> Self {
-        ExceptionBuilder::new_expected(source, "string")
-            .build_without_hint()
-    }
-
-    pub fn expected_number(source: S) -> Self {
-        ExceptionBuilder::new_expected(source, "number")
-            .build_without_hint()
-    }
-
-    pub fn expected_character(source: S) -> Self {
-        ExceptionBuilder::new_expected(source, "character")
             .build_without_hint()
     }
 
@@ -193,9 +184,19 @@ impl<S> CompilationException<S> {
             .build_without_hint()
     }
 
-    pub fn invalid_char_literal(source: S) -> Self {
-        ExceptionBuilder::new_syntax_error(source, "Invalid char literal: value must be between 0 and 255")
+    pub fn expected_expression(source: S) -> Self {
+        ExceptionBuilder::new_expected(source, "expression")
             .build_without_hint()
+    }
+
+    pub fn expected_namespace_element(source: S) -> Self {
+        ExceptionBuilder::new_expected(source, "namespace_element")
+            .build_without_hint()
+    }
+
+    pub fn integer_literal_too_large(source: S) -> Self {
+        ExceptionBuilder::new_syntax_error(source, "Integer literal is too large")
+            .build(format!("The value of an integer literal must not exceed {}", i32::MAX))
     }
 
     pub fn element_name_is_already_used(source: S, element_type: &str, initial_definition_location: Location) -> Self {
@@ -273,6 +274,11 @@ impl<S> CompilationException<S> {
     pub fn unexpected_return(source: S, returned_type: &Type) -> Self {
         ExceptionBuilder::new_type_error(source, "Unexpected `return` in procedure")
             .build(format!("Try changing the procedure to a function returning {}.", returned_type))
+    }
+
+    pub fn context_snapshot_on_non_variable(source: S) -> Self {
+        ExceptionBuilder::new_type_error(source, "Context snapshot must be on a variable")
+            .build_without_hint()
     }
 
     pub fn invalid_operator(source: S, operator: Symbol, operand_types: &[&Type]) -> Self {

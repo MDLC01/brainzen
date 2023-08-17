@@ -28,3 +28,29 @@ pub fn parse_file(file: impl AsRef<Path>, tokens: Sequence<Token>) -> Compilatio
     let elements = Sequence::parse(&mut token_stream)?;
     Ok(BrainzenFile(elements))
 }
+
+
+/// The `public` keyword.
+pub const PUBLIC_KEYWORD: &str = "public";
+/// The `type` keyword.
+pub const TYPE_KEYWORD: &str = "type";
+/// The `native` keyword.
+pub const NATIVE_KEYWORD: &str = "native";
+/// The `func` keyword.
+pub const FUNC_KEYWORD: &str = "func";
+/// The `namespace` keyword.
+pub const NAMESPACE_KEYWORD: &str = "namespace";
+/// The `loop` keyword.
+pub const LOOP_KEYWORD: &str = "loop";
+/// The `while` keyword.
+pub const WHILE_KEYWORD: &str = "while";
+/// The `do` keyword.
+pub const DO_KEYWORD: &str = "do";
+/// The `if` keyword.
+pub const IF_KEYWORD: &str = "if";
+/// The `else` keyword.
+pub const ELSE_KEYWORD: &str = "else";
+/// The `let` keyword.
+pub const LET_KEYWORD: &str = "let";
+/// The `return` keyword.
+pub const RETURN_KEYWORD: &str = "return";

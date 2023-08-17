@@ -38,7 +38,7 @@ impl Reader {
 
     /// Returns a location that starts at the start of the specified `start_location` and ends at
     /// the end of the previous location.
-    pub fn location_from(&self, start_location: Location) -> Location {
+    pub fn location_from(&self, start_location: &Location) -> Location {
         start_location.extended_to(&self.previous_location)
     }
 
@@ -265,7 +265,7 @@ impl Reader {
                         return Err(LocatedException::unterminated_string_literal(escape_location, delimiter));
                     }
                 };
-                Ok(Located::new(self.location_from(location), escaped_character))
+                Ok(Located::new(self.location_from(&location), escaped_character))
             }
             // Invalid character
             Some(c) if !c.is_ascii() || c.is_control() => {
