@@ -27,38 +27,32 @@ impl Reader {
     }
 
     /// Updates the current location to the passed location.
-    #[inline]
     fn update_location(&mut self, location: Location) {
         self.previous_location = mem::replace(&mut self.location, location);
     }
 
     /// Returns the current location of the reader.
-    #[inline]
     pub fn location(&self) -> Location {
         self.location.clone()
     }
 
     /// Returns a location that starts at the start of the specified `start_location` and ends at
     /// the end of the previous location.
-    #[inline]
     pub fn location_from(&self, start_location: Location) -> Location {
         start_location.extended_to(&self.previous_location)
     }
 
     /// Returns the character at a specific offset from the current position of the reader.
-    #[inline]
     fn peek_at(&self, offset: usize) -> Option<char> {
         self.chars.get(self.cursor + offset).copied()
     }
 
     /// Returns a copy of the next character.
-    #[inline]
     pub fn peek(&self) -> Option<char> {
         self.peek_at(0)
     }
 
     /// Tests if there are remaining characters to be read.
-    #[inline]
     pub fn can_read(&self) -> bool {
         self.peek().is_some()
     }
@@ -81,13 +75,11 @@ impl Reader {
     }
 
     /// Skips the next character.
-    #[inline]
     pub fn skip(&mut self) {
         self.next();
     }
 
     /// Skips a specific amount of characters.
-    #[inline]
     pub fn skip_amount(&mut self, amount: usize) {
         for _ in 0..amount {
             self.skip()
@@ -96,7 +88,6 @@ impl Reader {
 
     /// Tests if the character at a specific offset from the current position of the reader is equal
     /// to the passed character.
-    #[inline]
     fn has_at(&self, offset: usize, character: char) -> bool {
         match self.peek_at(offset) {
             Some(c) => c == character,
@@ -105,7 +96,6 @@ impl Reader {
     }
 
     /// Tests if the next character is equal to the passed character.
-    #[inline]
     pub fn has(&self, character: char) -> bool {
         self.has_at(0, character)
     }
@@ -119,7 +109,6 @@ impl Reader {
 
     /// Skips the next character and returns `true` if, and only if, the next character is equal to
     /// the passed character.
-    #[inline]
     pub fn eat(&mut self, character: char) -> bool {
         if self.has(character) {
             self.skip();
@@ -141,7 +130,6 @@ impl Reader {
     }
 
     /// Tests if the next character is a whitespace, according to [`char::is_whitespace`].
-    #[inline]
     pub fn has_whitespace(&self) -> bool {
         match self.peek() {
             Some(c) => c.is_whitespace(),
@@ -151,7 +139,6 @@ impl Reader {
 
     /// Skips all characters until the next non-whitespace character, according to
     /// [`char::is_whitespace`].
-    #[inline]
     pub fn skip_whitespace(&mut self) {
         while self.has_whitespace() {
             self.skip()
@@ -159,7 +146,6 @@ impl Reader {
     }
 
     /// Skips all characters until, and including, the next newline (`'\n'`) character.
-    #[inline]
     pub fn skip_line(&mut self) {
         while !self.eat('\n') {
             self.skip()
@@ -188,7 +174,6 @@ impl Reader {
     }
 
     /// Tests if the next character is a digit (`'0'..='9'`).
-    #[inline]
     pub fn has_digit(&self) -> bool {
         matches!(self.peek(), Some('0'..='9'))
     }
@@ -197,13 +182,11 @@ impl Reader {
     ///
     /// A character is allowed in a word if it is [alphanumeric](char::is_alphanumeric) or an
     /// underscore (`'_'`).
-    #[inline]
     pub fn is_word_character(c: char) -> bool {
         c.is_alphanumeric() || c == '_'
     }
 
     /// Tests if the next character is a word character, according to [`Self::is_word_character`].
-    #[inline]
     pub fn has_word_character(&self) -> bool {
         match self.peek() {
             Some(c) => Self::is_word_character(c),
@@ -213,7 +196,6 @@ impl Reader {
 
     /// Skips the next character and returns it if, and only if, it is a word character, according
     /// to [`Self::is_word_character`].
-    #[inline]
     pub fn eat_word_character(&mut self) -> Option<char> {
         match self.peek() {
             Some(c) if Self::is_word_character(c) => {

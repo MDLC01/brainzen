@@ -22,7 +22,6 @@ enum File {
 }
 
 impl File {
-    #[inline]
     fn new(path: impl AsRef<Path>) -> Self {
         Self::Path(Rc::new(path.as_ref().to_path_buf()))
     }
@@ -65,7 +64,6 @@ impl Span {
     };
 
     /// Creates a new span that starts at a specific position and covers `width + 1` columns.
-    #[inline]
     pub fn new(line: usize, column: usize, width: usize) -> Self {
         Self {
             start_line: line,
@@ -76,34 +74,29 @@ impl Span {
     }
 
     /// Creates a new span that starts at a specific position and covers a single column.
-    #[inline]
     pub fn new_at(line: usize, column: usize) -> Self {
         Self::new(line, column, 0)
     }
 
     /// Creates a new span that starts and ends on the first column of the line after the first line
     /// of this span.
-    #[inline]
     pub fn next_line(self) -> Self {
         Self::new_at(self.start_line + 1, 0)
     }
 
     /// Creates a new span that starts and ends on the column right after the first column of this
     /// span.
-    #[inline]
     pub fn next_column(self) -> Self {
         Self::new_at(self.start_line, self.start_column + 1)
     }
 
     /// Creates a new span that starts at the start of this span, but covers `width + 1` columns.
-    #[inline]
     pub fn with_length(self, width: usize) -> Self {
         Self::new(self.start_line, self.start_column, width)
     }
 
     /// Creates a new span that starts at the start of this span, but covers `amount` more columns
     /// than this span.
-    #[inline]
     pub fn extended_by(self, amount: usize) -> Self {
         Self {
             start_line: self.start_line,
@@ -117,7 +110,6 @@ impl Span {
     /// span.
     ///
     /// Panics if `end` ends before the start of this span.
-    #[inline]
     pub fn extended_to(self, end: Self) -> Self {
         let height = end.start_line + end.height - self.start_line;
         assert!(height != 0 || end.end_column >= self.start_column);
@@ -130,13 +122,11 @@ impl Span {
     }
 
     /// Creates a new span that starts and ends at the start of this span.
-    #[inline]
     pub fn collapse(self) -> Self {
         Self::new_at(self.start_line, self.start_column)
     }
 
     /// Creates a new span that starts and ends on the column right after the end of this span.
-    #[inline]
     pub fn after(self) -> Self {
         Self::new_at(self.start_line + self.height, self.end_column + 1)
     }
@@ -223,7 +213,6 @@ impl Location {
     };
 
     /// Creates a new location that is at the start of a file.
-    #[inline]
     pub fn start_of_file(file_path: impl AsRef<Path>) -> Self {
         Self {
             file: File::new(file_path),
@@ -231,7 +220,6 @@ impl Location {
         }
     }
 
-    #[inline]
     pub fn new(file_path: PathBuf, line: usize, column: usize, length: usize) -> Self {
         Self {
             file: File::Path(Rc::new(file_path)),
@@ -242,7 +230,6 @@ impl Location {
     /// Creates a new location that is at the line after this location.
     ///
     /// The new location is created with a length of 1.
-    #[inline]
     pub fn next_line(&self) -> Self {
         Self {
             file: self.file.clone(),
@@ -253,7 +240,6 @@ impl Location {
     /// Creates a new location that is at the column right after the start of this location.
     ///
     /// The new location is created with a length of 1.
-    #[inline]
     pub fn next_column(&self) -> Self {
         Self {
             file: self.file.clone(),
@@ -262,7 +248,6 @@ impl Location {
     }
 
     /// Creates a new location by changing the length of this location.
-    #[inline]
     pub fn with_length(&self, length: usize) -> Self {
         Self {
             file: self.file.clone(),
@@ -271,7 +256,6 @@ impl Location {
     }
 
     /// Creates a new location by extending this one by the specified amount.
-    #[inline]
     pub fn extended_by(&self, amount: usize) -> Self {
         Self {
             file: self.file.clone(),
@@ -280,7 +264,6 @@ impl Location {
     }
 
     /// Creates a new location by extending this one to the end of the passed location.
-    #[inline]
     pub fn extended_to(&self, location: &Location) -> Self {
         assert_eq!(location.file, self.file);
         Self {
@@ -290,7 +273,6 @@ impl Location {
     }
 
     /// Creates a location that is at the start of this location.
-    #[inline]
     pub fn collapse(&self) -> Self {
         Self {
             file: self.file.clone(),
@@ -299,7 +281,6 @@ impl Location {
     }
 
     /// Creates a new location that is right after this location.
-    #[inline]
     pub fn after(&self) -> Self {
         Self {
             file: self.file.clone(),
@@ -308,13 +289,11 @@ impl Location {
     }
 
     /// Returns the span associated with this location.
-    #[inline]
     pub fn span(&self) -> Span {
         self.span
     }
 
     /// Boxes a value and locates it.
-    #[inline]
     pub fn attach<T>(self, value: T) -> Located<Box<T>> {
         Located::new_boxed(self, value)
     }
@@ -342,25 +321,21 @@ pub struct Located<T> {
 
 impl<T> Located<T> {
     /// Constructs a new located value.
-    #[inline]
     pub fn new(location: Location, value: T) -> Self {
         Self { location, value }
     }
 
     /// Constructs a new located value with an [unknown location][`Location::UNKNOWN`].
-    #[inline]
     pub fn new_unknown(value: T) -> Self {
         Self::new(Location::UNKNOWN, value)
     }
 
     /// Returns an owned location.
-    #[inline]
     pub fn location(&self) -> Location {
         self.location.to_owned()
     }
 
     /// Applies a function to this value and returns the result with the same location.
-    #[inline]
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Located<U> {
         Located::new(self.location, f(self.value))
     }
@@ -369,20 +344,17 @@ impl<T> Located<T> {
     ///
     /// If the function returns an error, it is propagated. Otherwise, the result is returned, with
     /// the same location.
-    #[inline]
     pub fn try_map<R, E>(self, f: impl FnOnce(T) -> Result<R, E>) -> Result<Located<R>, E> {
         let mapped_value = f(self.value)?;
         Ok(Located::new(self.location, mapped_value))
     }
 
     /// Returns a located box containing this value (location is unchanged).
-    #[inline]
     pub fn boxed(self) -> Located<Box<T>> {
         self.map(Box::new)
     }
 
     /// Returns a located reference to this value.
-    #[inline]
     pub fn as_ref(&self) -> Located<&T> {
         Located::new(self.location(), &self.value)
     }
@@ -390,32 +362,27 @@ impl<T> Located<T> {
 
 impl<T> Located<Box<T>> {
     /// Constructs a new located [`Box<T>`].
-    #[inline]
     pub fn new_boxed(location: Location, value: T) -> Self {
         Self::new(location, Box::new(value))
     }
 
     /// Returns the unboxed value.
-    #[inline]
     pub fn unbox(self) -> T {
         *self.value
     }
 
     /// Converts this located box to a located value.
-    #[inline]
     pub fn unboxed(self) -> Located<T> {
         Located::new(self.location, *self.value)
     }
 
     /// Returns a new located reference to the value inside this box.
-    #[inline]
     pub fn box_as_ref(&self) -> Located<&T> {
         Located::new(self.location(), &self.value)
     }
 }
 
 impl<T: Eq> PartialEq for Located<T> {
-    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.value == other.value
     }
@@ -424,7 +391,6 @@ impl<T: Eq> PartialEq for Located<T> {
 impl<T: Eq> Eq for Located<T> {}
 
 impl<T: Hash> Hash for Located<T> {
-    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.value.hash(state)
     }

@@ -55,7 +55,6 @@ macro_rules! define_symbols {
         impl $enum_name {
             /// Returns a vector of `(value, symbol)` pairs, ordered by reverse length of `value`
             /// where `value` is the string representation of the corresponding `symbol`.
-            #[inline]
             pub fn symbols() -> Vec<(&'static str, Self)> {
                 let mut symbols = vec![ $( ($symbol_value, Self::$symbol_name) ), * ];
                 symbols.sort_by(|(string, _), (other_string, _)| other_string.len().cmp(&string.len()));

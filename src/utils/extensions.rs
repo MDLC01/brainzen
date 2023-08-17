@@ -14,7 +14,6 @@ pub trait OptionFlatten<'a, T> {
 }
 
 impl<'a, T> OptionFlatten<'a, T> for Option<&'a Option<T>> {
-    #[inline]
     fn flatten(self) -> Option<&'a T> {
         match self {
             None => None,
@@ -32,7 +31,6 @@ pub trait OptionExtensions<T> {
 }
 
 impl<T> OptionExtensions<T> for Option<T> {
-    #[inline]
     fn is_none_or(self, f: impl FnOnce(T) -> bool) -> bool {
         match self {
             None => true,
@@ -48,7 +46,6 @@ pub trait ResultExtensions<T, E> {
 }
 
 impl<T, E> ResultExtensions<T, E> for Result<T, E> {
-    #[inline]
     fn ok_or<F>(self, err: F) -> Result<T, F> {
         match self {
             Ok(x) => Ok(x),
@@ -67,7 +64,6 @@ impl<I, T> TryCollectOption<T> for I
 where
     I: Iterator<Item=Option<T>>,
 {
-    #[inline]
     fn try_collect<B: FromIterator<T>>(self) -> Option<B> {
         self.collect()
     }
@@ -83,7 +79,6 @@ impl<I, T, E> TryCollectResult<T, E> for I
 where
     I: Iterator<Item=Result<T, E>>,
 {
-    #[inline]
     fn try_collect<B: FromIterator<T>>(self) -> Result<B, E> {
         self.collect()
     }

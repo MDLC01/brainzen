@@ -33,7 +33,6 @@ impl<T: WithOwned, U: WithOwned> WithOwned for (T, U) {
     ///     x.with_owned()
     /// }
     /// ```
-    #[inline]
     fn with_owned(self) -> Self::Owned {
         let (t, u) = self;
         (t.with_owned(), u.with_owned())

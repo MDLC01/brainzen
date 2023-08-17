@@ -387,7 +387,6 @@ pub(super) struct ParseChoice<'a, T> {
 
 impl<T> ParseChoice<'_, T> {
     /// Tries another parser. If a parser already succeeded, this does not do anything.
-    #[inline]
     pub fn branch(mut self, parser: impl FnOnce(&mut TokenStream) -> CompilationResult<T>) -> Self {
         self.state = self.state.update(|| self.tokens.try_parse(parser));
         self
@@ -395,7 +394,6 @@ impl<T> ParseChoice<'_, T> {
 
     /// Returns the result of the first parser that succeeded. If no parser succeeded, returns the
     /// result of the provided default parser.
-    #[inline]
     pub fn parse_or(self, default: impl FnOnce(&mut TokenStream) -> CompilationResult<T>) -> CompilationResult<T> {
         match self.state {
             ChoiceState::Value(value) => Ok(value),
@@ -408,7 +406,6 @@ impl<T> ParseChoice<'_, T> {
     /// If no parser succeeded, returns the [`LocatedException`] corresponding to the first
     /// parser that read at least one token. If no parser read at least one token, a generic
     /// "expected" compilation exception is returned.
-    #[inline]
     pub fn parse(self, description: impl Display) -> CompilationResult<T> {
         match self.state {
             ChoiceState::Nothing => Err(LocatedException::expected(self.tokens.location(), description)),
@@ -419,7 +416,6 @@ impl<T> ParseChoice<'_, T> {
 
     /// Returns the located result of the first parser that succeeded. If no parser succeeded,
     /// returns a [`LocatedException`].
-    #[inline]
     pub fn locate(self, description: impl Display) -> LocatedResult<T> {
         let location = self.tokens.location_from(&self.start_location);
         self.parse(description).map(|value| Located::new(location, value))
