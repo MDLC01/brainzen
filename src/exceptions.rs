@@ -184,6 +184,11 @@ impl<S> CompilationException<S> {
             .build_without_hint()
     }
 
+    pub fn expected_definition_colon_or_equal(source: S) -> Self {
+        ExceptionBuilder::new_syntax_error(source, format!("Expected `{}` or `{}`", Symbol::Colon, Symbol::Equal))
+            .build(format!("Use `{}`, followed by an expression, to initialize the value.", Symbol::Equal))
+    }
+
     pub fn expected_expression(source: S) -> Self {
         ExceptionBuilder::new_expected(source, "expression")
             .build_without_hint()

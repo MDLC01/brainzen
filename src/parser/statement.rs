@@ -37,7 +37,7 @@ impl Construct for Instruction {
                 let value = Expression::locate(tokens)?;
                 Ok(Self::Initialization(target, value))
             } else {
-                todo!()
+                Err(LocatedException::expected_definition_colon_or_equal(tokens.location()))
             }
         } else if tokens.eat(RETURN_KEYWORD) {
             // Return
