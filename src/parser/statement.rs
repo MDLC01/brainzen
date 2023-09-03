@@ -1,12 +1,12 @@
-use crate::exceptions::CompilationResult;
-use crate::lexer::tokens::Symbol;
+use crate::exceptions::{CompilationResult, LocatedException};
+use crate::lexer::lexemes::Symbol;
 use crate::location::{Located, Sequence};
-use crate::parser::{DO_KEYWORD, ELSE_KEYWORD, IF_KEYWORD, LET_KEYWORD, LOOP_KEYWORD, RETURN_KEYWORD, WHILE_KEYWORD};
 use crate::parser::expression::Expression;
 use crate::parser::target::{AssignmentTarget, DefinitionTarget};
 use crate::parser::token_stream::{Construct, TokenStream};
 use crate::parser::type_descriptor::TypeDescriptor;
 use crate::reference::Reference;
+use crate::tokenizer::tokens::{BracketKind, Keyword};
 
 /// An instruction is a statement that does not contain child statements.
 #[derive(Debug)]
@@ -23,9 +23,9 @@ pub enum Instruction {
 }
 
 impl Construct for Instruction {
-    /// Parses a single instruction, without the trailing semicolon.
-    fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
-        if tokens.eat(LET_KEYWORD) {
+    /// Reads a single instruction, without the trailing semicolon.
+    fn read(tokens: &mut TokenStream) -> CompilationResult<Self> {
+        if tokens.eat(Keyword::Let) {
             // Definition
             let target = DefinitionTarget::locate(tokens)?;
             if tokens.eat(Symbol::Colon) {
@@ -39,21 +39,21 @@ impl Construct for Instruction {
             } else {
                 Err(LocatedException::expected_definition_colon_or_equal(tokens.location()))
             }
-        } else if tokens.eat(RETURN_KEYWORD) {
+        } else if tokens.eat(Keyword::Return) {
             // Return
             let value = Expression::locate(tokens)?;
             Ok(Self::Return(value))
-        } else if let Some(reference) = tokens.eat_located_reference_with(Symbol::DoublePlus) {
+        } else if let Some(reference) = tokens.next_located_reference_with(Symbol::DoublePlus) {
             // Increment
             Ok(Self::Increment(reference))
-        } else if let Some(reference) = tokens.eat_located_reference_with(Symbol::DoubleMinus) {
+        } else if let Some(reference) = tokens.next_located_reference_with(Symbol::DoubleMinus) {
             // Decrement
             Ok(Self::Decrement(reference))
-        } else if let Some(reference) = tokens.eat_located_reference_with(Symbol::OpenParenthesis) {
+        } else if let Some((reference, body)) = tokens.next_located_reference_with_parenthesized(BracketKind::Round) {
             // Procedure call
-            let arguments = Expression::parse_delimited_separated_sequence(tokens, Symbol::Comma, Symbol::CloseParenthesis)?;
+            let arguments = Expression::parse_separated_sequence(body, Symbol::Comma)?;
             Ok(Self::ProcedureCall(reference.value, arguments))
-        } else if let Some(reference) = tokens.eat_located_reference_with(Symbol::QuestionMark) {
+        } else if let Some(reference) = tokens.next_located_reference_with(Symbol::QuestionMark) {
             // Context snapshot on variable
             Ok(Self::ContextSnapshot(Some(reference)))
         } else if tokens.eat(Symbol::QuestionMark) {
@@ -89,37 +89,37 @@ pub enum Statement {
 
 
 impl Construct for Statement {
-    /// Parses a statement.
+    /// Reads a statement.
     ///
     /// The statement might be a block. To only allow blocks, use [`StatementBlock::parse_block`].
-    fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
+    fn read(tokens: &mut TokenStream) -> CompilationResult<Self> {
         if tokens.is(Symbol::OpenBrace) {
             // Block
-            let block = StatementBlock::parse(tokens)?;
+            let block = StatementBlock::read(tokens)?;
             Ok(Self::Block(block))
-        } else if tokens.eat(LOOP_KEYWORD) {
+        } else if tokens.eat(Keyword::Loop) {
             // Loop
             let count = Expression::locate(tokens)?;
-            let body = StatementBlock::parse(tokens)?;
+            let body = StatementBlock::read(tokens)?;
             Ok(Self::Loop { count, body })
-        } else if tokens.eat(WHILE_KEYWORD) {
+        } else if tokens.eat(Keyword::While) {
             // While loop
             let test = Expression::locate(tokens)?;
-            let body = StatementBlock::parse(tokens)?;
+            let body = StatementBlock::read(tokens)?;
             Ok(Self::WhileLoop { test, body })
-        } else if tokens.eat(DO_KEYWORD) {
+        } else if tokens.eat(Keyword::Do) {
             // Do-while loop
-            let body = StatementBlock::parse(tokens)?;
-            tokens.consume(WHILE_KEYWORD)?;
+            let body = StatementBlock::read(tokens)?;
+            tokens.consume(Keyword::While)?;
             let test = Expression::locate(tokens)?;
             tokens.consume(Symbol::Semicolon)?;
             Ok(Self::DoWhileLoop { body, test })
-        } else if tokens.eat(IF_KEYWORD) {
+        } else if tokens.eat(Keyword::If) {
             // Conditional branching
             let test = Expression::locate(tokens)?;
-            let if_body = StatementBlock::parse(tokens)?;
-            if tokens.eat(ELSE_KEYWORD) {
-                let else_body = StatementBlock::parse(tokens)?;
+            let if_body = StatementBlock::read(tokens)?;
+            if tokens.eat(Keyword::Else) {
+                let else_body = StatementBlock::read(tokens)?;
                 Ok(Self::ConditionalBranching { test, if_body, else_body: Some(else_body) })
             } else {
                 Ok(Self::ConditionalBranching { test, if_body, else_body: None })
@@ -147,12 +147,14 @@ impl IntoIterator for StatementBlock {
 }
 
 impl Construct for StatementBlock {
-    /// Parses a statement block.
+    /// Reads a statement block.
     ///
-    /// To allow any statement, use [`Statement::parse`].
-    fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
-        tokens.expect(Symbol::OpenBrace)?;
-        let statements = Statement::parse_delimited_sequence(tokens, Symbol::CloseBrace)?;
+    /// To allow any statement, use [`Statement::read`].
+    fn read(tokens: &mut TokenStream) -> CompilationResult<Self> {
+        let Some(body) = tokens.next_parenthesized(BracketKind::Curly) else {
+            return Err(LocatedException::expected_statement_block(tokens.location()));
+        };
+        let statements = Statement::parse_sequence(body)?;
         Ok(Self(statements))
     }
 }

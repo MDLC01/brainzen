@@ -11,20 +11,22 @@ use utils::extensions::VecExtensions;
 use crate::exceptions::CompilationResult;
 use crate::generator::brainfuck_code::BrainfuckCode;
 use crate::generator::compile_subroutines;
-use crate::lexer::tokenize;
+use crate::lexer::lex;
 use crate::parser::parse_file;
 use crate::reference::Reference;
+use crate::tokenizer::tokenize;
 use crate::type_checker::type_check_and_get_subroutines;
 
+mod utils;
+mod reference;
 mod location;
 mod exceptions;
-mod parser;
 mod lexer;
+mod tokenizer;
+mod parser;
 mod type_checker;
 mod generator;
 mod test;
-mod utils;
-mod reference;
 
 
 /// A set of optimizations to apply or not.
@@ -65,7 +67,8 @@ const MAIN_SUBROUTINE: &str = "main";
 
 /// Converts Brainzen source code to Brainfuck code.
 fn compile(source: impl AsRef<Path>, content: &str, optimizations: &OptimizationSettings) -> CompilationResult<BrainfuckCode> {
-    let tokens = tokenize(&source, content)?;
+    let lexemes = lex(&source, content)?;
+    let tokens = tokenize(lexemes)?;
     let parsed_file = parse_file(&source, tokens)?;
     let main_subroutine = Reference::with_identifier(MAIN_SUBROUTINE);
     let (subroutines, main_procedure_id) = type_check_and_get_subroutines(&main_subroutine, parsed_file, optimizations)?;

@@ -1,8 +1,9 @@
 use crate::exceptions::CompilationResult;
-use crate::lexer::tokens::Symbol;
+use crate::lexer::lexemes::Symbol;
 use crate::location::Located;
 use crate::parser::expression::Expression;
 use crate::parser::token_stream::{Construct, TokenStream};
+use crate::tokenizer::tokens::BracketKind;
 use crate::utils::product::{MaybeProduct2, Product};
 
 /// A target is a pattern that can be used to unpack a value.
@@ -16,16 +17,16 @@ pub enum Target<D> {
 }
 
 impl<D: Construct> Construct for Target<D> {
-    fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
-        if tokens.eat(Symbol::OpenParenthesis) {
-            let elements = Self::parse_delimited_separated_sequence(tokens, Symbol::Comma, Symbol::CloseParenthesis)?;
+    fn read(tokens: &mut TokenStream) -> CompilationResult<Self> {
+        if let Some(body) = tokens.next_parenthesized(BracketKind::Round) {
+            let elements = Self::parse_separated_sequence(body, Symbol::Comma)?;
             match elements.into() {
                 MaybeProduct2::None => Ok(Self::Unit),
                 MaybeProduct2::Single(element) => Ok(element.value),
                 MaybeProduct2::Product(elements) => Ok(Self::Tuple(elements)),
             }
         } else {
-            let destination = D::parse(tokens)?;
+            let destination = D::read(tokens)?;
             Ok(Self::Destination(destination))
         }
     }
@@ -38,7 +39,7 @@ pub enum DefinitionTargetDestination {
 }
 
 impl Construct for DefinitionTargetDestination {
-    fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
+    fn read(tokens: &mut TokenStream) -> CompilationResult<Self> {
         let identifier = tokens.read_identifier()?;
         Ok(Self::Variable(identifier))
     }
@@ -55,7 +56,7 @@ pub enum AssignmentTargetDestination {
 }
 
 impl Construct for AssignmentTargetDestination {
-    fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
+    fn read(tokens: &mut TokenStream) -> CompilationResult<Self> {
         let start_location = tokens.location();
         let identifier = tokens.read_identifier()?;
         let mut location = tokens.location_from(&start_location);

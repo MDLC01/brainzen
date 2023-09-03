@@ -1,11 +1,11 @@
 use crate::exceptions::{CompilationResult, LocatedException};
-use crate::lexer::tokens::Symbol;
+use crate::lexer::lexemes::Symbol;
 use crate::location::{Located, Sequence};
 use crate::parser::expression::Expression;
-use crate::parser::{FUNC_KEYWORD, NAMESPACE_KEYWORD, NATIVE_KEYWORD, PUBLIC_KEYWORD, TYPE_KEYWORD};
 use crate::parser::statement::StatementBlock;
 use crate::parser::token_stream::{Construct, TokenStream};
 use crate::parser::type_descriptor::TypeDescriptor;
+use crate::tokenizer::tokens::{BracketKind, Keyword};
 use crate::utils::Visibility;
 
 /// An argument in a subroutine signature.
@@ -16,10 +16,10 @@ pub struct SubroutineArgument {
 }
 
 impl Construct for SubroutineArgument {
-    fn parse(tokens: &mut TokenStream) -> CompilationResult<SubroutineArgument> {
+    fn read(tokens: &mut TokenStream) -> CompilationResult<SubroutineArgument> {
         let identifier = tokens.read_identifier()?;
         tokens.expect(Symbol::Colon)?;
-        let r#type = TypeDescriptor::parse(tokens)?;
+        let r#type = TypeDescriptor::read(tokens)?;
         Ok(SubroutineArgument { name: identifier, r#type })
     }
 }
@@ -51,11 +51,13 @@ pub struct NamespaceElementHolder {
     pub element: NamespaceElement,
 }
 
-/// Parses a subroutine header (identifier, arguments and return type).
-fn parse_subroutine_header(tokens: &mut TokenStream) -> CompilationResult<(String, Sequence<SubroutineArgument>, Option<Located<TypeDescriptor>>)> {
+/// Reads a subroutine header (identifier, arguments and return type).
+fn read_subroutine_header(tokens: &mut TokenStream) -> CompilationResult<(String, Sequence<SubroutineArgument>, Option<Located<TypeDescriptor>>)> {
     let identifier = tokens.read_identifier()?;
-    tokens.consume(Symbol::OpenParenthesis)?;
-    let arguments = SubroutineArgument::parse_delimited_separated_sequence(tokens, Symbol::Comma, Symbol::CloseParenthesis)?;
+    let Some(body) = tokens.next_parenthesized(BracketKind::Round) else {
+        return Err(LocatedException::expected_subroutine_argument_declaration(tokens.location()));
+    };
+    let arguments = SubroutineArgument::parse_separated_sequence(body, Symbol::Comma)?;
     let return_type = if tokens.eat(Symbol::Arrow) {
         Some(TypeDescriptor::locate(tokens)?)
     } else {
@@ -65,9 +67,9 @@ fn parse_subroutine_header(tokens: &mut TokenStream) -> CompilationResult<(Strin
 }
 
 impl Construct for NamespaceElementHolder {
-    /// Parses a full namespace element definition.
-    fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
-        let visibility = if tokens.eat(PUBLIC_KEYWORD) {
+    /// Reads a full namespace element definition.
+    fn read(tokens: &mut TokenStream) -> CompilationResult<Self> {
+        let visibility = if tokens.eat(Keyword::Public) {
             Visibility::Public
         } else {
             Visibility::Private
@@ -78,33 +80,35 @@ impl Construct for NamespaceElementHolder {
             tokens.expect(Symbol::Equal)?;
             let value = Expression::locate(tokens)?;
             (identifier, NamespaceElement::Constant(value))
-        } else if tokens.eat(TYPE_KEYWORD) {
+        } else if tokens.eat(Keyword::Type) {
             // Type alias
             let identifier = tokens.read_identifier()?;
             tokens.expect(Symbol::Equal)?;
-            let value = TypeDescriptor::parse(tokens)?;
+            let value = TypeDescriptor::read(tokens)?;
             tokens.expect(Symbol::Semicolon)?;
             (identifier, NamespaceElement::TypeAlias(value))
-        } else if tokens.eat(FUNC_KEYWORD) {
+        } else if tokens.eat(Keyword::Func) {
             // Subroutine
-            let (identifier, arguments, return_type) = parse_subroutine_header(tokens)?;
+            let (identifier, arguments, return_type) = read_subroutine_header(tokens)?;
             let body = StatementBlock::locate(tokens)?;
             let subroutine = SubroutineBody::StatementBlock(body);
             (identifier, NamespaceElement::Subroutine(arguments, return_type, subroutine))
-        } else if tokens.eat(NATIVE_KEYWORD) {
+        } else if tokens.eat(Keyword::Native) {
             // Native subroutine
-            tokens.consume(FUNC_KEYWORD)?;
-            let (identifier, arguments, return_type) = parse_subroutine_header(tokens)?;
+            tokens.consume(Keyword::Func)?;
+            let (identifier, arguments, return_type) = read_subroutine_header(tokens)?;
             tokens.consume(Symbol::Tilde)?;
             let offset = Expression::locate(tokens)?;
             let code = tokens.read_native_code_block()?;
             let body = SubroutineBody::Native { offset, code };
             (identifier, NamespaceElement::Subroutine(arguments, return_type, body))
-        } else if tokens.eat(NAMESPACE_KEYWORD) {
+        } else if tokens.eat(Keyword::Namespace) {
             // Namespace
             let identifier = tokens.read_identifier()?;
-            tokens.consume(Symbol::OpenBrace)?;
-            let elements = NamespaceElementHolder::parse_delimited_sequence(tokens, Symbol::CloseBrace)?;
+            let Some(body) = tokens.next_parenthesized(BracketKind::Curly) else {
+                return Err(LocatedException::expected_namespace_body(tokens.location()));
+            };
+            let elements = NamespaceElementHolder::parse_sequence(body)?;
             (identifier, NamespaceElement::Namespace(elements))
         } else {
             return Err(LocatedException::expected_namespace_element(tokens.location()));

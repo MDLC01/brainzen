@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 
 use crate::exceptions::{CompilationException, CompilationResult};
-use crate::lexer::tokens::Symbol;
+use crate::lexer::lexemes::Symbol;
 use crate::location::{Located, Location};
 use crate::type_checker::types::{Type, Value};
 use crate::utils::product::Product;

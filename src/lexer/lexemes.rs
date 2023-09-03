@@ -2,7 +2,6 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 
 use crate::location::Sequence;
-use crate::reference::Reference;
 use crate::utils::write_iterator;
 
 /// Lower priorities are applied first. For example, [`Priority::Multiplication`] < [`Priority::Addition`].
@@ -145,42 +144,57 @@ define_symbols! {
 }
 
 
-/// A Brainzen token.
+/// A Brainzen lexeme.
 ///
-/// A token corresponds to a substring of the input, and carries some additional meaning.
+/// A lexeme corresponds to a substring of the input, and carries some additional meaning.
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum Token {
-    /// Represents a symbol (like `==`, `->` or `}`).
+pub enum Lexeme {
+    /// # Symbols
+    ///
+    /// A *symbol* is a specific string of non-word characters that corresponds to a known pattern
+    /// (e.g., `==`, `->` or `}`).
+    ///
+    /// See [`Symbol`].
     Symbol(Symbol),
-    /// Represents a [`Reference`].
+    /// # Words
     ///
-    /// Might be a single word, i.e., a sequence of word characters (`A`–`Z`, `a`–`z`, `0`–`9`)
-    /// surrounded by non-word characters.
+    /// A *word* is a succession of so-called *word characters* (`A`–`Z`, `a`–`z`, `0`–`9`, `_`)
+    /// that does not start with a digit, surrounded by non-word characters.
+    Word(String),
+    /// # Numeric literals
     ///
-    /// Note that keywords are actually parsed as a reference with no namespace. There is no such
-    /// thing as keywords from the lexer's point of view.
-    Reference(Reference),
-    /// Represents a numeric literal.
+    /// A *numeric literal* is a succession of digits (`0`–`9`) surrounded by non-word characters,
+    /// interpreted as a base-ten integer. Optionally, it can start with `0x` to indicate a base-
+    /// sixteen integer.
+    ///
+    /// Note that the optional `-` before a numeric literal is interpreted as a separate
+    /// [symbol](Lexeme::Symbol).
     Numeric(u32),
-    /// Represents a character literal.
+    /// # Character literals
     ///
-    /// A character literal consists of a single ASCII character, surrounded by single quotes.
-    Character(u8),
-    /// Represents a string literal.
-    String(Sequence<u8>),
-    /// Represents a block of native (Brainfuck) code.
+    /// A *character literal* consists of a single character or escape sequence, surrounded by
+    /// single quotes.
+    Character(char),
+    /// # String literals
+    ///
+    /// A *string literal* consists of a succession of characters or escape sequences, surrounded by
+    /// double quotes.
+    String(Sequence<char>),
+    /// # Native code block
+    ///
+    /// A *native code block* is a succession of characters surrounded by backticks.
     NativeCodeBlock(String),
 }
 
-impl Display for Token {
+impl Display for Lexeme {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Token::Symbol(symbol) => write!(f, "{}", symbol),
-            Token::Reference(reference) => write!(f, "{}", reference),
-            Token::Numeric(value) => write!(f, "{}", value),
-            Token::Character(character) => write!(f, "'{}'", *character as char),
-            Token::String(characters) => write_iterator!(f, characters, "", "\"", "\""),
-            Token::NativeCodeBlock(code) => write!(f, "```{}```", code),
+            Self::Symbol(symbol) => write!(f, "{}", symbol),
+            Self::Word(word) => write!(f, "{}", word),
+            Self::Numeric(value) => write!(f, "{}", value),
+            Self::Character(character) => write!(f, "'{}'", character),
+            Self::String(characters) => write_iterator!(f, characters, "", "\"", "\""),
+            Self::NativeCodeBlock(code) => write!(f, "```{}```", code),
         }
     }
 }

@@ -1,10 +1,10 @@
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 
-use crate::lexer::tokens::Symbol;
+use crate::lexer::lexemes::Symbol;
 use crate::location::Location;
-use crate::parser::PUBLIC_KEYWORD;
 use crate::reference::Reference;
+use crate::tokenizer::tokens::{BracketKind, Keyword};
 use crate::type_checker::operations::Operation;
 use crate::type_checker::types::Type;
 
@@ -157,6 +157,11 @@ impl<S> CompilationException<S> {
             .build("Only non-control ASCII characters are allowed in literals.")
     }
 
+    pub fn unmatched_bracket(source: S, bracket_kind: BracketKind) -> Self {
+        ExceptionBuilder::new_syntax_error(source, format!("Unmatched `{}`", bracket_kind.get_opening()))
+            .build_without_hint()
+    }
+
     /// This constructor is for highly generic cases. For more specific cases, it is preferable to
     /// use a more semantically accurate `expected_*` constructor.
     pub fn expected(source: S, expected: impl Display) -> Self {
@@ -184,6 +189,26 @@ impl<S> CompilationException<S> {
             .build_without_hint()
     }
 
+    pub fn expected_namespace_element(source: S) -> Self {
+        ExceptionBuilder::new_expected(source, "namespace element")
+            .build_without_hint()
+    }
+
+    pub fn expected_namespace_body(source: S) -> Self {
+        ExceptionBuilder::new_expected(source, "namespace body")
+            .build("Surround the body of the namespace with curly braces (`{}`) even if it contains a single element.")
+    }
+
+    pub fn expected_subroutine_argument_declaration(source: S) -> Self {
+        ExceptionBuilder::new_expected(source, "subroutine argument declaration")
+            .build("If the subroutine does not accept any argument, use `()`.")
+    }
+
+    pub fn expected_statement_block(source: S) -> Self {
+        ExceptionBuilder::new_expected(source, "statement block")
+            .build("A statement block must be surrounded in curly braces (`{}`) even if it contains a single element.")
+    }
+
     pub fn expected_definition_colon_or_equal(source: S) -> Self {
         ExceptionBuilder::new_syntax_error(source, format!("Expected `{}` or `{}`", Symbol::Colon, Symbol::Equal))
             .build(format!("Use `{}`, followed by an expression, to initialize the value.", Symbol::Equal))
@@ -194,13 +219,8 @@ impl<S> CompilationException<S> {
             .build_without_hint()
     }
 
-    pub fn expected_namespace_element(source: S) -> Self {
-        ExceptionBuilder::new_expected(source, "namespace_element")
-            .build_without_hint()
-    }
-
     pub fn integer_literal_too_large(source: S) -> Self {
-        ExceptionBuilder::new_syntax_error(source, "Integer literal is too large")
+        ExceptionBuilder::new(source, "Integer literal is too large")
             .build(format!("The value of an integer literal must not exceed {}", i32::MAX))
     }
 
@@ -226,7 +246,7 @@ impl<S> CompilationException<S> {
 
     pub fn inaccessible_element(source: S, element_type: &str, reference: &Reference) -> Self {
         ExceptionBuilder::new_type_error(source, format!("{} {} is inaccessible from here", element_type, reference))
-            .build(format!("If possible, try making {} public using the {} keyword.", reference, PUBLIC_KEYWORD))
+            .build(format!("If possible, try making {} public using the `{}` keyword.", reference, Keyword::Public))
     }
 
     pub fn negative_offset(source: S) -> Self {

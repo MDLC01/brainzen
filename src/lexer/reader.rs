@@ -1,8 +1,8 @@
 use std::mem;
 use std::path::Path;
 
-use crate::exceptions::{LocatedException, CompilationResult};
-use crate::lexer::tokens::Symbol;
+use crate::exceptions::{CompilationResult, LocatedException};
+use crate::lexer::lexemes::Symbol;
 use crate::location::{Located, Location};
 
 /// A reader can be used to read Brainzen source code.
@@ -242,22 +242,22 @@ impl Reader {
     ///
     /// If the next character is a backslash (`'\'`), an escape sequence for a single character is
     /// read.
-    pub fn expect_literal_character(&mut self, delimiter: char) -> CompilationResult<Located<u8>> {
+    pub fn expect_literal_character(&mut self, delimiter: char) -> CompilationResult<Located<char>> {
         let location = self.location();
         match self.next() {
             // Escape sequence
             Some('\\') => {
                 let escape_location = self.location();
                 let escaped_character = match self.next() {
-                    Some('n') => b'\n',
-                    Some('r') => b'\r',
-                    Some('t') => b'\t',
-                    Some('b') => b'\x08',
-                    Some('f') => b'\x0C',
-                    Some('\\') => b'\\',
-                    Some('"') => b'"',
-                    Some('\'') => b'\'',
-                    Some('x') => (self.expect_digit(16)? * 16 + self.expect_digit(16)?) as u8,
+                    Some('n') => '\n',
+                    Some('r') => '\r',
+                    Some('t') => '\t',
+                    Some('b') => '\x08',
+                    Some('f') => '\x0C',
+                    Some('\\') => '\\',
+                    Some('"') => '"',
+                    Some('\'') => '\'',
+                    Some('x') => (self.expect_digit(16)? * 16 + self.expect_digit(16)?) as u8 as char,
                     Some(c) if c != '\n' => {
                         return Err(LocatedException::invalid_escape_sequence(location.extended_to(&escape_location)));
                     }
@@ -273,7 +273,7 @@ impl Reader {
             }
             // Valid (ASCII, non-control) character
             Some(c) if c != '\n' => {
-                Ok(Located::new(location, c as u8))
+                Ok(Located::new(location, c))
             }
             // EOL / EOF
             _ => {

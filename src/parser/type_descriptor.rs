@@ -1,6 +1,6 @@
 use crate::exceptions::CompilationResult;
-use crate::lexer::tokens::Symbol;
-use crate::location::{Located, Sequence};
+use crate::lexer::lexemes::Symbol;
+use crate::location::{Located, LocatedResult, Sequence};
 use crate::parser::token_stream::{Construct, TokenStream};
 use crate::reference::Reference;
 
@@ -19,7 +19,7 @@ impl TypeDescriptor {
             if tokens.eat(Symbol::CloseParenthesis) {
                 Ok(Self::Unit)
             } else {
-                let descriptor = TypeDescriptor::parse(tokens)?;
+                let descriptor = TypeDescriptor::read(tokens)?;
                 tokens.expect(Symbol::CloseParenthesis)?;
                 Ok(descriptor)
             }
@@ -29,7 +29,7 @@ impl TypeDescriptor {
         }
     }
 
-    fn parse_factor(tokens: &mut TokenStream) -> CompilationResult<Self> {
+    fn parse_factor(tokens: &mut TokenStream) -> LocatedResult<Self> {
         let start_location = tokens.location();
         let mut operand = Self::parse_operand(tokens)?;
         let mut location = tokens.location_from(&start_location);
@@ -38,12 +38,12 @@ impl TypeDescriptor {
             operand = Self::Array(location.attach(operand));
             location = tokens.location_from(&start_location);
         }
-        Ok(operand)
+        Ok(Located::new(location, operand))
     }
 }
 
 impl Construct for TypeDescriptor {
-    fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
+    fn read(tokens: &mut TokenStream) -> CompilationResult<Self> {
         let mut factors = tokens.read_separated_items(Symbol::Star, Self::parse_factor)?;
         if factors.len() == 1 {
             Ok(factors.remove(0).value)

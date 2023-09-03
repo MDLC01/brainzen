@@ -1,8 +1,9 @@
 use crate::exceptions::{CompilationResult, LocatedException};
-use crate::lexer::tokens::{Priority, Symbol};
+use crate::lexer::lexemes::{Priority, Symbol};
 use crate::location::{Located, LocatedResult, Sequence};
 use crate::parser::token_stream::{Construct, TokenStream};
 use crate::reference::Reference;
+use crate::tokenizer::tokens::BracketKind;
 use crate::utils::product::{MaybeProduct2, Product};
 
 /// An expression is a peace of code that can be evaluated.
@@ -47,40 +48,35 @@ impl Expression {
         }
     }
 
-    /// Parses an operand for a prefix or infix operation.
+    /// Reads and locates an operand for a prefix or infix operation.
     fn locate_operand(tokens: &mut TokenStream) -> LocatedResult<Self> {
         let start_location = tokens.location();
-        let operand = if tokens.eat(Symbol::OpenParenthesis) {
+        let operand = if let Some(body) = tokens.next_parenthesized(BracketKind::Round) {
             // Unit, parenthesized expression, or tuple
-            let elements = Expression::parse_delimited_separated_sequence(tokens, Symbol::Comma, Symbol::CloseParenthesis)?;
+            let elements = Expression::parse_separated_sequence(body, Symbol::Comma)?;
             match elements.into() {
                 MaybeProduct2::None => Self::Unit,
                 MaybeProduct2::Single(element) => element.value,
                 MaybeProduct2::Product(elements) => Self::TupleLiteral(elements),
             }
-        } else if tokens.eat(Symbol::OpenBracket) {
+        } else if let Some(body) = tokens.next_parenthesized(BracketKind::Square) {
             // Array literal
-            let elements = Expression::parse_delimited_separated_sequence(tokens, Symbol::Comma, Symbol::CloseBracket)?;
+            let elements = Expression::parse_separated_sequence(body, Symbol::Comma)?;
             Self::ArrayLiteral(elements)
-        } else if let Some(reference) = tokens.eat_located_reference_with(Symbol::OpenParenthesis) {
+        } else if let Some((reference, body)) = tokens.next_located_reference_with_parenthesized(BracketKind::Round) {
             // Function call
-            let arguments = Expression::parse_delimited_separated_sequence(tokens, Symbol::Comma, Symbol::CloseParenthesis)?;
+            let arguments = Expression::parse_separated_sequence(body, Symbol::Comma)?;
             Self::FunctionCall(reference.value, arguments)
-        } else if let Some(reference) = tokens.eat_located_reference() {
+        } else if let Some(reference) = tokens.next_located_reference() {
             // Variable
             Self::Variable(reference)
-        } else if let Some(value) = tokens.eat_integer() {
+        } else if let Some(value) = tokens.next_integer() {
             // Integer literal
-            match value.try_into() {
-                Ok(value) => Self::IntegerLiteral(value),
-                Err(_) => {
-                    return Err(LocatedException::integer_literal_too_large(tokens.previous_location()));
-                }
-            }
-        } else if let Some(value) = tokens.eat_character() {
+            Self::IntegerLiteral(value)
+        } else if let Some(value) = tokens.next_character() {
             // Character literal
             Self::CharacterLiteral(value)
-        } else if let Some(characters) = tokens.eat_string() {
+        } else if let Some(characters) = tokens.next_string() {
             // String literal
             Self::tuple_from_characters(characters)
         } else {
@@ -90,7 +86,7 @@ impl Expression {
         Self::locate_postfix_operations(tokens, Located::new(location, operand))
     }
 
-    /// Parses postfix operations for the passed operand.
+    /// Reads and locates postfix operations for the passed operand.
     fn locate_postfix_operations(tokens: &mut TokenStream, operand: Located<Self>) -> LocatedResult<Self> {
         if tokens.eat(Symbol::OpenBracket) {
             let index = Self::locate(tokens)?;
@@ -116,7 +112,7 @@ impl Expression {
 
     fn locate_prefix_operation(tokens: &mut TokenStream) -> LocatedResult<Self> {
         let start_location = tokens.location();
-        match tokens.eat_unary_operator() {
+        match tokens.next_unary_operator() {
             Some(operator) => {
                 let operand = Self::locate_prefix_operation(tokens)?;
                 let location = tokens.location_from(&start_location);
@@ -131,7 +127,7 @@ impl Expression {
         /// `current_priority`, which must be the priority of `current_operator`.
         fn aux(tokens: &mut TokenStream, current_left_operand: Located<Expression>, current_operator: Symbol, current_priority: Priority) -> LocatedResult<Expression> {
             let current_right_operand = Expression::locate_prefix_operation(tokens)?;
-            match tokens.eat_binary_operator() {
+            match tokens.next_binary_operator() {
                 Some((new_operator, new_priority)) => {
                     if current_priority <= new_priority {
                         let new_left_operand_location = current_left_operand.location.extended_to(&current_right_operand.location);
@@ -164,7 +160,7 @@ impl Expression {
             }
         }
         let operand = Self::locate_prefix_operation(tokens)?;
-        match tokens.eat_binary_operator() {
+        match tokens.next_binary_operator() {
             Some((operator, priority)) => aux(tokens, operand, operator, priority),
             None => Ok(operand)
         }
@@ -172,7 +168,7 @@ impl Expression {
 }
 
 impl Construct for Expression {
-    fn parse(tokens: &mut TokenStream) -> CompilationResult<Self> {
+    fn read(tokens: &mut TokenStream) -> CompilationResult<Self> {
         Self::locate_infix_operation(tokens).map(|expression| expression.value)
     }
 

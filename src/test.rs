@@ -9,11 +9,12 @@ use std::path::PathBuf;
 
 use crate::exceptions::CompilationResult;
 use crate::generator::compile_subroutines;
-use crate::lexer::tokenize;
+use crate::lexer::lex;
 use crate::OptimizationSettings;
 use crate::parser::parse_file;
 use crate::reference::Reference;
 use crate::test::brainfuck::interpret;
+use crate::tokenizer::tokenize;
 use crate::type_checker::get_tests;
 
 mod brainfuck {
@@ -151,7 +152,8 @@ fn test_samples() -> CompilationResult<()> {
     let optimizations = OptimizationSettings::none();
     let content = fs::read_to_string(TEST_FILE)
         .expect("Unable to locate test samples");
-    let tokens = tokenize(TEST_FILE, &content)?;
+    let lexemes = lex(TEST_FILE, &content)?;
+    let tokens = tokenize(lexemes)?;
     let parsed_file = parse_file(TEST_FILE, tokens)?;
     let test_namespace = Reference::with_identifier(TEST_NAMESPACE);
     let (subroutines, tests) = get_tests(&test_namespace, parsed_file, &optimizations)?;
