@@ -209,6 +209,11 @@ impl<S> CompilationException<S> {
             .build("A statement block must be surrounded in curly braces (`{}`) even if it contains a single element.")
     }
 
+    pub fn expected_instruction(source: S) -> Self {
+        ExceptionBuilder::new_expected(source, "instruction")
+            .build_without_hint()
+    }
+
     pub fn expected_definition_colon_or_equal(source: S) -> Self {
         ExceptionBuilder::new_syntax_error(source, format!("Expected `{}` or `{}`", Symbol::Colon, Symbol::Equal))
             .build(format!("Use `{}`, followed by an expression, to initialize the value.", Symbol::Equal))

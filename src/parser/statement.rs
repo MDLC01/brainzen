@@ -64,14 +64,20 @@ impl Construct for Instruction {
             let test = Expression::locate(tokens)?;
             Ok(Self::Capture(test))
         } else {
-            // Assignment
-            let target = AssignmentTarget::locate(tokens)?;
-            tokens.consume(Symbol::Equal)?;
-            let value = Expression::locate(tokens)?;
-            Ok(Self::Assignment(target, value))
+            let location = tokens.location();
+            match AssignmentTarget::locate(tokens) {
+                Ok(target) => {
+                    // Assignment
+                    tokens.consume(Symbol::Equal)?;
+                    let value = Expression::locate(tokens)?;
+                    Ok(Self::Assignment(target, value))
+                }
+                Err(_) => {
+                    // Syntax error
+                    Err(LocatedException::expected_instruction(location))
+                }
+            }
         }
-        // FIXME: In case the syntax is wrong here, the error message will mention assignment
-        //  targets only, which is not ideal.
     }
 }
 
